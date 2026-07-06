@@ -1,7 +1,26 @@
+# Passlib bcrypt compatibility monkeypatch for bcrypt >= 4.0.0
+import sys
+import types
+import bcrypt
+
+# Fake __about__ module
+about = types.ModuleType("bcrypt.__about__")
+about.__version__ = bcrypt.__version__
+sys.modules["bcrypt.__about__"] = about
+bcrypt.__about__ = about
+
+# Patch hashpw to truncate passwords to 72 bytes
+_original_hashpw = bcrypt.hashpw
+def _patched_hashpw(password: bytes, salt: bytes) -> bytes:
+    if len(password) > 72:
+        password = password[:72]
+    return _original_hashpw(password, salt)
+bcrypt.hashpw = _patched_hashpw
+
+from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from typing import Any, Union
 from jose import jwt
-from passlib.context import CryptContext
 from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

@@ -14,7 +14,7 @@ router = APIRouter()
 def get_projects_list(
     category: Optional[str] = None,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
     Get recommended and sanctioned development works (Admin access required).
@@ -25,7 +25,7 @@ def get_projects_list(
 @router.post("/recommend", response_model=List[ProjectOut])
 def run_project_recommendations(
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
     Trigger the AI prioritization model to scan unresolved suggestions, calculate scores,
@@ -39,7 +39,7 @@ def update_project_status(
     id: int,
     project_in: ProjectUpdate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
     Update project details, such as changing status (Proposed, Sanctioned, Completed) (Admin access required).
@@ -47,15 +47,14 @@ def update_project_status(
     project = db.query(ProposedProject).filter(ProposedProject.id == id).first()
     if not project:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Proposed project not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Proposed project not found"
         )
-    
+
     if project_in.status is not None:
-        project.status = project_in.status
+        setattr(project, "status", project_in.status)
     if project_in.estimated_cost is not None:
-        project.estimated_cost = project_in.estimated_cost
-        
+        setattr(project, "estimated_cost", project_in.estimated_cost)
+
     db.commit()
     db.refresh(project)
     return project

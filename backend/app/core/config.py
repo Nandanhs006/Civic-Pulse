@@ -1,6 +1,6 @@
 import os
 from typing import List, Union
-from pydantic import AnyHttpUrl, BeforeValidator
+from pydantic import BeforeValidator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Annotated
 
@@ -8,8 +8,13 @@ from typing_extensions import Annotated
 def parse_cors(v: Union[str, List[str]]) -> List[str]:
     if isinstance(v, str) and not v.startswith("["):
         return [i.strip() for i in v.split(",")]
-    elif isinstance(v, (list, str)):
+    elif isinstance(v, list):
         return v
+    elif isinstance(v, str):
+        import json
+        parsed = json.loads(v)
+        if isinstance(parsed, list):
+            return [str(item) for item in parsed]
     raise ValueError(v)
 
 
@@ -20,14 +25,17 @@ class Settings(BaseSettings):
 
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Civic Pulse - People's Priorities"
-    
+
     # CORS Origins configuration
-    BACKEND_CORS_ORIGINS: Annotated[
-        List[str], BeforeValidator(parse_cors)
-    ] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    BACKEND_CORS_ORIGINS: Annotated[List[str], BeforeValidator(parse_cors)] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
     # Security configuration
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "super-secret-token-key-for-civic-pulse-123456")
+    SECRET_KEY: str = os.getenv(
+        "SECRET_KEY", "super-secret-token-key-for-civic-pulse-123456"
+    )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
 
     # Postgres config
@@ -35,7 +43,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "civic_pulse")
-    
+
     @property
     def DATABASE_URL(self) -> str:
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"

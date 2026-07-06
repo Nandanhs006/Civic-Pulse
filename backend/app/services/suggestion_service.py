@@ -73,9 +73,9 @@ class SuggestionService:
             sentiment=sentiment,
             priority_score=priority_score,
             ward_id=ward_id,
-            status="Submitted"
+            status="Submitted",
         )
-        
+
         db.add(db_suggestion)
         db.commit()
         db.refresh(db_suggestion)
@@ -88,7 +88,7 @@ class SuggestionService:
         status: Optional[str] = None,
         ward_id: Optional[int] = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
     ) -> List[Suggestion]:
         query = db.query(Suggestion)
         if category:
@@ -97,8 +97,10 @@ class SuggestionService:
             query = query.filter(Suggestion.status == status)
         if ward_id:
             query = query.filter(Suggestion.ward_id == ward_id)
-        
-        return query.order_by(Suggestion.created_at.desc()).offset(skip).limit(limit).all()
+
+        return (
+            query.order_by(Suggestion.created_at.desc()).offset(skip).limit(limit).all()
+        )
 
 
 suggestion_service = SuggestionService()

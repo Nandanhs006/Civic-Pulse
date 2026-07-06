@@ -22,7 +22,7 @@ app = FastAPI(
     version="1.0.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # CORS middleware
@@ -39,35 +39,28 @@ os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")
 
 # Mount Routers
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Auth"])
 app.include_router(
-    auth.router, 
-    prefix=f"{settings.API_V1_STR}/auth", 
-    tags=["Auth"]
-)
-app.include_router(
-    suggestions.router, 
-    prefix=f"{settings.API_V1_STR}/suggestions", 
+    suggestions.router,
+    prefix=f"{settings.API_V1_STR}/suggestions",
     tags=["Suggestions"],
-    dependencies=[Depends(check_rate_limit)]
+    dependencies=[Depends(check_rate_limit)],
 )
 app.include_router(
-    projects.router, 
-    prefix=f"{settings.API_V1_STR}/projects", 
-    tags=["Projects"]
+    projects.router, prefix=f"{settings.API_V1_STR}/projects", tags=["Projects"]
 )
 app.include_router(
-    analytics.router, 
-    prefix=f"{settings.API_V1_STR}/analytics", 
-    tags=["Analytics"]
+    analytics.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics"]
 )
 
 
 # Prometheus Instrumentation
+Instrumentator().instrument(app).expose(app)
+
+
 @app.on_event("startup")
 async def startup_event():
-    # Initialize metrics exporter
-    Instrumentator().instrument(app).expose(app)
-    
+
     # Seed Wards & Administrative User if database is empty
     db = SessionLocal()
     try:
@@ -79,11 +72,13 @@ async def startup_event():
                 hashed_password=get_password_hash("admin123"),
                 full_name="Constituency MP Administrator",
                 is_active=True,
-                is_admin=True
+                is_admin=True,
             )
             db.add(admin_user)
-            print("[Seed] Created default administrator: admin@civicpulse.gov / admin123")
-            
+            print(
+                "[Seed] Created default administrator: admin@civicpulse.gov / admin123"
+            )
+
         # 2. Seed Wards
         if db.query(Ward).count() == 0:
             mock_wards = [
@@ -93,7 +88,11 @@ async def startup_event():
                     population=15200,
                     area_sq_km=2.45,
                     demographics={"literacy_rate": 84.5, "income_tier": "Medium"},
-                    infrastructure_gaps={"school_ratio_deficit": 0.15, "water_supply_hrs": 14.5, "pothole_index": 4.2}
+                    infrastructure_gaps={
+                        "school_ratio_deficit": 0.15,
+                        "water_supply_hrs": 14.5,
+                        "pothole_index": 4.2,
+                    },
                 ),
                 Ward(
                     id=2,
@@ -101,7 +100,11 @@ async def startup_event():
                     population=22400,
                     area_sq_km=4.12,
                     demographics={"literacy_rate": 62.0, "income_tier": "Low"},
-                    infrastructure_gaps={"school_ratio_deficit": 0.45, "water_supply_hrs": 4.0, "pothole_index": 7.8}
+                    infrastructure_gaps={
+                        "school_ratio_deficit": 0.45,
+                        "water_supply_hrs": 4.0,
+                        "pothole_index": 7.8,
+                    },
                 ),
                 Ward(
                     id=3,
@@ -109,7 +112,11 @@ async def startup_event():
                     population=12800,
                     area_sq_km=6.80,
                     demographics={"literacy_rate": 71.2, "income_tier": "Low-Medium"},
-                    infrastructure_gaps={"school_ratio_deficit": 0.30, "water_supply_hrs": 8.0, "pothole_index": 5.5}
+                    infrastructure_gaps={
+                        "school_ratio_deficit": 0.30,
+                        "water_supply_hrs": 8.0,
+                        "pothole_index": 5.5,
+                    },
                 ),
                 Ward(
                     id=4,
@@ -117,8 +124,12 @@ async def startup_event():
                     population=18500,
                     area_sq_km=3.10,
                     demographics={"literacy_rate": 92.1, "income_tier": "High"},
-                    infrastructure_gaps={"school_ratio_deficit": 0.05, "water_supply_hrs": 24.0, "pothole_index": 2.1}
-                )
+                    infrastructure_gaps={
+                        "school_ratio_deficit": 0.05,
+                        "water_supply_hrs": 24.0,
+                        "pothole_index": 2.1,
+                    },
+                ),
             ]
             db.add_all(mock_wards)
             db.commit()

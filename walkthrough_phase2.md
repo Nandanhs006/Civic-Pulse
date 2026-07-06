@@ -1,9 +1,24 @@
 # Walkthrough: Phase 2 Implementation Complete
 *Continuous Integration & Spinnaker Continuous Delivery*
 
-We have successfully implemented **Phase 2: CI/CD & Production Cloud Deployment** for the Civic Pulse project directly inside your VS Code workspace directory `/Volumes/DiskD/Civicpulse/Civic-Pulse/`.
+We have successfully implemented and verified **Phase 2: CI/CD & Production Cloud Deployment** for the Civic Pulse project directly inside your VS Code workspace directory `/Volumes/DiskD/Civicpulse/Civic-Pulse/`.
 
-This setup implements automated linting, type safety compilation checks, and test suites triggered by GitHub Actions, combined with Helm-packaged Kubernetes templates designed for Spinnaker CD pipelines.
+This setup implements automated linting, type safety compilation checks, and test suites triggered by GitHub Actions, combined with Helm-packaged Kubernetes templates designed for Spinnaker CD pipelines. All python tests and linting check metrics compile green on the host machine.
+
+---
+
+## Technical Troubleshooting & Fixes Applied
+
+To ensure compatibility with modern environments (including Python 3.14 on macOS), several critical fixes were resolved and implemented:
+1. **Passlib & Bcrypt Version Compatibility**:
+   - *Problem*: Modern `bcrypt >= 4.0.0` packages throw a `ValueError` on passwords exceeding 72 bytes, which crashes the older `passlib` context setup during internal startup checks.
+   - *Solution*: Wrote a custom monkeypatch in [security.py](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/backend/app/core/security.py) to intercept `bcrypt.hashpw`, truncate passwords to 72 bytes if necessary, and mock the deprecated `bcrypt.__about__` versions.
+2. **SQLAlchemy & Python 3.14**:
+   - *Problem*: `sqlalchemy==2.0.30` raises a `TypeError` when evaluating symbol line numbers on Python 3.14.
+   - *Solution*: Upgraded dependency targets in [requirements.txt](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/backend/requirements.txt) to `sqlalchemy==2.0.51`.
+3. **psycopg2-binary Build Error**:
+   - *Problem*: `psycopg2-binary==2.9.9` lacks pre-compiled wheels for Python 3.14 on Apple Silicon, requiring pg_config compilations that fail locally.
+   - *Solution*: Upgraded package requirement targets to `psycopg2-binary==2.9.12` which supports macOS Python 3.14 wheels natively.
 
 ---
 
@@ -14,14 +29,14 @@ We created a workflow file [.github/workflows/ci.yml](file:///Volumes/DiskD/Civi
 * **Backend Quality Checks**:
   - Python Environment setup (cached dependencies).
   - Code formatting check with `black`.
-  - Style guide compliance check with `flake8`.
+  - Style guide compliance check with `flake8` (using black-compatible rules in [.flake8](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/.flake8)).
   - Static type safety verification with `mypy`.
   - Executes API and logic tests with `pytest`.
 * **Frontend Quality Checks**:
   - Node.js environment setup (cached packages).
   - Web compliance check with `eslint`.
   - TypeScript compilation check with `tsc --noEmit`.
-  - Executes unit component tests with `vitest`.
+  - Executes unit component tests with `vitest` (configured template in [App.test.tsx](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/frontend/src/App.test.tsx)).
 
 ### 2. Continuous Delivery (GitHub Actions CD)
 We created a deployment workflow [.github/workflows/cd.yml](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/.github/workflows/cd.yml) that triggers on every merge/push to `main` (after CI succeeds):
@@ -46,24 +61,19 @@ We created a modular Helm chart layout inside `/charts/civic-pulse`:
 
 ---
 
-## Created Files Directory (Phase 2)
+## Running Verification Locally
 
-* [.github/workflows/ci.yml](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/.github/workflows/ci.yml)
-* [.github/workflows/cd.yml](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/.github/workflows/cd.yml)
-* [spinnaker/pipeline.json](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/spinnaker/pipeline.json)
-* [charts/civic-pulse/Chart.yaml](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/charts/civic-pulse/Chart.yaml)
-* [charts/civic-pulse/values.yaml](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/charts/civic-pulse/values.yaml)
-* [charts/civic-pulse/templates/backend-deployment.yaml](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/charts/civic-pulse/templates/backend-deployment.yaml)
-* [charts/civic-pulse/templates/backend-service.yaml](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/charts/civic-pulse/templates/backend-service.yaml)
-* [charts/civic-pulse/templates/frontend-deployment.yaml](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/charts/civic-pulse/templates/frontend-deployment.yaml)
-* [charts/civic-pulse/templates/frontend-service.yaml](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/charts/civic-pulse/templates/frontend-service.yaml)
-
----
-
-## Verifying Helm Configurations
-
-Verify that your Helm templates compile and render properly before deploying them via Spinnaker:
+### 1. Execute Backend Tests
+Ensure your python virtual environment is initialized at the root folder level, then run pytest:
 ```bash
-helm template civic-pulse ./charts/civic-pulse
+POSTGRES_PASSWORD="" PYTHONPATH=backend ./venv/bin/pytest backend/tests
 ```
-This prints the interpolated Kubernetes manifests, ensuring values bindings and structural indentation are correct.
+*(Runs SQLite in-memory, passing all checks).*
+
+### 2. Verify Linting and Typing
+```bash
+./venv/bin/black --check backend/app backend/tests
+./venv/bin/flake8 backend/app backend/tests
+./venv/bin/mypy backend/app --ignore-missing-imports
+```
+*(Successfully completes checks with zero warnings).*

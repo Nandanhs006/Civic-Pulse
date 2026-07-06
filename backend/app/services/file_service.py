@@ -13,7 +13,9 @@ class FileService:
         os.makedirs(target_dir, exist_ok=True)
 
         # Generate unique filename
-        file_ext = os.path.splitext(upload_file.filename)[1] if upload_file.filename else ""
+        file_ext = (
+            os.path.splitext(upload_file.filename)[1] if upload_file.filename else ""
+        )
         unique_filename = f"{uuid.uuid4()}{file_ext}"
         file_path = os.path.join(target_dir, unique_filename)
 

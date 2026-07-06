@@ -12,22 +12,22 @@ router = APIRouter()
 
 @router.post("/login", response_model=Token)
 def login_access_token(
-    db: Session = Depends(deps.get_db),
-    form_data: OAuth2PasswordRequestForm = Depends()
+    db: Session = Depends(deps.get_db), form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
     """
     OAuth2 compatible token login, retrieve a JWT access token.
     """
     user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not security.verify_password(form_data.password, user.hashed_password):
+    if not user or not security.verify_password(
+        form_data.password, str(user.hashed_password)
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incorrect email or password"
+            detail="Incorrect email or password",
         )
     elif not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
         )
     return {
         "access_token": security.create_access_token(subject=user.email),
@@ -36,10 +36,7 @@ def login_access_token(
 
 
 @router.post("/register", response_model=UserOut)
-def register_user(
-    user_in: UserCreate,
-    db: Session = Depends(deps.get_db)
-) -> Any:
+def register_user(user_in: UserCreate, db: Session = Depends(deps.get_db)) -> Any:
     """
     Register a new administrative/MP account.
     """
@@ -47,7 +44,7 @@ def register_user(
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email already exists."
+            detail="User with this email already exists.",
         )
     hashed_password = security.get_password_hash(user_in.password)
     db_user = User(
@@ -55,7 +52,7 @@ def register_user(
         hashed_password=hashed_password,
         full_name=user_in.full_name,
         is_active=True,
-        is_admin=user_in.is_admin
+        is_admin=user_in.is_admin,
     )
     db.add(db_user)
     db.commit()
@@ -64,9 +61,7 @@ def register_user(
 
 
 @router.get("/me", response_model=UserOut)
-def read_user_me(
-    current_user: User = Depends(deps.get_current_user)
-) -> Any:
+def read_user_me(current_user: User = Depends(deps.get_current_user)) -> Any:
     """
     Retrieve current logged-in user profile details.
     """

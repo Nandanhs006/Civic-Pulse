@@ -5,8 +5,8 @@ def test_register_user(client):
             "email": "testuser@civicpulse.gov",
             "password": "testpassword123",
             "full_name": "Test Administrator",
-            "is_admin": True
-        }
+            "is_admin": True,
+        },
     )
     assert response.status_code == 200
     data = response.json()
@@ -22,17 +22,14 @@ def test_login_user(client):
         json={
             "email": "loginuser@civicpulse.gov",
             "password": "loginpassword123",
-            "full_name": "Login User"
-        }
+            "full_name": "Login User",
+        },
     )
-    
+
     # Login
     response = client.post(
         "/api/v1/auth/login",
-        data={
-            "username": "loginuser@civicpulse.gov",
-            "password": "loginpassword123"
-        }
+        data={"username": "loginuser@civicpulse.gov", "password": "loginpassword123"},
     )
     assert response.status_code == 200
     data = response.json()

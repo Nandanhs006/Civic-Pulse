@@ -1,0 +1,41 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# IDEs and OS files
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Node / Vite dependencies and builds
+node_modules/
+dist/
+dist-ssr/
+*.local
+.eslintcache
+
+# Testing & Cache directories
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Databases
+*.db
+*.sqlite3
+
+# Local uploads and data
+backend/uploads/
+uploads/

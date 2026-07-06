@@ -15,6 +15,27 @@ Civic Pulse is an enterprise-ready, multilingual civic engagement and decision-s
 
 ---
 
+## System Architecture (MVP Flow)
+
+The following diagram illustrates how the Phase 1 local MVP orchestrates requests and runs priorities:
+
+```mermaid
+graph TD
+    Citizen[Citizen Web Client] -->|1. Submit Voice/Text/Photo| FastAPI[FastAPI Backend app.main]
+    FastAPI -->|2. Redis Rate Check / Local Fallback| RateLimit[Rate Limit Middleware]
+    FastAPI -->|3. Audio / Text Analysis| AIService[AI Processing Service]
+    FastAPI -->|4. Save Uploaded Files| FileService[File Upload Service]
+    FastAPI -->|5. Dynamic Priority Ranking| ProjectService[Project Ranking Service]
+    
+    FastAPI -->|6. Data Persistency| DB[(PostgreSQL / SQLite fallback)]
+    FastAPI -->|7. Export Metrics| Prometheus[Prometheus Exporter]
+    
+    Admin[MP/Admin Dashboard] -->|8. Query Map & Analytics| FastAPI
+    Prometheus -->|9. Scrape Metrics| Grafana[Grafana Dashboard]
+```
+
+---
+
 ## Phase 1: Architecture & Directory Structure
 
 ```

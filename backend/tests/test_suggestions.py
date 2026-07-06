@@ -8,8 +8,8 @@ def test_submit_text_suggestion(client):
             "content": "Road water leakage near city hall.",
             "citizen_phone": "9876543210",
             "latitude": "27.7172",
-            "longitude": "85.3240"
-        }
+            "longitude": "85.3240",
+        },
     )
     assert response.status_code == 201
     data = response.json()
@@ -27,11 +27,9 @@ def test_submit_audio_suggestion(client):
         data={
             "citizen_phone": "9876543210",
             "latitude": "27.7172",
-            "longitude": "85.3240"
+            "longitude": "85.3240",
         },
-        files={
-            "audio": ("mock_recording.wav", audio_data, "audio/wav")
-        }
+        files={"audio": ("mock_recording.wav", audio_data, "audio/wav")},
     )
     assert response.status_code == 201
     data = response.json()

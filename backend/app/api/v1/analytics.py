@@ -33,14 +33,16 @@ def get_analytics_summary(db: Session = Depends(deps.get_db)) -> Any:
         .group_by(Suggestion.sentiment)
         .all()
     )
-    sentiment_distribution = {sent: count for sent, count in sentiment_data if sent is not None}
+    sentiment_distribution = {
+        sent: count for sent, count in sentiment_data if sent is not None
+    }
 
     # Unresolved percentage
-    unresolved_count = db.query(Suggestion).filter(Suggestion.status == "Submitted").count()
+    unresolved_count = (
+        db.query(Suggestion).filter(Suggestion.status == "Submitted").count()
+    )
     unresolved_percentage = (
-        (unresolved_count / total_suggestions * 100.0)
-        if total_suggestions > 0
-        else 0.0
+        (unresolved_count / total_suggestions * 100.0) if total_suggestions > 0 else 0.0
     )
 
     return {

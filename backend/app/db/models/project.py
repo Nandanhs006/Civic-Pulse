@@ -15,5 +15,7 @@ class ProposedProject(Base):
     priority_score = Column(Integer, nullable=False)
     supporting_suggestions_count = Column(Integer, default=0)
     ai_justification = Column(Text)
-    status = Column(String(30), default="Proposed") # "Proposed", "Sanctioned", "Work In Progress", "Completed"
+    status = Column(
+        String(30), default="Proposed"
+    )  # "Proposed", "Sanctioned", "Work In Progress", "Completed"
     created_at = Column(DateTime(timezone=True), server_default=func.now())

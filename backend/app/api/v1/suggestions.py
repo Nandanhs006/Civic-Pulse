@@ -19,7 +19,7 @@ def submit_suggestion(
     language_code: str = Form("en"),
     audio: Optional[UploadFile] = File(None),
     image: Optional[UploadFile] = File(None),
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
 ) -> Any:
     """
     Submit a citizen developmental suggestion.
@@ -28,9 +28,9 @@ def submit_suggestion(
     if not content and not audio:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Either text content or audio voice recording must be provided."
+            detail="Either text content or audio voice recording must be provided.",
         )
-    
+
     db_suggestion = suggestion_service.create_suggestion(
         db=db,
         content=content,
@@ -39,7 +39,7 @@ def submit_suggestion(
         latitude=latitude,
         longitude=longitude,
         audio_file=audio,
-        image_file=image
+        image_file=image,
     )
     return db_suggestion
 
@@ -52,18 +52,13 @@ def get_suggestions_list(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
     Retrieve list of citizen suggestions (Admin access required).
     """
     return suggestion_service.get_suggestions(
-        db=db,
-        category=category,
-        status=status,
-        ward_id=ward_id,
-        skip=skip,
-        limit=limit
+        db=db, category=category, status=status, ward_id=ward_id, skip=skip, limit=limit
     )
 
 
@@ -71,7 +66,7 @@ def get_suggestions_list(
 def read_suggestion(
     id: str,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
     Get suggestion details by ID (Admin access required).
@@ -79,7 +74,6 @@ def read_suggestion(
     suggestion = db.query(Suggestion).filter(Suggestion.id == id).first()
     if not suggestion:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Suggestion not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found"
         )
     return suggestion
