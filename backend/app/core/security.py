@@ -5,16 +5,20 @@ import bcrypt
 
 # Fake __about__ module
 about = types.ModuleType("bcrypt.__about__")
-about.__version__ = bcrypt.__version__
+about.__version__ = bcrypt.__version__  # type: ignore
 sys.modules["bcrypt.__about__"] = about
-bcrypt.__about__ = about
+bcrypt.__about__ = about  # type: ignore
 
 # Patch hashpw to truncate passwords to 72 bytes
 _original_hashpw = bcrypt.hashpw
+
+
 def _patched_hashpw(password: bytes, salt: bytes) -> bytes:
     if len(password) > 72:
         password = password[:72]
     return _original_hashpw(password, salt)
+
+
 bcrypt.hashpw = _patched_hashpw
 
 from passlib.context import CryptContext

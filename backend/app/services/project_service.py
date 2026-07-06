@@ -7,29 +7,28 @@ from app.db.models.suggestion import Suggestion
 
 
 class ProjectService:
-    @staticmethod
-    def get_projects(
-        db: Session, category: Optional[str] = None
-    ) -> List[ProposedProject]:
-        query = db.query(ProposedProject)
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_projects(self, category: Optional[str] = None) -> List[ProposedProject]:
+        query = self.db.query(ProposedProject)
         if category:
             query = query.filter(ProposedProject.category == category)
         return query.order_by(ProposedProject.priority_score.desc()).all()
 
-    @staticmethod
-    def generate_recommendations(db: Session) -> List[ProposedProject]:
+    def generate_recommendations(self) -> List[ProposedProject]:
         """
         AI-assisted recommendation algorithm to generate and prioritize public projects
         based on citizen request density, infrastructure gap database, and ward sizes.
         """
         # Step 1: Query all wards and current unresolved suggestions count
-        wards = db.query(Ward).all()
+        wards = self.db.query(Ward).all()
         if not wards:
             return []
 
         # Count suggestions by ward and category
         suggestion_counts = (
-            db.query(
+            self.db.query(
                 Suggestion.ward_id,
                 Suggestion.category,
                 func.count(Suggestion.id).label("total_count"),
@@ -63,7 +62,9 @@ class ProjectService:
         for ward in wards:
             ward_id = int(ward.id)
             ward_counts = counts_map.get(ward_id, {})
-            infra_gaps: Dict[str, Any] = cast(Dict[str, Any], ward.infrastructure_gaps or {})
+            infra_gaps: Dict[str, Any] = cast(
+                Dict[str, Any], ward.infrastructure_gaps or {}
+            )
 
             for category in categories:
                 # Calculate Suggestion Density
@@ -75,10 +76,8 @@ class ProjectService:
                 suggestion_density = (sug_count / area) * 10.0  # scale factor
 
                 # Fetch category infrastructure gap index (scale 0 to 10)
-                # e.g., "water_supply_hrs" or "school_deficit"
                 infra_gap_index = 0.0
                 if category == "Water":
-                    # deficit if daily water supply hours is low
                     hrs = float(infra_gaps.get("water_supply_hrs", 12))
                     infra_gap_index = max(0.0, (24.0 - hrs) / 2.4)
                 elif category == "Roads":
@@ -94,7 +93,6 @@ class ProjectService:
                 pop_score = min(float(ward.population) / 10000.0, 10.0)
 
                 # Prioritization formula: P = w1 * suggestion_density + w2 * gap + w3 * pop
-                # Weights: w1=0.4, w2=0.4, w3=0.2
                 priority_score = int(
                     (0.4 * suggestion_density)
                     + (0.4 * infra_gap_index * 10)
@@ -120,7 +118,7 @@ class ProjectService:
 
                 # Check if this recommendation already exists to avoid duplicates
                 existing = (
-                    db.query(ProposedProject)
+                    self.db.query(ProposedProject)
                     .filter(
                         ProposedProject.title == title,
                         ProposedProject.status == "Proposed",
@@ -140,13 +138,10 @@ class ProjectService:
                         ai_justification=justification,
                         status="Proposed",
                     )
-                    db.add(new_proj)
+                    self.db.add(new_proj)
                     recommendations.append(new_proj)
 
         if recommendations:
-            db.commit()
+            self.db.commit()
 
         return recommendations
-
-
-project_service = ProjectService()

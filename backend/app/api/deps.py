@@ -8,6 +8,8 @@ from app.core.config import settings
 from app.core.security import ALGORITHM
 from app.db.models.user import User
 from app.schemas import TokenData
+from app.services.suggestion_service import SuggestionService
+from app.services.project_service import ProjectService
 
 reusable_oauth2 = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
@@ -37,3 +39,11 @@ def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return user
+
+
+def get_suggestion_service(db: Session = Depends(get_db)) -> SuggestionService:
+    return SuggestionService(db)
+
+
+def get_project_service(db: Session = Depends(get_db)) -> ProjectService:
+    return ProjectService(db)

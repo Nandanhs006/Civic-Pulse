@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile, s
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.schemas import SuggestionOut
-from app.services.suggestion_service import suggestion_service
+from app.services.suggestion_service import SuggestionService
 from app.db.models.suggestion import Suggestion
 from app.db.models.user import User
 
@@ -19,7 +19,7 @@ def submit_suggestion(
     language_code: str = Form("en"),
     audio: Optional[UploadFile] = File(None),
     image: Optional[UploadFile] = File(None),
-    db: Session = Depends(deps.get_db),
+    service: SuggestionService = Depends(deps.get_suggestion_service),
 ) -> Any:
     """
     Submit a citizen developmental suggestion.
@@ -31,8 +31,7 @@ def submit_suggestion(
             detail="Either text content or audio voice recording must be provided.",
         )
 
-    db_suggestion = suggestion_service.create_suggestion(
-        db=db,
+    db_suggestion = service.create_suggestion(
         content=content,
         citizen_phone=citizen_phone,
         language_code=language_code,
@@ -51,14 +50,18 @@ def get_suggestions_list(
     ward_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(deps.get_db),
+    service: SuggestionService = Depends(deps.get_suggestion_service),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
     Retrieve list of citizen suggestions (Admin access required).
     """
-    return suggestion_service.get_suggestions(
-        db=db, category=category, status=status, ward_id=ward_id, skip=skip, limit=limit
+    return service.get_suggestions(
+        category=category,
+        status=status,
+        ward_id=ward_id,
+        skip=skip,
+        limit=limit,
     )
 
 

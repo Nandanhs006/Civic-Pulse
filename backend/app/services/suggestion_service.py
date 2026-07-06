@@ -8,9 +8,11 @@ from app.services.ai_service import ai_service
 
 
 class SuggestionService:
-    @staticmethod
+    def __init__(self, db: Session):
+        self.db = db
+
     def create_suggestion(
-        db: Session,
+        self,
         content: Optional[str] = None,
         citizen_phone: Optional[str] = None,
         language_code: str = "en",
@@ -51,11 +53,9 @@ class SuggestionService:
         ward_id = None
         if latitude is not None and longitude is not None:
             # Simple check: query wards and map to closest coordinate or simple lat/long bounding logic
-            wards = db.query(Ward).all()
+            wards = self.db.query(Ward).all()
             if wards:
                 # Fallback: assign to the first ward, or calculate a mock ward mapping
-                # In real app, we would run a PostGIS query
-                # Let's map dynamically: split lat/long values
                 ward_index = int((abs(latitude) + abs(longitude)) * 100) % len(wards)
                 ward_id = wards[ward_index].id
 
@@ -76,21 +76,20 @@ class SuggestionService:
             status="Submitted",
         )
 
-        db.add(db_suggestion)
-        db.commit()
-        db.refresh(db_suggestion)
+        self.db.add(db_suggestion)
+        self.db.commit()
+        self.db.refresh(db_suggestion)
         return db_suggestion
 
-    @staticmethod
     def get_suggestions(
-        db: Session,
+        self,
         category: Optional[str] = None,
         status: Optional[str] = None,
         ward_id: Optional[int] = None,
         skip: int = 0,
         limit: int = 100,
     ) -> List[Suggestion]:
-        query = db.query(Suggestion)
+        query = self.db.query(Suggestion)
         if category:
             query = query.filter(Suggestion.category == category)
         if status:
@@ -101,6 +100,3 @@ class SuggestionService:
         return (
             query.order_by(Suggestion.created_at.desc()).offset(skip).limit(limit).all()
         )
-
-
-suggestion_service = SuggestionService()

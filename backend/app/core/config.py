@@ -12,6 +12,7 @@ def parse_cors(v: Union[str, List[str]]) -> List[str]:
         return v
     elif isinstance(v, str):
         import json
+
         parsed = json.loads(v)
         if isinstance(parsed, list):
             return [str(item) for item in parsed]
