@@ -20,18 +20,52 @@ Civic Pulse is an enterprise-ready, multilingual civic engagement and decision-s
 The following diagram illustrates how the Phase 1 local MVP orchestrates requests and runs priorities:
 
 ```mermaid
-graph TD
-    Citizen[Citizen Web Client] -->|1. Submit Voice/Text/Photo| FastAPI[FastAPI Backend app.main]
-    FastAPI -->|2. Redis Rate Check / Local Fallback| RateLimit[Rate Limit Middleware]
-    FastAPI -->|3. Audio / Text Analysis| AIService[AI Processing Service]
-    FastAPI -->|4. Save Uploaded Files| FileService[File Upload Service]
-    FastAPI -->|5. Dynamic Priority Ranking| ProjectService[Project Ranking Service]
+graph TB
+    subgraph Client Layer
+        Citizen["Citizen Portal <br/> (Voice/Text/Photo)"]
+        Admin["MP Admin Dashboard <br/> (Priority Map & Analytics)"]
+    end
+
+    subgraph Gateway & Middleware
+        Nginx["Nginx Reverse Proxy"]
+        Limiter["Rate Limiting Middleware <br/> (Redis Token Bucket)"]
+    end
+
+    subgraph FastAPI Core Application
+        API["API Endpoints <br/> (app/api/v1)"]
+        AIService["AI Service <br/> (Whisper & NLP Tagging)"]
+        FileService["File Service <br/> (Disk/S3 Uploads)"]
+        ProjService["Project Service <br/> (Prioritization Scoring)"]
+    end
+
+    subgraph Data & Storage Layer
+        DB[("PostgreSQL Database <br/> (with SQLite fallback)")]
+        Storage[("Local Storage <br/> (/uploads directory)")]
+        Cache[("Redis Cache")]
+    end
+
+    subgraph Observability
+        Prom["Prometheus Metrics"]
+        Grafana["Grafana Dashboards"]
+    end
+
+    %% Routing connections
+    Citizen -->|HTTP Requests| Nginx
+    Admin -->|API Requests & JWT Auth| Nginx
     
-    FastAPI -->|6. Data Persistency| DB[(PostgreSQL / SQLite fallback)]
-    FastAPI -->|7. Export Metrics| Prometheus[Prometheus Exporter]
+    Nginx -->|Route Request| API
+    API -->|1. Check Limits| Limiter
+    Limiter -->|Query / Increment| Cache
     
-    Admin[MP/Admin Dashboard] -->|8. Query Map & Analytics| FastAPI
-    Prometheus -->|9. Scrape Metrics| Grafana[Grafana Dashboard]
+    API -->|2. Ingest Suggestion| ProjService
+    ProjService -->|Triggers Translation/Transcription| AIService
+    ProjService -->|Saves Media Attachments| FileService
+    
+    FileService -->|Writes Files| Storage
+    API -->|Read/Write Records| DB
+    
+    API -->|Metrics Output| Prom
+    Prom -->|Scrape / Query| Grafana
 ```
 
 ---
