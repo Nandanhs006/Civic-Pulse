@@ -4,6 +4,7 @@ const en = {
   // Brand / nav
   'brand.tagline': "Bharat · People's Priorities",
   'nav.portal': 'Citizen Portal',
+  'nav.participate': 'Participate',
   'nav.myConstituency': 'My Constituency',
   'nav.pmoCommand': 'PMO Command',
   'nav.staffLogin': 'Staff Login',

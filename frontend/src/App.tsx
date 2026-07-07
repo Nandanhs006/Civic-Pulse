@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Pmo from './pages/Pmo';
 import LiveMap from './pages/LiveMap';
+import Participate from './pages/Participate';
 import RequireRole from './components/common/RequireRole';
 import { useIsMobile } from './hooks/useIsMobile';
 
@@ -56,6 +57,7 @@ const App: React.FC = () => (
     />
     {/* Live map keeps the app navbar; the map fills the rest of the screen */}
     <Route path="/map" element={<MapLayout />} />
+    <Route path="/participate" element={<Layout><Participate /></Layout>} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 );
