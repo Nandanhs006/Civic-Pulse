@@ -10,6 +10,20 @@ jobs:
   backend-qa:
     name: Backend Lint, Type Check & Test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: civic_pulse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v3
 
@@ -34,6 +48,11 @@ jobs:
         run: mypy backend/app --ignore-missing-imports
 
       - name: Run Pytest suite
+        env:
+          POSTGRES_SERVER: localhost
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: civic_pulse
         run: |
           cd backend
           pytest

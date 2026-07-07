@@ -182,7 +182,7 @@ def ingest(rows: List[Dict]) -> None:
     matched_pc = 0
     try:
         # Cache PC name -> id for parent linkage.
-        pc_map = {norm(c.name): c.id for c in db.query(Constituency).all()}
+        pc_map = {norm(str(c.name)): c.id for c in db.query(Constituency).all()}
         for row in rows:
             name = row["name"].strip()
             existing_ac = (

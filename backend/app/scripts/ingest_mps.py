@@ -318,7 +318,7 @@ def ingest(members: List[Dict]) -> None:
                 created_m += 1
             elif photo and not mp.photo_url:
                 # Backfill a photo that was missing on a previous run.
-                mp.photo_url = photo
+                mp.photo_url = photo  # type: ignore[assignment]
 
             # One pre-seeded login per constituency (idempotent by constituency).
             existing_mp_user = (
@@ -360,7 +360,7 @@ def ingest(members: List[Dict]) -> None:
         # Promote the legacy seed admin to PMO role too.
         legacy = db.query(User).filter(User.email == "admin@civicpulse.gov").first()
         if legacy:
-            legacy.role = "pmo"
+            legacy.role = "pmo"  # type: ignore[assignment]
 
         db.commit()
         total_photos = db.query(MP).filter(MP.photo_url.isnot(None)).count()
