@@ -88,7 +88,6 @@ const ConstituencyPicker: React.FC<ConstituencyPickerProps> = ({ value, onChange
     if (found) onChange(found);
     setPendingId(null);
     setPendingHints(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingId, pendingHints, constituencies]);
 
   const labelStyle: React.CSSProperties = {
