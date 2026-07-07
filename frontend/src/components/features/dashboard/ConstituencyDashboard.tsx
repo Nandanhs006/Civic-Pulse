@@ -69,7 +69,6 @@ const ConstituencyDashboard: React.FC<ConstituencyDashboardProps> = ({ constitue
       setLoading(false);
       setRefreshing(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [constituencyId]);
 
   useEffect(() => {
