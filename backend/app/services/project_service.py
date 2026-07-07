@@ -51,9 +51,9 @@ class ProjectService:
                 Suggestion.category,
                 func.count(Suggestion.id).label("total"),
                 func.avg(Suggestion.priority_score).label("avg_priority"),
-                func.sum(
-                    case((Suggestion.sentiment == "Negative", 1), else_=0)
-                ).label("negatives"),
+                func.sum(case((Suggestion.sentiment == "Negative", 1), else_=0)).label(
+                    "negatives"
+                ),
             )
             .filter(Suggestion.status == "Submitted")
             .filter(Suggestion.constituency_id.isnot(None))

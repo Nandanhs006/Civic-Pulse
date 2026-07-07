@@ -10,7 +10,11 @@ class MP(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     constituency_id = Column(
-        Integer, ForeignKey("constituencies.id"), unique=True, nullable=False, index=True
+        Integer,
+        ForeignKey("constituencies.id"),
+        unique=True,
+        nullable=False,
+        index=True,
     )
     name = Column(String(150), nullable=False, index=True)
     party = Column(String(150))

@@ -51,16 +51,18 @@ def _to_out(mp: MP, cname: Optional[str], maps) -> MPOut:
     resolved = total - pending
     pct = (pending / total * 100.0) if total else 0.0
     return MPOut(
-        id=mp.id,
-        constituency_id=mp.constituency_id,
+        id=int(mp.id),
+        constituency_id=(
+            int(mp.constituency_id) if mp.constituency_id is not None else None
+        ),
         constituency_name=cname,
-        name=mp.name,
-        party=mp.party,
-        party_abbr=mp.party_abbr,
-        state=mp.state,
-        photo_url=mp.photo_url,
-        email=mp.email,
-        wikipedia_url=mp.wikipedia_url,
+        name=str(mp.name),
+        party=str(mp.party) if mp.party is not None else None,
+        party_abbr=str(mp.party_abbr) if mp.party_abbr is not None else None,
+        state=str(mp.state) if mp.state is not None else None,
+        photo_url=str(mp.photo_url) if mp.photo_url is not None else None,
+        email=str(mp.email) if mp.email is not None else None,
+        wikipedia_url=str(mp.wikipedia_url) if mp.wikipedia_url is not None else None,
         total_suggestions=total,
         resolved_suggestions=resolved,
         pending_suggestions=pending,
@@ -77,9 +79,8 @@ def list_mps(
 ) -> Any:
     """All MPs with progress metrics for the PMO command center (PMO only)."""
     maps = _metrics_maps(db)
-    q = (
-        db.query(MP, Constituency.name)
-        .join(Constituency, MP.constituency_id == Constituency.id)
+    q = db.query(MP, Constituency.name).join(
+        Constituency, MP.constituency_id == Constituency.id
     )
     if state:
         q = q.filter(MP.state == state)
@@ -96,9 +97,5 @@ def get_mp(constituency_id: int, db: Session = Depends(deps.get_db)) -> Any:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No MP found for this constituency",
         )
-    c = (
-        db.query(Constituency)
-        .filter(Constituency.id == constituency_id)
-        .first()
-    )
-    return _to_out(mp, c.name if c else None, _metrics_maps(db))
+    c = db.query(Constituency).filter(Constituency.id == constituency_id).first()
+    return _to_out(mp, c.name if c else None, _metrics_maps(db))  # type: ignore

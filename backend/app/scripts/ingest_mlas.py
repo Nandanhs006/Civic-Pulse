@@ -10,6 +10,7 @@ Seeds AssemblyConstituency, MLA, and a role-based CivicOfficial per AC
 (BBMP / Greater Bengaluru Authority for Bengaluru urban ACs; generic elsewhere).
 Idempotent. Run:  python -m app.scripts.ingest_mlas
 """
+
 import csv
 import json
 import os
@@ -130,7 +131,9 @@ def fetch_mla_map(names: List[str]) -> Dict[str, Dict[str, str]]:
                 continue
             for page in data.get("query", {}).get("pages", []):
                 title = page.get("title", "")
-                key = norm(re.sub(r"\s*Assembly constituency\s*$", "", title, flags=re.I))
+                key = norm(
+                    re.sub(r"\s*Assembly constituency\s*$", "", title, flags=re.I)
+                )
                 try:
                     content = page["revisions"][0]["slots"]["main"]["content"]
                 except (KeyError, IndexError):
@@ -207,9 +210,12 @@ def ingest(rows: List[Dict]) -> None:
                 created_ac += 1
 
             mla_name = (row.get("mla") or "").strip()
-            if mla_name and not db.query(MLA).filter(
-                MLA.assembly_constituency_id == existing_ac.id
-            ).first():
+            if (
+                mla_name
+                and not db.query(MLA)
+                .filter(MLA.assembly_constituency_id == existing_ac.id)
+                .first()
+            ):
                 party = (row.get("party") or "").strip() or None
                 db.add(
                     MLA(
@@ -225,9 +231,11 @@ def ingest(rows: List[Dict]) -> None:
                 )
                 created_mla += 1
 
-            if not db.query(CivicOfficial).filter(
-                CivicOfficial.assembly_constituency_id == existing_ac.id
-            ).first():
+            if (
+                not db.query(CivicOfficial)
+                .filter(CivicOfficial.assembly_constituency_id == existing_ac.id)
+                .first()
+            ):
                 c = civic_for(name, row.get("district", ""))
                 db.add(
                     CivicOfficial(
@@ -255,6 +263,15 @@ def ingest(rows: List[Dict]) -> None:
 
 
 def main() -> None:
+    if os.path.exists(CSV_PATH):
+        print(f"[cache] loading cached Karnataka MLAs from {CSV_PATH}...")
+        import csv
+
+        with open(CSV_PATH, newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        ingest(rows)
+        return
+
     acs = load_acs()
     print(f"[geo] {len(acs)} Karnataka ACs loaded")
     try:

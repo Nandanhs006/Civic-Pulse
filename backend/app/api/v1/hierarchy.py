@@ -47,15 +47,13 @@ def locate_hierarchy(lat: float, lng: float, db: Session = Depends(deps.get_db))
             .all()
         )
         if officials:
-            out["civic"] = HierCivic(officials=officials)
+            out["civic"] = HierCivic(officials=officials)  # type: ignore
 
     return out
 
 
 @router.get("/pc/{constituency_id}", response_model=List[HierAssembly])
-def assembly_under_pc(
-    constituency_id: int, db: Session = Depends(deps.get_db)
-) -> Any:
+def assembly_under_pc(constituency_id: int, db: Session = Depends(deps.get_db)) -> Any:
     """List the assembly constituencies (+ MLAs) inside a parliamentary seat."""
     acs = (
         db.query(AssemblyConstituency)

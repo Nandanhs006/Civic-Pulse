@@ -10,6 +10,7 @@ Successful online runs cache the parsed dataset to
 Run:  python -m app.scripts.ingest_mps
 It is idempotent - existing constituencies/MPs/users are skipped.
 """
+
 import csv
 import os
 import re
@@ -210,7 +211,9 @@ def fetch_photos(members: List[Dict]) -> None:
                 continue
             time.sleep(0.8)  # be polite to the API between batches
             # Map back through any redirects so titles line up.
-            norm = {n["from"]: n["to"] for n in data.get("query", {}).get("redirects", [])}
+            norm = {
+                n["from"]: n["to"] for n in data.get("query", {}).get("redirects", [])
+            }
             for page in data.get("query", {}).get("pages", []):
                 thumb = page.get("thumbnail", {}).get("source")
                 if thumb:
@@ -228,7 +231,15 @@ def save_csv(members: List[Dict]) -> None:
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(CSV_PATH, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(
-            f, fieldnames=["state", "constituency", "name", "name_title", "party", "photo_url"]
+            f,
+            fieldnames=[
+                "state",
+                "constituency",
+                "name",
+                "name_title",
+                "party",
+                "photo_url",
+            ],
         )
         w.writeheader()
         for m in members:
@@ -250,8 +261,10 @@ def get_members() -> List[Dict]:
         print("[fetch] downloading member list from Wikipedia...")
         wt = fetch_wikitext()
         members = parse_members(wt)
-        print(f"[parse] parsed {len(members)} members across "
-              f"{len(set(m['state'] for m in members))} states/UTs")
+        print(
+            f"[parse] parsed {len(members)} members across "
+            f"{len(set(m['state'] for m in members))} states/UTs"
+        )
         if len(members) < 400:
             raise RuntimeError(f"parsed too few members ({len(members)}); using cache")
         fetch_photos(members)
@@ -365,6 +378,11 @@ def ingest(members: List[Dict]) -> None:
 
 
 def main() -> None:
+    if os.path.exists(CSV_PATH):
+        print(f"[cache] loading cached Lok Sabha members from {CSV_PATH}...")
+        members = load_csv()
+        ingest(members)
+        return
     members = get_members()
     ingest(members)
 

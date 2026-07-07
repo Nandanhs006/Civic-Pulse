@@ -7,6 +7,7 @@ app/scripts/data/karnataka_ac.geojson with props: ac_no, ac_name, pc_name, st_na
 Dev/data-prep only (needs `pyshp`); the running app just reads the GeoJSON.
 Run:  python -m app.scripts.convert_ac_shapefile
 """
+
 import json
 import os
 import tempfile
