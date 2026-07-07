@@ -20,7 +20,7 @@ def check_rate_limit(request: Request):
         request.url.path.endswith("/api/v1/suggestions/") and request.method == "POST"
     )
 
-    limit = 5 if is_submission else 100
+    limit = settings.RATE_LIMIT_SUGGESTIONS_PER_HOUR if is_submission else 100
     window = 3600 if is_submission else 60
     key = f"rate_limit:{client_ip}:{request.url.path}"
 

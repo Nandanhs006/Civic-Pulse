@@ -21,7 +21,7 @@ def parse_cors(v: Union[str, List[str]]) -> List[str]:
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env", env_ignore_empty=True, extra="ignore"
+        env_file=".env", env_ignore_empty=False, extra="ignore"
     )
 
     API_V1_STR: str = "/api/v1"
@@ -57,5 +57,14 @@ class Settings(BaseSettings):
     MOCK_AI_PIPELINE: bool = True
     UPLOAD_DIR: str = "uploads"
 
+    # Gemini Integration Configs
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # Rate Limiting Configs
+    RATE_LIMIT_SUGGESTIONS_PER_HOUR: int = 100
+
+
 
 settings = Settings()
+
