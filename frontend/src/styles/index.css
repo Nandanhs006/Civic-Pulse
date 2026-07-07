@@ -1,29 +1,61 @@
 :root {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-display: 'Outfit', sans-serif;
+  --font-sans: 'Inter', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Noto Sans Tamil', 'Noto Sans Telugu', 'Noto Sans Gujarati', 'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Gurmukhi', 'Noto Sans Oriya', system-ui, -apple-system, sans-serif;
+  --font-display: 'Outfit', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Noto Sans Tamil', 'Noto Sans Telugu', 'Noto Sans Gujarati', 'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Gurmukhi', 'Noto Sans Oriya', sans-serif;
 
-  /* HSL Palette: Sleek slate & neon blue/purple */
-  --bg-app: hsl(224, 25%, 8%);
-  --bg-card: hsla(224, 25%, 12%, 0.65);
-  --bg-card-hover: hsla(224, 25%, 16%, 0.8);
-  --border-card: hsla(224, 15%, 25%, 0.4);
-  --border-glow: hsla(263, 70%, 50%, 0.3);
-  
-  --text-main: hsl(210, 20%, 98%);
-  --text-muted: hsl(215, 15%, 70%);
-  --text-dark: hsl(220, 20%, 15%);
-  
-  --primary: hsl(263, 70%, 60%);
-  --primary-hover: hsl(263, 70%, 50%);
-  --secondary: hsl(190, 90%, 50%);
-  --accent: hsl(325, 90%, 60%);
-  
-  --success: hsl(142, 70%, 45%);
-  --warning: hsl(38, 92%, 50%);
-  --danger: hsl(346, 84%, 55%);
+  /* India civic palette: Ashoka navy, saffron & India-green (dark default) */
+  --bg-app: hsl(222, 42%, 8%);
+  --bg-card: hsla(222, 34%, 14%, 0.66);
+  --bg-card-hover: hsla(222, 34%, 18%, 0.82);
+  --border-card: hsla(220, 20%, 30%, 0.45);
+  --border-glow: hsla(28, 90%, 55%, 0.35);
 
-  --shadow-glow: 0 0 20px hsla(263, 70%, 50%, 0.25);
+  --text-main: hsl(210, 30%, 97%);
+  --text-muted: hsl(214, 16%, 70%);
+  --text-dark: hsl(222, 30%, 12%);
+
+  --primary: hsl(222, 70%, 52%);          /* Ashoka Chakra blue */
+  --primary-hover: hsl(222, 72%, 44%);
+  --secondary: hsl(142, 58%, 42%);        /* India green */
+  --accent: hsl(28, 95%, 55%);            /* Saffron */
+
+  --saffron: hsl(28, 95%, 55%);
+  --india-green: hsl(142, 58%, 42%);
+
+  --success: hsl(142, 62%, 42%);
+  --warning: hsl(38, 92%, 52%);
+  --danger: hsl(4, 78%, 56%);
+
+  --shadow-glow: 0 0 22px hsla(222, 70%, 50%, 0.28);
   --glass-blur: blur(16px);
+
+  /* Surfaces referenced by both themes */
+  --input-bg: hsla(222, 40%, 6%, 0.5);
+  --panel-shadow: 0 10px 34px 0 rgba(0, 0, 0, 0.34);
+  --btn-secondary-hover: hsla(222, 34%, 20%, 0.6);
+  color-scheme: dark;
+}
+
+/* Light theme: paper-white surfaces; brand hues stay saffron/navy/green */
+[data-theme='light'] {
+  --bg-app: hsl(214, 40%, 96%);
+  --bg-card: hsla(0, 0%, 100%, 0.82);
+  --bg-card-hover: hsla(214, 40%, 99%, 0.95);
+  --border-card: hsla(220, 22%, 66%, 0.5);
+  --border-glow: hsla(28, 90%, 50%, 0.35);
+
+  --text-main: hsl(222, 40%, 15%);
+  --text-muted: hsl(220, 14%, 40%);
+  --text-dark: hsl(222, 30%, 12%);
+
+  --primary: hsl(222, 72%, 46%);
+  --primary-hover: hsl(222, 74%, 38%);
+  --secondary: hsl(142, 55%, 36%);
+
+  --shadow-glow: 0 0 20px hsla(222, 70%, 50%, 0.16);
+  --input-bg: hsla(214, 40%, 100%, 0.8);
+  --panel-shadow: 0 10px 30px 0 rgba(40, 55, 100, 0.12);
+  --btn-secondary-hover: hsla(214, 30%, 88%, 0.7);
+  color-scheme: light;
 }
 
 * {
@@ -39,6 +71,7 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   line-height: 1.5;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -54,7 +87,7 @@ h1, h2, h3, h4, h5, h6 {
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-card);
   border-radius: 16px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: var(--panel-shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -66,7 +99,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .glass-input {
-  background: hsla(224, 25%, 6%, 0.5);
+  background: var(--input-bg);
   border: 1px solid var(--border-card);
   border-radius: 8px;
   color: var(--text-main);
@@ -82,7 +115,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary), hsl(280, 70%, 50%));
+  background: linear-gradient(135deg, var(--primary), hsl(222, 72%, 40%));
   border: none;
   border-radius: 8px;
   color: white;
@@ -91,12 +124,42 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 500;
   padding: 12px 24px;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 14px 0 rgba(124, 58, 237, 0.4);
+  box-shadow: 0 4px 14px 0 hsla(222, 72%, 40%, 0.45);
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px 0 rgba(124, 58, 237, 0.6);
+  box-shadow: 0 6px 20px 0 hsla(222, 72%, 40%, 0.6);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Tricolour accent bar (Indian flag): saffron / white / green */
+.tricolour-bar {
+  height: 4px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--saffron) 0 33.33%,
+    #f4f4f5 33.33% 66.66%,
+    var(--india-green) 66.66% 100%
+  );
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border-card);
+  background: var(--bg-card);
 }
 
 .btn-primary:active {
@@ -116,7 +179,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-secondary:hover {
-  background: hsla(224, 25%, 15%, 0.5);
+  background: var(--btn-secondary-hover);
   border-color: var(--text-muted);
 }
 

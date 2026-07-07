@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
 
+    # Rate limiting (per client IP). Override via env vars.
+    RATE_LIMIT_SUBMISSION_MAX: int = int(os.getenv("RATE_LIMIT_SUBMISSION_MAX", "60"))
+    RATE_LIMIT_SUBMISSION_WINDOW: int = int(
+        os.getenv("RATE_LIMIT_SUBMISSION_WINDOW", "3600")
+    )
+    RATE_LIMIT_API_MAX: int = int(os.getenv("RATE_LIMIT_API_MAX", "300"))
+    RATE_LIMIT_API_WINDOW: int = int(os.getenv("RATE_LIMIT_API_WINDOW", "60"))
+
     # AI Mock Config
     MOCK_AI_PIPELINE: bool = True
     UPLOAD_DIR: str = "uploads"

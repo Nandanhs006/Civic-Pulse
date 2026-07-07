@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, GeoJSON } from 'react-leaflet';
 import L from 'leaflet';
 import { Suggestion, Ward } from '../../../types';
+import { useTheme } from '../../../context/ThemeContext';
+import { useLang } from '../../../context/LanguageContext';
 
 // Resolve Leaflet marker assets icon mismatch in Webpack/Vite
 // @ts-ignore
@@ -16,7 +18,24 @@ interface MapViewProps {
   suggestions: Suggestion[];
   wards: Ward[];
   onSelectSuggestion?: (sug: Suggestion) => void;
+  center?: [number, number];
+  zoom?: number;
+  boundary?: any; // GeoJSON Feature of the constituency to highlight
 }
+
+// Fit the map to the constituency boundary when one is provided.
+const FitBoundary: React.FC<{ data: any }> = ({ data }) => {
+  const map = useMap();
+  useEffect(() => {
+    try {
+      const bounds = L.geoJSON(data).getBounds();
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] });
+    } catch {
+      /* ignore malformed geometry */
+    }
+  }, [data, map]);
+  return null;
+};
 
 // Custom map trigger to center coordinates dynamically
 const ChangeView: React.FC<{ center: [number, number]; zoom: number }> = ({ center, zoom }) => {
@@ -27,13 +46,23 @@ const ChangeView: React.FC<{ center: [number, number]; zoom: number }> = ({ cent
   return null;
 };
 
-const MapView: React.FC<MapViewProps> = ({ suggestions, wards, onSelectSuggestion }) => {
-  // Center on constituency (Default seed coordinates)
-  const defaultCenter: [number, number] = [27.7172, 85.3240];
-  const zoomLevel = 13;
+const MapView: React.FC<MapViewProps> = ({
+  suggestions,
+  onSelectSuggestion,
+  center,
+  zoom,
+  boundary,
+}) => {
+  const { theme } = useTheme();
+  const { t } = useLang();
+  // Default to a national view of India; dashboards may pass a constituency centre.
+  const defaultCenter: [number, number] = center || [22.9734, 78.6569];
+  const zoomLevel = zoom ?? 5;
+  // Match the basemap to the active theme
+  const tileVariant = theme === 'light' ? 'light_all' : 'dark_all';
 
   // Custom icon colors based on priority score (red = high, yellow = medium, green = low)
-  const createMarkerIcon = (priority: number, category: string | null) => {
+  const createMarkerIcon = (priority: number) => {
     let color = 'hsl(142, 70%, 45%)'; // green
     if (priority > 75) {
       color = 'hsl(346, 84%, 55%)'; // red
@@ -65,10 +94,22 @@ const MapView: React.FC<MapViewProps> = ({ suggestions, wards, onSelectSuggestio
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
+          key={tileVariant}
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url={`https://{s}.basemaps.cartocdn.com/${tileVariant}/{z}/{x}/{y}{r}.png`}
         />
-        <ChangeView center={defaultCenter} zoom={zoomLevel} />
+        {boundary ? (
+          <>
+            <GeoJSON
+              key={JSON.stringify(boundary?.properties)}
+              data={boundary}
+              style={{ color: '#FF9933', weight: 2.5, fillColor: '#FF9933', fillOpacity: 0.1 }}
+            />
+            <FitBoundary data={boundary} />
+          </>
+        ) : (
+          <ChangeView center={defaultCenter} zoom={zoomLevel} />
+        )}
 
         {/* Suggestion Markers */}
         {suggestions
@@ -79,7 +120,7 @@ const MapView: React.FC<MapViewProps> = ({ suggestions, wards, onSelectSuggestio
               <Marker
                 key={sug.id}
                 position={markerCoords}
-                icon={createMarkerIcon(sug.priority_score, sug.category)}
+                icon={createMarkerIcon(sug.priority_score)}
                 eventHandlers={{
                   click: () => onSelectSuggestion && onSelectSuggestion(sug),
                 }}
@@ -87,7 +128,7 @@ const MapView: React.FC<MapViewProps> = ({ suggestions, wards, onSelectSuggestio
                 <Popup>
                   <div style={{ color: 'var(--text-dark)', fontFamily: 'var(--font-sans)', fontSize: '13px' }}>
                     <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
-                      {sug.category || 'General'} Issue
+                      {t('map.issue', { cat: t('category.' + (sug.category || 'General')) })}
                     </div>
                     <p style={{ margin: '4px 0', fontStyle: 'italic' }}>
                       "{sug.english_translation || sug.content}"
@@ -100,7 +141,7 @@ const MapView: React.FC<MapViewProps> = ({ suggestions, wards, onSelectSuggestio
                         borderRadius: '4px',
                         fontWeight: 600
                       }}>
-                        Priority: {sug.priority_score}/100
+                        {t('map.priority', { score: sug.priority_score })}
                       </span>
                       <span style={{
                         padding: '2px 6px',
@@ -109,7 +150,7 @@ const MapView: React.FC<MapViewProps> = ({ suggestions, wards, onSelectSuggestio
                         borderRadius: '4px',
                         fontWeight: 600
                       }}>
-                        Status: {sug.status}
+                        {t('map.status', { status: t('status.' + sug.status) })}
                       </span>
                     </div>
                   </div>

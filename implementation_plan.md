@@ -164,3 +164,75 @@ To ensure high-grade production stability, we implement automated gates for code
 ### Manual Verification
 1. **Spinnaker Dashboard**: Access the Spinnaker UI (Deck) to verify service registry accounts and verify pipeline status.
 2. **Live Inspection**: Test that production updates roll out with zero downtime.
+
+---
+
+## Hackathon Requirements Alignment & Google Cloud Integration
+
+This section details how the current codebase aligns with the Google Hackathon parameters, and provides a blueprint for integrating Google Cloud Platform (GCP) services to achieve production-grade scale.
+
+### 1. Gap Analysis & Proposed Tech Upgrades
+
+| Hackathon Parameter | Current Code Status | Proposed GCP Upgrade |
+| :--- | :--- | :--- |
+| **AI/ML & Generative AI** | Mock text classification and scoring in `ai_service.py`. | **Gemini 1.5 Flash API**: Replace mock text analysis with direct prompts to categorize issues, translate to English, assess sentiment, and output a structured JSON priority score. |
+| **Multimodal Vision** | Simple photo uploading without analysis. | **Gemini Multimodal Vision**: Pass citizen-uploaded photos of infrastructure issues directly to Gemini to analyze damage, detect severity, and classify category automatically. |
+| **Language & Voice** | Mock transcription logic. | **Google Cloud Speech-to-Text API**: Natively convert uploaded citizen audio recordings (.wav/webm) to English-translated transcripts. |
+| **Geospatial & Mapping** | Leaflet open-source mapping. | **Google Maps Platform**: Integrate Javascript API Heatmap layers for hotspot density visualization in the MP Dashboard. |
+| **Storage & Data** | PostgreSQL & local `/uploads` directory. | **Google Cloud SQL (Postgres)** for DB, and **Google Cloud Storage (GCS)** buckets for media file uploads in `FileService`. |
+| **Deployability** | Local Docker Compose. | **Google Cloud Run**: Package backend/frontend into serverless containers for scalable hosting. |
+
+---
+
+### 2. Code Implementation Blueprint (GCP Swaps)
+
+#### A. Multimodal Gemini Integration (`backend/app/services/ai_service.py`)
+Replace the mock analyzer with a wrapper calling the `google-generativeai` SDK:
+```python
+import google.generativeai as genai
+
+class AIService:
+    def __init__(self):
+        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
+
+    def analyze_text(self, text: str, lang: str) -> dict:
+        prompt = f"Analyze the following civic issue: '{text}'. Translate to English if needed. Output JSON with fields: english_translation, category (Roads/Water/Education/Health/Sanitation/Electricity/Safety/General), sentiment (Positive/Neutral/Negative), priority_score (1-100)."
+        response = self.model.generate_content(prompt)
+        return json.loads(response.text)
+
+    def analyze_image(self, image_bytes: bytes) -> dict:
+        # Multimodal Vision Analysis
+        prompt = "Analyze this image showing a public infrastructure issue. Describe the issue, classify the category, and rate the severity from 1-100."
+        response = self.model.generate_content([prompt, {"mime_type": "image/jpeg", "data": image_bytes}])
+        return json.loads(response.text)
+```
+
+#### B. Cloud Run & GCS Storage Setup (`backend/app/services/file_service.py`)
+Swap local file writing with Google Cloud Storage bucket uploads:
+```python
+from google.cloud import storage
+
+class FileService:
+    def __init__(self):
+        self.client = storage.Client()
+        self.bucket = self.client.bucket(os.environ.get("GCS_BUCKET_NAME"))
+
+    def save_file(self, upload_file, subfolder: str) -> str:
+        blob = self.bucket.blob(f"{subfolder}/{uuid.uuid4()}_{upload_file.filename}")
+        blob.upload_from_file(upload_file.file)
+        return blob.public_url
+```
+
+---
+
+### 3. Deployed Prototype Link (Bundle & Build Strategy)
+
+To generate a clean, standalone build folder ready for hosting or deployment:
+1. **Frontend Production Build**:
+   * Run `npm run build` inside `frontend/` to generate optimized production assets in `frontend/dist/`.
+2. **Build Distribution Bundle**:
+   * Create a folder `/deploy-bundle`.
+   * Copy `backend/` into `deploy-bundle/backend/`.
+   * Copy `frontend/dist/` into `deploy-bundle/frontend/dist/` (configured to be served as static files by the backend or via Nginx).
+   * Bundle `docker-compose.yml` and a deploy script `deploy.sh` that pushes images to Google Artifact Registry and launches them on Google Cloud Run.

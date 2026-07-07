@@ -1,10 +1,19 @@
+import os
+import sys
+# Force fallback to pure Python protobuf to prevent Python 3.14 C-extension crashes
+sys.modules["google._upb"] = None  # type: ignore
+sys.modules["google._upb._message"] = None  # type: ignore
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+
 import random
 import base64
 import os
 import mimetypes
 import logging
 import httpx
+import json
 from typing import Dict, Any
+import google.generativeai as genai
 from app.core.config import settings
 
 logger = logging.getLogger("app")
@@ -23,8 +32,23 @@ class AIService:
     ]
     SENTIMENTS = ["Positive", "Neutral", "Negative"]
 
-    @classmethod
-    def transcribe_audio(cls, file_path: str) -> Dict[str, Any]:
+    def __init__(self):
+        self.api_key = os.environ.get("GEMINI_API_KEY")
+        self.use_gemini = False
+        if self.api_key:
+            try:
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel("gemini-1.5-flash")
+                self.use_gemini = True
+                logger.info("[AI] Gemini Generative Model configured successfully.")
+            except Exception as e:
+                logger.warning(
+                    f"[AI] Failed to configure Gemini client: {e}. Falling back to mock NLP."
+                )
+        else:
+            logger.info("[AI] GEMINI_API_KEY not found. Running with local mock NLP.")
+
+    def transcribe_audio(self, file_path: str) -> Dict[str, Any]:
         """
         Whisper translation and transcription service.
         Detects language, transcribes, and translates it.
@@ -132,8 +156,8 @@ class AIService:
                         "raw_text": {"type": "STRING"},
                         "language_code": {"type": "STRING"},
                         "english_translation": {"type": "STRING"},
-                        "category": {"type": "STRING", "enum": cls.CATEGORIES + ["General"]},
-                        "sentiment": {"type": "STRING", "enum": cls.SENTIMENTS},
+                        "category": {"type": "STRING", "enum": self.CATEGORIES + ["General"]},
+                        "sentiment": {"type": "STRING", "enum": self.SENTIMENTS},
                         "priority_score": {"type": "INTEGER"}
                     },
                     "required": ["raw_text", "language_code", "english_translation", "category", "sentiment", "priority_score"]
@@ -167,11 +191,42 @@ class AIService:
             logger.error(f"Error calling Gemini API for audio transcription: {e}. Falling back to mock transcription.")
             return random.choice(mock_transcripts)
 
-    @classmethod
-    def analyze_text(cls, text: str, language_code: str = "en") -> Dict[str, Any]:
+    def analyze_text(self, text: str, language_code: str = "en") -> Dict[str, Any]:
         """
         NLP service that translates text, classifies it into category/sentiment, and scores it.
+        Uses Gemini 1.5 Flash if api key is present, otherwise falls back to local regex heuristics.
         """
+        if self.use_gemini:
+            try:
+                prompt = (
+                    f"You are a civic prioritization agent. Analyze this citizen complaint: '{text}'. "
+                    f"Perform the following: "
+                    f"1. English translation (leave as is if already in English) "
+                    f"2. Category classification (must be exactly one of: Water, Roads, Education, Health, Sanitation, Public Spaces, Electricity, Safety, General) "
+                    f"3. Sentiment tracking (Positive, Neutral, Negative) "
+                    f"4. Urgency priority score (1-100 based on danger, public impact, safety risks). "
+                    f"Output strictly a JSON block with keys: 'english_translation', 'category', 'sentiment', 'priority_score'."
+                )
+                response = self.model.generate_content(prompt)
+                cleaned_text = response.text.strip()
+                if cleaned_text.startswith("```json"):
+                    cleaned_text = cleaned_text[7:]
+                if cleaned_text.endswith("```"):
+                    cleaned_text = cleaned_text[:-3]
+                cleaned_text = cleaned_text.strip()
+                data = json.loads(cleaned_text)
+                return {
+                    "english_translation": data.get("english_translation", text),
+                    "category": data.get("category", "General"),
+                    "sentiment": data.get("sentiment", "Neutral"),
+                    "priority_score": int(data.get("priority_score", 50)),
+                }
+            except Exception as e:
+                logger.error(
+                    f"[AI] Gemini API processing failed: {e}. Falling back to local heuristics."
+                )
+
+        # Local heuristic fallback
         lower_text = text.lower()
         
         # Define fallback heuristics
@@ -194,7 +249,7 @@ class AIService:
             elif any(w in lower_text for w in ["safety", "police", "crime", "thief", "security", "सुरक्षा"]):
                 category = "Safety"
             else:
-                category = random.choice(cls.CATEGORIES)
+                category = random.choice(self.CATEGORIES)
 
             sentiment = "Neutral"
             if any(w in lower_text for w in ["bad", "poor", "broken", "danger", "terrible", "worst", "problem", "गार्हो", "समस्या"]):
@@ -259,8 +314,8 @@ class AIService:
                         "raw_text": {"type": "STRING"},
                         "language_code": {"type": "STRING"},
                         "english_translation": {"type": "STRING"},
-                        "category": {"type": "STRING", "enum": cls.CATEGORIES + ["General"]},
-                        "sentiment": {"type": "STRING", "enum": cls.SENTIMENTS},
+                        "category": {"type": "STRING", "enum": self.CATEGORIES + ["General"]},
+                        "sentiment": {"type": "STRING", "enum": self.SENTIMENTS},
                         "priority_score": {"type": "INTEGER"}
                     },
                     "required": ["raw_text", "language_code", "english_translation", "category", "sentiment", "priority_score"]

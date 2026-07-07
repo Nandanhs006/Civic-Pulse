@@ -1,52 +1,63 @@
-import React, { useState } from 'react';
-import Sidebar from './components/layouts/Sidebar';
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import TopBar from './components/layouts/TopBar';
 import Portal from './pages/Portal';
-import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
-import { useAuth } from './context/AuthContext';
+import Dashboard from './pages/Dashboard';
+import Pmo from './pages/Pmo';
+import LiveMap from './pages/LiveMap';
+import RequireRole from './components/common/RequireRole';
+import { useIsMobile } from './hooks/useIsMobile';
 
 import './styles/index.css';
 import './styles/animations.css';
 
-const App: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<string>('portal');
-  const { token, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'var(--bg-app)',
-        color: 'var(--text-muted)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '18px'
-      }}>
-        Initializing Civic Pulse System...
-      </div>
-    );
-  }
-
+const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const isMobile = useIsMobile();
   return (
-    <div style={{ display: 'flex', background: 'var(--bg-app)', minHeight: '100vh' }}>
-      {/* Sidebar Layout */}
-      <Sidebar currentTab={currentTab} setCurrentTab={setCurrentTab} />
-
-      {/* Main Content Area */}
-      <main style={{
-        marginLeft: '320px', // matches sidebar width (280) + padding offsets (40)
-        flex: 1,
-        padding: '40px 20px',
-        minHeight: '100vh'
-      }}>
-        {currentTab === 'portal' && <Portal />}
-        {currentTab === 'dashboard' && (
-          token ? <Dashboard /> : <Login />
-        )}
+    <div style={{ background: 'var(--bg-app)', minHeight: '100vh' }}>
+      <TopBar />
+      <main style={{ maxWidth: '1440px', margin: '0 auto', padding: isMobile ? '18px 14px 48px' : '28px 24px 64px' }}>
+        {children}
       </main>
     </div>
   );
 };
+
+// Same app navbar, but the map fills the rest of the viewport full-bleed (no padded main).
+const MapLayout: React.FC = () => (
+  <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-app)' }}>
+    <TopBar />
+    <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+      <LiveMap />
+    </div>
+  </div>
+);
+
+const App: React.FC = () => (
+  <Routes>
+    <Route path="/" element={<Layout><Portal /></Layout>} />
+    <Route path="/login" element={<Layout><Login /></Layout>} />
+    <Route
+      path="/mp"
+      element={
+        <RequireRole role="mp">
+          <Layout><Dashboard /></Layout>
+        </RequireRole>
+      }
+    />
+    <Route
+      path="/pmo"
+      element={
+        <RequireRole role="pmo">
+          <Layout><Pmo /></Layout>
+        </RequireRole>
+      }
+    />
+    {/* Live map keeps the app navbar; the map fills the rest of the screen */}
+    <Route path="/map" element={<MapLayout />} />
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>
+);
 
 export default App;
