@@ -1,0 +1,150 @@
+{
+  "name": "Deploy Civic Pulse",
+  "application": "civicpulse",
+  "id": "deploy-civic-pulse-pipeline",
+  "keepWaitingPipelines": false,
+  "limitConcurrent": true,
+  "spelEvaluator": "v4",
+  "triggers": [
+    {
+      "enabled": true,
+      "type": "docker",
+      "account": "ghcr-registry-account",
+      "registry": "ghcr.io",
+      "repository": "chiraghs/civic-pulse-backend",
+      "tag": "latest"
+    }
+  ],
+  "stages": [
+    {
+      "name": "Deploy to Staging Namespace",
+      "refId": "1",
+      "requisiteStageRefIds": [],
+      "type": "deployManifest",
+      "account": "staging-k8s-account",
+      "source": "text",
+      "manifestArtifactAccount": "github-artifact-account",
+      "manifests": [
+        {
+          "apiVersion": "apps/v1",
+          "kind": "Deployment",
+          "metadata": {
+            "name": "civic-pulse-backend-staging",
+            "namespace": "staging"
+          },
+          "spec": {
+            "replicas": 1,
+            "selector": {
+              "matchLabels": {
+                "app": "civic-pulse-backend"
+              }
+            },
+            "template": {
+              "metadata": {
+                "labels": {
+                  "app": "civic-pulse-backend"
+                }
+              },
+              "spec": {
+                "containers": [
+                  {
+                    "name": "backend",
+                    "image": "ghcr.io/chiraghs/civic-pulse-backend:latest",
+                    "ports": [
+                      {
+                        "containerPort": 8000
+                      }
+                    ],
+                    "env": [
+                      {
+                        "name": "POSTGRES_SERVER",
+                        "value": "postgres-staging-service"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Manual Gate Approval",
+      "refId": "2",
+      "requisiteStageRefIds": [
+        "1"
+      ],
+      "type": "manualJudgment",
+      "failPipeline": true,
+      "instructions": "Please inspect the Staging deployment dashboard and confirm that the API endpoints are functional before promoting to Production."
+    },
+    {
+      "name": "Deploy to Production (Red/Black)",
+      "refId": "3",
+      "requisiteStageRefIds": [
+        "2"
+      ],
+      "type": "deployManifest",
+      "account": "production-k8s-account",
+      "source": "text",
+      "trafficManagement": {
+        "enabled": true,
+        "options": {
+          "strategy": "redblack",
+          "redblack": {
+            "rollbackOnFailure": true,
+            "scaleDownDelaySeconds": 30,
+            "maxRemainingAsgNum": 2
+          }
+        }
+      },
+      "manifests": [
+        {
+          "apiVersion": "apps/v1",
+          "kind": "Deployment",
+          "metadata": {
+            "name": "civic-pulse-backend-prod",
+            "namespace": "production"
+          },
+          "spec": {
+            "replicas": 3,
+            "selector": {
+              "matchLabels": {
+                "app": "civic-pulse-backend"
+              }
+            },
+            "template": {
+              "metadata": {
+                "labels": {
+                  "app": "civic-pulse-backend"
+                }
+              },
+              "spec": {
+                "containers": [
+                  {
+                    "name": "backend",
+                    "image": "ghcr.io/chiraghs/civic-pulse-backend:latest",
+                    "ports": [
+                      {
+                        "containerPort": 8000
+                      }
+                    ],
+                    "readinessProbe": {
+                      "httpGet": {
+                        "path": "/",
+                        "port": 8000
+                      },
+                      "initialDelaySeconds": 5,
+                      "periodSeconds": 10
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

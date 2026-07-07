@@ -1,0 +1,10 @@
+from app.db.base_class import Base  # noqa
+from app.db.models.constituency import Constituency  # noqa
+from app.db.models.mp import MP  # noqa
+from app.db.models.assembly_constituency import AssemblyConstituency  # noqa
+from app.db.models.mla import MLA  # noqa
+from app.db.models.civic_official import CivicOfficial  # noqa
+from app.db.models.user import User  # noqa
+from app.db.models.ward import Ward  # noqa
+from app.db.models.suggestion import Suggestion  # noqa
+from app.db.models.project import ProposedProject  # noqa
