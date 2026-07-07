@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Pmo from './pages/Pmo';
 import LiveMap from './pages/LiveMap';
+import Participate from './pages/Participate';
 import RequireRole from './components/common/RequireRole';
 import { useIsMobile } from './hooks/useIsMobile';
 
@@ -56,6 +57,16 @@ const App: React.FC = () => (
     />
     {/* Live map keeps the app navbar; the map fills the rest of the screen */}
     <Route path="/map" element={<MapLayout />} />
+    <Route path="/participate" element={<Layout><Participate /></Layout>} />
+    <Route path="/participate/streetmapper" element={<Layout><Participate activeApp="fixmystreet" /></Layout>} />
+    <Route path="/participate/civicfund" element={<Layout><Participate activeApp="decidim" /></Layout>} />
+    <Route path="/participate/aegis-ai" element={<Layout><Participate activeApp="cpgrams" /></Layout>} />
+    <Route path="/participate/civictimeline" element={<Layout><Participate activeApp="seeclickfix" /></Layout>} />
+    <Route path="/participate/hotspot-tracker" element={<Layout><Participate activeApp="ushahidi" /></Layout>} />
+    <Route path="/participate/command-dispatch" element={<Layout><Participate activeApp="hotline" /></Layout>} />
+    <Route path="/participate/sector-directory" element={<Layout><Participate activeApp="grid" /></Layout>} />
+    <Route path="/participate/citypulse-iot" element={<Layout><Participate activeApp="citybrain" /></Layout>} />
+    <Route path="/participate/constituency-mailbox" element={<Layout><Participate activeApp="mailbox" /></Layout>} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 );

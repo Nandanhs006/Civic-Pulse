@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 from sqlalchemy import Column, String, Numeric, ForeignKey, DateTime, Integer
 from sqlalchemy.sql import func
 from app.db.base_class import Base
@@ -19,7 +20,7 @@ class Suggestion(Base):
     category = Column(String(50))  # e.g., "Water", "Roads", "Education"
     sentiment = Column(String(10))  # e.g., "Positive", "Negative", "Neutral"
     priority_score = Column(Integer, default=0)  # AI priority score (1-100)
-    status = Column(
+    status: Any = Column(
         String(20), default="Submitted"
     )  # "Submitted", "Processing", "Reviewed", "Approved", "Rejected"
 
@@ -30,6 +31,13 @@ class Suggestion(Base):
     assembly_constituency_id = Column(
         Integer, ForeignKey("assembly_constituencies.id"), nullable=True, index=True
     )
+
+    # Grid dispatch assignments
+    assigned_officer_id: Any = Column(
+        Integer, ForeignKey("grid_officers.id"), nullable=True, index=True
+    )
+    dispatch_status: Any = Column(String(50), default="Unassigned")
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
