@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/apiClient';
 import { MapContainer, TileLayer, Popup, Marker, CircleMarker } from 'react-leaflet';
@@ -54,13 +55,102 @@ const WARD_COLORS = {
   4: '#a855f7'  // Amethyst
 };
 
-const Participate: React.FC = () => {
+const MOCK_OFFICERS: GridOfficer[] = [
+  {
+    id: 1,
+    name: "Arjun Mehta",
+    email: "arjun.mehta@civicpulse.gov",
+    phone: "+91-98765-43210",
+    avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+    is_active: true,
+    ward_id: 1,
+    active_cases: 3
+  },
+  {
+    id: 2,
+    name: "Priya Sharma",
+    email: "priya.sharma@civicpulse.gov",
+    phone: "+91-98765-43211",
+    avatar_url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+    is_active: true,
+    ward_id: 2,
+    active_cases: 6
+  },
+  {
+    id: 3,
+    name: "Rohan Das",
+    email: "rohan.das@civicpulse.gov",
+    phone: "+91-98765-43212",
+    avatar_url: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150",
+    is_active: true,
+    ward_id: 3,
+    active_cases: 1
+  },
+  {
+    id: 4,
+    name: "Anjali Nair",
+    email: "anjali.nair@civicpulse.gov",
+    phone: "+91-98765-43213",
+    avatar_url: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150",
+    is_active: true,
+    ward_id: 4,
+    active_cases: 4
+  }
+];
+
+const MOCK_PROJECTS: ProposedProject[] = [
+  {
+    id: 1,
+    title: "Ward 1 Water Pipe Restoration",
+    description: "Systemic leak repair of main water distribution pipe in Ward 1 district to restore stable daily supply.",
+    category: "Water",
+    estimated_cost: 350000,
+    priority_score: 82,
+    supporting_suggestions_count: 14,
+    status: "Proposed"
+  },
+  {
+    id: 2,
+    title: "Pothole Filling & Tarring - Market Road",
+    description: "Re-paving of the central commercial corridor to prevent water logging and vehicle wear.",
+    category: "Roads",
+    estimated_cost: 180000,
+    priority_score: 75,
+    supporting_suggestions_count: 9,
+    status: "Proposed"
+  }
+];
+
+const MOCK_SUGGESTIONS: Suggestion[] = [
+  {
+    id: "s1",
+    content: "Potholes are very deep near the market corner, causing constant traffic jams.",
+    category: "Roads",
+    priority_score: 78,
+    status: "Submitted",
+    dispatch_status: "Unassigned",
+    latitude: 12.972,
+    longitude: 77.595
+  },
+  {
+    id: "s2",
+    content: "Street lights are completely off on 4th cross road, unsafe for women walking home.",
+    category: "Safety",
+    priority_score: 85,
+    status: "Submitted",
+    dispatch_status: "Unassigned",
+    latitude: 12.975,
+    longitude: 77.591
+  }
+];
+
+interface ParticipateProps {
+  activeApp?: 'hub' | 'fixmystreet' | 'decidim' | 'cpgrams' | 'seeclickfix' | 'ushahidi' | 'hotline' | 'grid' | 'citybrain' | 'mailbox';
+}
+
+const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
+  const navigate = useNavigate();
   useAuth();
-  
-  // App views
-  // 'hub' displays grid of 9 models.
-  // Specific views open upon click.
-  const [activeApp, setActiveApp] = useState<'hub' | 'fixmystreet' | 'decidim' | 'cpgrams' | 'seeclickfix' | 'ushahidi' | 'hotline' | 'grid' | 'citybrain' | 'mailbox'>('hub');
   
   const [officers, setOfficers] = useState<GridOfficer[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -97,15 +187,18 @@ const Participate: React.FC = () => {
     setLoading(true);
     try {
       const officersRes = await apiClient.get<GridOfficer[]>('/api/v1/grid/officers');
-      setOfficers(officersRes.data);
+      setOfficers(officersRes.data.length > 0 ? officersRes.data : MOCK_OFFICERS);
 
       const suggestionsRes = await apiClient.get<Suggestion[]>('/api/v1/suggestions/');
-      setSuggestions(suggestionsRes.data);
+      setSuggestions(suggestionsRes.data.length > 0 ? suggestionsRes.data : MOCK_SUGGESTIONS);
 
       const projectsRes = await apiClient.get<ProposedProject[]>('/api/v1/projects/');
-      setProjects(projectsRes.data);
+      setProjects(projectsRes.data.length > 0 ? projectsRes.data : MOCK_PROJECTS);
     } catch (err) {
       console.error("Error synchronizing command data:", err);
+      setOfficers(MOCK_OFFICERS);
+      setSuggestions(MOCK_SUGGESTIONS);
+      setProjects(MOCK_PROJECTS);
     } finally {
       setLoading(false);
     }
@@ -276,7 +369,7 @@ const Participate: React.FC = () => {
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Map-based report system. Drop a coordinates pin to report infrastructure damage with auto-routing to grid officers.
               </p>
-              <button onClick={() => setActiveApp('fixmystreet')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
+              <button onClick={() => navigate('/participate/streetmapper')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
@@ -291,7 +384,7 @@ const Participate: React.FC = () => {
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Participatory budget and policy support center. Citizens support proposals and influence project sanctions.
               </p>
-              <button onClick={() => setActiveApp('decidim')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
+              <button onClick={() => navigate('/participate/civicfund')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
@@ -306,7 +399,7 @@ const Participate: React.FC = () => {
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Centralized grievance tracker. Submissions are classified, translated, and scored for priority by Gemini AI.
               </p>
-              <button onClick={() => setActiveApp('cpgrams')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
+              <button onClick={() => navigate('/participate/aegis-ai')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
@@ -321,7 +414,7 @@ const Participate: React.FC = () => {
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Community ticket timeline. Track status changes {"(Submitted → Dispatched → Resolved)"} and review public analytics.
               </p>
-              <button onClick={() => setActiveApp('seeclickfix')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
+              <button onClick={() => navigate('/participate/civictimeline')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
@@ -336,7 +429,7 @@ const Participate: React.FC = () => {
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Crowdsourced incident locator. Heatmaps highlight active grievances and pinpoint infrastructure distress hotspots.
               </p>
-              <button onClick={() => setActiveApp('ushahidi')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
+              <button onClick={() => navigate('/participate/hotspot-tracker')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
@@ -351,7 +444,7 @@ const Participate: React.FC = () => {
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Unified admin dispatch board. Review reports and allocate tasks directly to local grid managers in real-time.
               </p>
-              <button onClick={() => setActiveApp('hotline')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
+              <button onClick={() => navigate('/participate/command-dispatch')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
@@ -366,7 +459,7 @@ const Participate: React.FC = () => {
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Grid officer roster. Review local representative contacts, emails, assigned sectors, and active workload monitors.
               </p>
-              <button onClick={() => setActiveApp('grid')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
+              <button onClick={() => navigate('/participate/sector-directory')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
@@ -381,7 +474,7 @@ const Participate: React.FC = () => {
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Real-time smart city dashboard simulator. Monitors utility loads and coordinates emergency department alerts.
               </p>
-              <button onClick={() => setActiveApp('citybrain')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
+              <button onClick={() => navigate('/participate/citypulse-iot')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
@@ -396,7 +489,7 @@ const Participate: React.FC = () => {
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Direct consultation interface. Post long-term structural proposals and track planning replies from the MP.
               </p>
-              <button onClick={() => setActiveApp('mailbox')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
+              <button onClick={() => navigate('/participate/constituency-mailbox')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
@@ -410,7 +503,7 @@ const Participate: React.FC = () => {
       {/* ========================================================= */}
       {activeApp === 'fixmystreet' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => setActiveApp('hub')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
@@ -467,7 +560,7 @@ const Participate: React.FC = () => {
       {/* ========================================================= */}
       {activeApp === 'decidim' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => setActiveApp('hub')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
@@ -517,7 +610,7 @@ const Participate: React.FC = () => {
       {/* ========================================================= */}
       {activeApp === 'cpgrams' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => setActiveApp('hub')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
@@ -588,7 +681,7 @@ const Participate: React.FC = () => {
       {/* ========================================================= */}
       {activeApp === 'seeclickfix' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => setActiveApp('hub')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
@@ -624,7 +717,7 @@ const Participate: React.FC = () => {
       {/* ========================================================= */}
       {activeApp === 'ushahidi' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => setActiveApp('hub')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
@@ -671,7 +764,7 @@ const Participate: React.FC = () => {
       {/* ========================================================= */}
       {activeApp === 'hotline' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => setActiveApp('hub')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
@@ -722,7 +815,7 @@ const Participate: React.FC = () => {
       {/* ========================================================= */}
       {activeApp === 'grid' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => setActiveApp('hub')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
@@ -767,7 +860,7 @@ const Participate: React.FC = () => {
       {/* ========================================================= */}
       {activeApp === 'citybrain' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => setActiveApp('hub')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
@@ -831,7 +924,7 @@ const Participate: React.FC = () => {
       {/* ========================================================= */}
       {activeApp === 'mailbox' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => setActiveApp('hub')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
