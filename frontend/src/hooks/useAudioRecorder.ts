@@ -47,11 +47,17 @@ export const useAudioRecorder = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      
+
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     }
+  };
+
+  const deleteRecording = () => {
+    audioChunksRef.current = [];
+    setAudioBlob(null);
+    setDuration(0);
   };
 
   return {
@@ -60,5 +66,6 @@ export const useAudioRecorder = () => {
     duration,
     startRecording,
     stopRecording,
+    deleteRecording,
   };
 };
