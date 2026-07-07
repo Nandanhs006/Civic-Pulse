@@ -10,6 +10,7 @@ Seeds AssemblyConstituency, MLA, and a role-based CivicOfficial per AC
 (BBMP / Greater Bengaluru Authority for Bengaluru urban ACs; generic elsewhere).
 Idempotent. Run:  python -m app.scripts.ingest_mlas
 """
+
 import csv
 import json
 import os
@@ -130,7 +131,9 @@ def fetch_mla_map(names: List[str]) -> Dict[str, Dict[str, str]]:
                 continue
             for page in data.get("query", {}).get("pages", []):
                 title = page.get("title", "")
-                key = norm(re.sub(r"\s*Assembly constituency\s*$", "", title, flags=re.I))
+                key = norm(
+                    re.sub(r"\s*Assembly constituency\s*$", "", title, flags=re.I)
+                )
                 try:
                     content = page["revisions"][0]["slots"]["main"]["content"]
                 except (KeyError, IndexError):
@@ -179,7 +182,7 @@ def ingest(rows: List[Dict]) -> None:
     matched_pc = 0
     try:
         # Cache PC name -> id for parent linkage.
-        pc_map = {norm(c.name): c.id for c in db.query(Constituency).all()}
+        pc_map = {norm(str(c.name)): c.id for c in db.query(Constituency).all()}
         for row in rows:
             name = row["name"].strip()
             existing_ac = (
@@ -207,9 +210,12 @@ def ingest(rows: List[Dict]) -> None:
                 created_ac += 1
 
             mla_name = (row.get("mla") or "").strip()
-            if mla_name and not db.query(MLA).filter(
-                MLA.assembly_constituency_id == existing_ac.id
-            ).first():
+            if (
+                mla_name
+                and not db.query(MLA)
+                .filter(MLA.assembly_constituency_id == existing_ac.id)
+                .first()
+            ):
                 party = (row.get("party") or "").strip() or None
                 db.add(
                     MLA(
@@ -225,9 +231,11 @@ def ingest(rows: List[Dict]) -> None:
                 )
                 created_mla += 1
 
-            if not db.query(CivicOfficial).filter(
-                CivicOfficial.assembly_constituency_id == existing_ac.id
-            ).first():
+            if (
+                not db.query(CivicOfficial)
+                .filter(CivicOfficial.assembly_constituency_id == existing_ac.id)
+                .first()
+            ):
                 c = civic_for(name, row.get("district", ""))
                 db.add(
                     CivicOfficial(

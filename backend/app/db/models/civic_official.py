@@ -17,7 +17,9 @@ class CivicOfficial(Base):
     assembly_constituency_id = Column(
         Integer, ForeignKey("assembly_constituencies.id"), nullable=False, index=True
     )
-    body = Column(String(150), nullable=False)  # e.g. "BBMP (Greater Bengaluru Authority)"
+    body = Column(
+        String(150), nullable=False
+    )  # e.g. "BBMP (Greater Bengaluru Authority)"
     zone = Column(String(120), nullable=True)
     role = Column(String(120), nullable=False)  # e.g. "Assistant Executive Engineer"
     name = Column(String(150), nullable=True)  # editable - fill real person later

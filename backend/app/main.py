@@ -65,9 +65,7 @@ app.include_router(
     prefix=f"{settings.API_V1_STR}/constituencies",
     tags=["Constituencies"],
 )
-app.include_router(
-    mps.router, prefix=f"{settings.API_V1_STR}/mps", tags=["MPs"]
-)
+app.include_router(mps.router, prefix=f"{settings.API_V1_STR}/mps", tags=["MPs"])
 app.include_router(
     hierarchy.router,
     prefix=f"{settings.API_V1_STR}/hierarchy",

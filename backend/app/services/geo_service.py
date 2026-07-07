@@ -4,6 +4,7 @@ Uses bundled 2019 delimitation boundaries (india_pc_2019_simplified.geojson,
 DataMeet) - the same delimitation in force for the 2024 general election.
 Polygons are matched to our DB constituencies by (state, name).
 """
+
 import json
 import os
 import re
@@ -152,8 +153,8 @@ class GeoService:
             return _name_map
         m: dict = {}
         for c in self.db.query(Constituency).all():
-            m[_norm(c.state) + "|" + _norm(c.name)] = c.id
-            m.setdefault(_norm(c.name), c.id)  # name-only fallback
+            m[_norm(str(c.state)) + "|" + _norm(str(c.name))] = c.id
+            m.setdefault(_norm(str(c.name)), c.id)  # name-only fallback
         _name_map = m
         return m
 
@@ -190,8 +191,8 @@ class GeoService:
 
         m: dict = {}
         for ac in self.db.query(AssemblyConstituency).all():
-            m[_norm(ac.state) + "|" + _norm(ac.name)] = ac.id
-            m.setdefault(_norm(ac.name), ac.id)
+            m[_norm(str(ac.state)) + "|" + _norm(str(ac.name))] = ac.id
+            m.setdefault(_norm(str(ac.name)), ac.id)
         _ac_name_map = m
         return m
 

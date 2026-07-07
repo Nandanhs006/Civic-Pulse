@@ -4,6 +4,7 @@ Primary path: an explicit constituency_id chosen via the State -> Constituency
 picker on the portal. Fallback: nearest constituency centroid to the given
 lat/long (only usable once centroids are populated; returns None otherwise).
 """
+
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.db.models.constituency import Constituency

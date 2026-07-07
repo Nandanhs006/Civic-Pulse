@@ -29,12 +29,7 @@ def locate_constituency(
 @router.get("/states", response_model=List[str])
 def list_states(db: Session = Depends(deps.get_db)) -> Any:
     """List all states/UTs that have constituencies (powers the picker)."""
-    rows = (
-        db.query(Constituency.state)
-        .distinct()
-        .order_by(Constituency.state)
-        .all()
-    )
+    rows = db.query(Constituency.state).distinct().order_by(Constituency.state).all()
     return [r[0] for r in rows]
 
 

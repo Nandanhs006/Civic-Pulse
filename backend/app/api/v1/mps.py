@@ -50,23 +50,15 @@ def _to_out(mp: MP, cname: Optional[str], maps) -> MPOut:
     pending = unresolved_map.get(mp.constituency_id, 0)
     resolved = total - pending
     pct = (pending / total * 100.0) if total else 0.0
-    return MPOut(
-        id=mp.id,
-        constituency_id=mp.constituency_id,
-        constituency_name=cname,
-        name=mp.name,
-        party=mp.party,
-        party_abbr=mp.party_abbr,
-        state=mp.state,
-        photo_url=mp.photo_url,
-        email=mp.email,
-        wikipedia_url=mp.wikipedia_url,
-        total_suggestions=total,
-        resolved_suggestions=resolved,
-        pending_suggestions=pending,
-        unresolved_percentage=round(pct, 1),
-        sanctioned_projects=sanctioned_map.get(mp.constituency_id, 0),
-    )
+    # Read identity fields from the ORM row, then attach computed metrics.
+    out = MPOut.model_validate(mp)
+    out.constituency_name = cname
+    out.total_suggestions = total
+    out.resolved_suggestions = resolved
+    out.pending_suggestions = pending
+    out.unresolved_percentage = round(pct, 1)
+    out.sanctioned_projects = sanctioned_map.get(mp.constituency_id, 0)
+    return out
 
 
 @router.get("/", response_model=List[MPOut])
@@ -77,9 +69,8 @@ def list_mps(
 ) -> Any:
     """All MPs with progress metrics for the PMO command center (PMO only)."""
     maps = _metrics_maps(db)
-    q = (
-        db.query(MP, Constituency.name)
-        .join(Constituency, MP.constituency_id == Constituency.id)
+    q = db.query(MP, Constituency.name).join(
+        Constituency, MP.constituency_id == Constituency.id
     )
     if state:
         q = q.filter(MP.state == state)
@@ -96,9 +87,5 @@ def get_mp(constituency_id: int, db: Session = Depends(deps.get_db)) -> Any:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No MP found for this constituency",
         )
-    c = (
-        db.query(Constituency)
-        .filter(Constituency.id == constituency_id)
-        .first()
-    )
-    return _to_out(mp, c.name if c else None, _metrics_maps(db))
+    c = db.query(Constituency).filter(Constituency.id == constituency_id).first()
+    return _to_out(mp, str(c.name) if c else None, _metrics_maps(db))

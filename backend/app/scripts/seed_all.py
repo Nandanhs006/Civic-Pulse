@@ -11,7 +11,6 @@ pmo@civicpulse.gov / pmo@india is created by step 1 here.
 
 Run:  python -m app.scripts.seed_all [demo_issue_count]
 """
-import sys
 
 from app.db.base import Base
 from app.db.session import engine
