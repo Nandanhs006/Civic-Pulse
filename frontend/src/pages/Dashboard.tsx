@@ -1,97 +1,68 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import apiClient from '../services/apiClient';
-import MapView from '../components/features/dashboard/MapView';
-import AnalyticsSummary from '../components/features/dashboard/AnalyticsSummary';
-import ProjectPrioritizer from '../components/features/dashboard/ProjectPrioritizer';
-import { Suggestion, ProposedProject, Ward, AnalyticsSummary as SummaryType } from '../types';
-import { RefreshCw, Map, Grid, ListTodo } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useLang } from '../context/LanguageContext';
+import { MP } from '../types';
+import Avatar from '../components/common/Avatar';
+import ConstituencyDashboard from '../components/features/dashboard/ConstituencyDashboard';
+import { MapPin, ExternalLink } from 'lucide-react';
 
+/** MP-facing dashboard: identity header + own-constituency data (server-scoped). */
 const Dashboard: React.FC = () => {
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [projects, setProjects] = useState<ProposedProject[]>([]);
-  const [wards, setWards] = useState<Ward[]>([]);
-  const [summary, setSummary] = useState<SummaryType | null>(null);
-  
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const fetchDashboardData = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const [sugRes, projRes, wardRes, sumRes] = await Promise.all([
-        apiClient.get<Suggestion[]>('/api/v1/suggestions/'),
-        apiClient.get<ProposedProject[]>('/api/v1/projects/'),
-        apiClient.get<Ward[]>('/api/v1/analytics/wards'),
-        apiClient.get<SummaryType>('/api/v1/analytics/summary'),
-      ]);
-
-      setSuggestions(sugRes.data);
-      setProjects(projRes.data);
-      setWards(wardRes.data);
-      setSummary(sumRes.data);
-    } catch (err) {
-      console.error('Failed to load dashboard data:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const { user } = useAuth();
+  const { t } = useLang();
+  const [mp, setMp] = useState<MP | null>(null);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px' }}>
-        <RefreshCw size={36} className="animate-spin" color="var(--primary)" />
-        <p style={{ color: 'var(--text-muted)' }}>Loading MP Planning metrics...</p>
-      </div>
-    );
-  }
+    if (user?.constituency_id) {
+      apiClient
+        .get<MP>(`/api/v1/mps/${user.constituency_id}`)
+        .then((r) => setMp(r.data))
+        .catch((e) => console.error('Failed to load MP profile', e));
+    }
+  }, [user?.constituency_id]);
 
   return (
-    <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '30px' }} className="animate-fade-in">
-      {/* Header Row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: '32px', color: 'var(--text-main)' }}>Constituency Dashboard</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '2px' }}>
-            Real-time public grievance mappings and AI-prioritized project proposals.
-          </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }} className="animate-fade-in">
+      {/* MP identity header */}
+      <div className="glass-panel" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+        <Avatar name={mp?.name || user?.full_name || 'MP'} photoUrl={mp?.photo_url} size={72} />
+        <div style={{ flex: 1, minWidth: '200px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+            {t('dash.mpBadge')}
+          </div>
+          <h1 style={{ fontSize: '28px', color: 'var(--text-main)' }}>{mp?.name || user?.full_name}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '4px', color: 'var(--text-muted)', fontSize: '14px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <MapPin size={14} color="var(--saffron)" /> {mp?.constituency_name || '—'}, {mp?.state || ''}
+            </span>
+            {mp?.party && <span className="chip">{mp.party_abbr || mp.party}</span>}
+            {mp?.wikipedia_url && (
+              <a href={mp.wikipedia_url} target="_blank" rel="noreferrer" style={{ color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}>
+                {t('dash.wikipedia')} <ExternalLink size={12} />
+              </a>
+            )}
+          </div>
         </div>
-        <button
-          onClick={fetchDashboardData}
-          disabled={refreshing}
-          className="btn-secondary"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', fontSize: '13px' }}
-        >
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          Sync Data
-        </button>
+        {mp && (
+          <div style={{ display: 'flex', gap: '24px' }}>
+            <Stat label={t('dash.requests')} value={mp.total_suggestions} />
+            <Stat label={t('dash.unresolved')} value={`${mp.unresolved_percentage}%`} accent="var(--warning)" />
+            <Stat label={t('dash.sanctioned')} value={mp.sanctioned_projects} accent="var(--success)" />
+          </div>
+        )}
       </div>
 
-      {/* Map & Metrics Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '24px' }}>
-        {/* Left: Map Card */}
-        <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Map size={18} color="var(--secondary)" />
-            Real-time Priority Mapping (GIS Heatmap)
-          </h3>
-          <MapView suggestions={suggestions} wards={wards} />
-        </div>
-
-        {/* Right: Summary Metrics */}
-        <AnalyticsSummary summary={summary} />
-      </div>
-
-      {/* Proposed Projects Prioritization Rankings */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
-        <ProjectPrioritizer projects={projects} onRefresh={fetchDashboardData} />
-      </div>
+      <ConstituencyDashboard constituencyId={user?.constituency_id ?? undefined} />
     </div>
   );
 };
+
+const Stat: React.FC<{ label: string; value: React.ReactNode; accent?: string }> = ({ label, value, accent }) => (
+  <div style={{ textAlign: 'center' }}>
+    <div style={{ fontSize: '26px', fontWeight: 700, color: accent || 'var(--text-main)' }}>{value}</div>
+    <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+  </div>
+);
 
 export default Dashboard;

@@ -5,7 +5,15 @@ from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.core.config import settings
-from app.api.v1 import auth, suggestions, projects, analytics
+from app.api.v1 import (
+    auth,
+    suggestions,
+    projects,
+    analytics,
+    constituencies,
+    mps,
+    hierarchy,
+)
 from app.db.session import engine, SessionLocal
 from app.db.base import Base
 from app.db.models.ward import Ward
@@ -51,6 +59,19 @@ app.include_router(
 )
 app.include_router(
     analytics.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics"]
+)
+app.include_router(
+    constituencies.router,
+    prefix=f"{settings.API_V1_STR}/constituencies",
+    tags=["Constituencies"],
+)
+app.include_router(
+    mps.router, prefix=f"{settings.API_V1_STR}/mps", tags=["MPs"]
+)
+app.include_router(
+    hierarchy.router,
+    prefix=f"{settings.API_V1_STR}/hierarchy",
+    tags=["Hierarchy"],
 )
 
 

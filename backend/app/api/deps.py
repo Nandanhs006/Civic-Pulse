@@ -1,4 +1,4 @@
-from typing import Generator
+from typing import Generator, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -39,6 +39,27 @@ def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return user
+
+
+def get_pmo_user(current_user: User = Depends(get_current_user)) -> User:
+    """Require a PMO super-admin (national oversight)."""
+    if getattr(current_user, "role", None) != "pmo" and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="PMO (super-admin) access required",
+        )
+    return current_user
+
+
+def resolve_scope(current_user: User, constituency_id: Optional[int]) -> Optional[int]:
+    """Return the effective constituency filter for a request.
+
+    - MP users are always locked to their own constituency.
+    - PMO users may pass a specific constituency_id, or None to view all.
+    """
+    if getattr(current_user, "role", None) == "mp":
+        return current_user.constituency_id
+    return constituency_id
 
 
 def get_suggestion_service(db: Session = Depends(get_db)) -> SuggestionService:

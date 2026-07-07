@@ -5,6 +5,8 @@ from app.db.models.suggestion import Suggestion
 from app.db.models.ward import Ward
 from app.services.file_service import file_service
 from app.services.ai_service import ai_service
+from app.services.location_service import LocationService
+from app.services.geo_service import GeoService
 
 
 class SuggestionService:
@@ -18,6 +20,7 @@ class SuggestionService:
         language_code: str = "en",
         latitude: Optional[float] = None,
         longitude: Optional[float] = None,
+        constituency_id: Optional[int] = None,
         audio_file: Optional[UploadFile] = None,
         image_file: Optional[UploadFile] = None,
     ) -> Suggestion:
@@ -49,13 +52,25 @@ class SuggestionService:
             sentiment = nlp_result.get("sentiment", "Neutral")
             priority_score = nlp_result.get("priority_score", 50)
 
-        # Geolocation: Assign to matching ward using a simple mock bounding box
+        # Route the request to a parliamentary constituency (the MP's unit).
+        resolved_constituency_id = LocationService(self.db).resolve_constituency(
+            constituency_id=constituency_id,
+            latitude=latitude,
+            longitude=longitude,
+        )
+
+        # Also route to the assembly constituency (the MLA's unit) from GPS.
+        assembly_constituency_id = None
+        if latitude is not None and longitude is not None:
+            assembly_constituency_id = GeoService(
+                self.db
+            ).locate_assembly_constituency_id(float(latitude), float(longitude))
+
+        # Legacy ward mapping retained for the demographic analytics cards.
         ward_id = None
         if latitude is not None and longitude is not None:
-            # Simple check: query wards and map to closest coordinate or simple lat/long bounding logic
             wards = self.db.query(Ward).all()
             if wards:
-                # Fallback: assign to the first ward, or calculate a mock ward mapping
                 ward_index = int((abs(latitude) + abs(longitude)) * 100) % len(wards)
                 ward_id = wards[ward_index].id
 
@@ -73,6 +88,8 @@ class SuggestionService:
             sentiment=sentiment,
             priority_score=priority_score,
             ward_id=ward_id,
+            constituency_id=resolved_constituency_id,
+            assembly_constituency_id=assembly_constituency_id,
             status="Submitted",
         )
 
@@ -86,6 +103,7 @@ class SuggestionService:
         category: Optional[str] = None,
         status: Optional[str] = None,
         ward_id: Optional[int] = None,
+        constituency_id: Optional[int] = None,
         skip: int = 0,
         limit: int = 100,
     ) -> List[Suggestion]:
@@ -96,7 +114,19 @@ class SuggestionService:
             query = query.filter(Suggestion.status == status)
         if ward_id:
             query = query.filter(Suggestion.ward_id == ward_id)
+        if constituency_id:
+            query = query.filter(Suggestion.constituency_id == constituency_id)
 
         return (
             query.order_by(Suggestion.created_at.desc()).offset(skip).limit(limit).all()
+        )
+
+    def get_map_issues(self, limit: int = 5000) -> List[Suggestion]:
+        """All geolocated issues for the public live map (no PII fields)."""
+        return (
+            self.db.query(Suggestion)
+            .filter(Suggestion.latitude.isnot(None), Suggestion.longitude.isnot(None))
+            .order_by(Suggestion.created_at.desc())
+            .limit(limit)
+            .all()
         )
