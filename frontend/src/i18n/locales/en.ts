@@ -1,0 +1,189 @@
+// English is the source of truth. Every other locale mirrors these keys.
+// Placeholders look like {var} and must be preserved in translations.
+const en = {
+  // Brand / nav
+  'brand.tagline': "Bharat · People's Priorities",
+  'nav.portal': 'Citizen Portal',
+  'nav.myConstituency': 'My Constituency',
+  'nav.pmoCommand': 'PMO Command',
+  'nav.staffLogin': 'Staff Login',
+  'nav.signOut': 'Sign out',
+  'role.pmo': 'PMO · Super Admin',
+  'role.mp': 'Member of Parliament',
+  'lang.label': 'Language',
+
+  // Common / picker
+  'common.selectState': 'Select state…',
+  'common.selectConstituency': 'Select constituency…',
+  'common.pickStateFirst': 'Pick a state first',
+  'common.loading': 'Loading…',
+  'picker.stateLabel': 'STATE / UT',
+  'picker.constituencyLabel': 'CONSTITUENCY',
+  'auth.verifying': 'Verifying access…',
+
+  // Portal
+  'portal.heroA': 'Raise Your Voice,',
+  'portal.heroB': 'Shape Your Constituency',
+  'portal.subtitle':
+    'Report local issues by text, voice, or photo. Your request goes straight to your elected Member of Parliament.',
+  'portal.step1': '1 · Where do you live?',
+  'portal.step2': '2 · Describe the issue',
+  'portal.detecting': 'Detecting from GPS…',
+  'portal.autofilled': 'Auto-filled from your location — please confirm',
+  'portal.routedTo': 'YOUR REQUEST WILL BE ROUTED TO',
+  'portal.enableLocation': 'Enable location to also route to your MLA and local body.',
+  'portal.recordLabel': 'Record voice request (any Indian language)',
+  'portal.tapToRecord': 'Tap to record',
+  'portal.recording': 'Recording…',
+  'portal.voiceRecorded': 'Voice clip recorded',
+  'portal.voiceLangs': 'Hindi, Tamil, Bengali, English & more',
+  'portal.lengthLimit': 'Length: {duration}s (60s limit)',
+  'portal.readyToSubmit': 'Captured. Ready to submit.',
+  'portal.orWrite': 'Or write your request',
+  'portal.writePlaceholder':
+    'e.g. The water pipeline near the market is broken; streetlights on the main road are not working…',
+  'portal.phone': 'Phone (optional)',
+  'portal.phonePlaceholder': 'e.g. +91 98XXXXXXXX',
+  'portal.photo': 'Photo (optional)',
+  'portal.attachImage': 'Attach Image',
+  'portal.gpsCaptured': 'GPS captured ({lat}, {lng})',
+  'portal.gpsWaiting': 'Waiting for GPS…',
+  'portal.submit': 'Submit to my MP',
+  'portal.analysing': 'Analysing with AI…',
+  'portal.selectConstituencyAlert':
+    'Please select your State and Constituency so we can route your request to the right MP.',
+  'portal.describeAlert': 'Please enter a description or record a voice message.',
+  'portal.submitFail': 'Failed to submit suggestion. Please try again.',
+  'portal.successTitle': 'Your request has been registered!',
+  'portal.followedUp': 'Your request is being followed up across:',
+  'portal.routedToMp': 'ROUTED TO YOUR MP',
+  'portal.yourReport': 'YOUR REPORT',
+  'portal.aiCategory': 'AI CATEGORY',
+  'portal.sentimentLabel': 'SENTIMENT',
+  'portal.priorityScore': 'PRIORITY SCORE',
+  'portal.submitAnother': 'Submit Another Request',
+
+  // Routing tree
+  'tree.mpTier': 'Parliament · Lok Sabha (MP)',
+  'tree.mlaTier': 'State · Vidhan Sabha (MLA)',
+  'tree.localTier': 'Local Body',
+  'tree.mpFallback': 'Member of Parliament',
+  'tree.mlaUpdating': 'MLA — record being updated',
+  'tree.noInfo': 'Enable location to see who will handle your request.',
+
+  // Login
+  'login.title': 'Government Sign In',
+  'login.subtitle': 'For PMO officials and Members of Parliament.',
+  'login.email': 'EMAIL ADDRESS',
+  'login.password': 'PASSWORD',
+  'login.signIn': 'Sign In',
+  'login.signingIn': 'Signing in…',
+  'login.invalid': 'Invalid email or password. Please try again.',
+  'login.demoAccounts': 'Demo accounts',
+
+  // MP dashboard
+  'dash.mpBadge': 'MEMBER OF PARLIAMENT · 18th LOK SABHA',
+  'dash.requests': 'Requests',
+  'dash.unresolved': 'Unresolved',
+  'dash.sanctioned': 'Sanctioned',
+  'dash.wikipedia': 'Wikipedia',
+  'dash.syncData': 'Sync Data',
+  'dash.loading': 'Loading constituency metrics…',
+  'dash.liveMap': 'Live Grievance Map',
+  'dash.localReps': 'Local Representatives — Assembly Segments (MLAs)',
+  'dash.localRepsSub':
+    'Requests in this parliamentary seat are also routed to the concerned MLA and local body.',
+  'dash.mlaToUpdate': 'MLA — to be updated',
+
+  // Analytics
+  'analytics.totalSuggestions': 'Total Suggestions',
+  'analytics.recommendedProjects': 'Recommended Projects',
+  'analytics.unresolvedRate': 'Unresolved Rate',
+  'analytics.sectorDemand': 'Sector-wise Grievance Demand (Constituency Metrics)',
+  'analytics.noDemand': 'No demand requests registered yet.',
+
+  // Project prioritizer
+  'proj.title': 'AI-Prioritized Development Works',
+  'proj.subtitle': 'MPLADS fund allocations ranked dynamically by urgency metrics.',
+  'proj.runAI': 'Run AI Prioritization',
+  'proj.ranking': 'Ranking…',
+  'proj.none1': 'No recommended projects generated yet.',
+  'proj.none2': 'Click "Run AI Prioritization" above to scan citizen demands.',
+  'proj.priority': 'Priority: {score}',
+  'proj.estCost': 'ESTIMATED COST',
+  'proj.supporting': 'SUPPORTING PETITIONS',
+  'proj.citizens': '{count} Citizens',
+  'proj.sanctionWork': 'Sanction Work',
+  'proj.categoryLabel': 'Category: {cat}',
+  'proj.aiDone': 'AI prioritization model completed! New project proposals generated.',
+  'proj.aiFail': 'Failed to generate project suggestions.',
+  'proj.updateFail': 'Failed to update project status.',
+
+  // PMO
+  'pmo.title': 'PMO Command Center',
+  'pmo.subtitle': 'National oversight of all {count} constituencies and their Members of Parliament.',
+  'pmo.loading': 'Loading national dashboard…',
+  'pmo.backToAll': 'Back to all MPs',
+  'stats.mps': 'Members of Parliament',
+  'stats.requests': 'Citizen Requests (national)',
+  'stats.sanctioned': 'Projects Sanctioned',
+  'stats.unresolvedRate': 'Unresolved Rate',
+
+  // MP directory
+  'dir.searchPlaceholder': 'Search MP, constituency or state…',
+  'dir.allStates': 'All states',
+  'dir.onlyWithRequests': 'Only MPs with requests',
+  'dir.showing': 'Showing {shown} of {total} MPs',
+  'dir.noMatch': 'No MPs match these filters.',
+  'dir.sortPrefix': 'Sort: {label}',
+  'dir.sortRequests': 'Most requests',
+  'dir.sortWork': 'Most work done (sanctioned)',
+  'dir.sortResolved': 'Most resolved',
+  'dir.sortPending': 'Most pending',
+  'dir.sortBacklog': 'Highest backlog %',
+  'dir.sortName': 'Name (A–Z)',
+  'dir.colMember': 'Member',
+  'dir.colState': 'State',
+  'dir.colRequests': 'Requests',
+  'dir.colResolved': 'Resolved',
+  'dir.colPending': 'Pending',
+  'dir.colDone': 'Done',
+  'card.requests': 'Requests',
+  'card.resolved': 'Resolved',
+  'card.pending': 'Pending',
+  'card.done': 'Done',
+
+  // Map popup
+  'map.issue': '{cat} Issue',
+  'map.priority': 'Priority: {score}/100',
+  'map.status': 'Status: {status}',
+
+  // Enumerated: categories
+  'category.Water': 'Water',
+  'category.Roads': 'Roads',
+  'category.Education': 'Education',
+  'category.Health': 'Health',
+  'category.Sanitation': 'Sanitation',
+  'category.Public Spaces': 'Public Spaces',
+  'category.Electricity': 'Electricity',
+  'category.Safety': 'Safety',
+  'category.General': 'General',
+
+  // Enumerated: statuses
+  'status.Submitted': 'Submitted',
+  'status.Reviewed': 'Reviewed',
+  'status.Approved': 'Approved',
+  'status.Rejected': 'Rejected',
+  'status.Proposed': 'Proposed',
+  'status.Sanctioned': 'Sanctioned',
+  'status.Work In Progress': 'Work In Progress',
+  'status.Completed': 'Completed',
+
+  // Enumerated: sentiment
+  'sentiment.Positive': 'Positive',
+  'sentiment.Negative': 'Negative',
+  'sentiment.Neutral': 'Neutral',
+};
+
+export default en;
+export type TranslationKey = keyof typeof en;

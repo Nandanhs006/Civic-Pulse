@@ -1,0 +1,188 @@
+// Marathi (मराठी) translation. Mirrors the keys in en.ts.
+// Placeholders look like {var} and must be preserved.
+const mr: Record<string, string> = {
+  // Brand / nav
+  'brand.tagline': 'भारत · जनतेच्या प्राधान्यक्रमांचा',
+  'nav.portal': 'नागरिक पोर्टल',
+  'nav.myConstituency': 'माझा मतदारसंघ',
+  'nav.pmoCommand': 'PMO कमांड',
+  'nav.staffLogin': 'कर्मचारी लॉगिन',
+  'nav.signOut': 'साइन आउट',
+  'role.pmo': 'PMO · सुपर अ‍ॅडमिन',
+  'role.mp': 'संसद सदस्य',
+  'lang.label': 'भाषा',
+
+  // Common / picker
+  'common.selectState': 'राज्य निवडा…',
+  'common.selectConstituency': 'मतदारसंघ निवडा…',
+  'common.pickStateFirst': 'आधी राज्य निवडा',
+  'common.loading': 'लोड होत आहे…',
+  'picker.stateLabel': 'राज्य / केंद्रशासित प्रदेश',
+  'picker.constituencyLabel': 'मतदारसंघ',
+  'auth.verifying': 'प्रवेश तपासला जात आहे…',
+
+  // Portal
+  'portal.heroA': 'तुमचा आवाज उठवा,',
+  'portal.heroB': 'तुमचा मतदारसंघ घडवा',
+  'portal.subtitle':
+    'स्थानिक समस्या मजकूर, आवाज किंवा छायाचित्राद्वारे नोंदवा. तुमची विनंती थेट तुमच्या निवडून आलेल्या संसद सदस्यांकडे जाते.',
+  'portal.step1': '1 · तुम्ही कोठे राहता?',
+  'portal.step2': '2 · समस्येचे वर्णन करा',
+  'portal.detecting': 'GPS वरून शोधले जात आहे…',
+  'portal.autofilled': 'तुमच्या स्थानावरून आपोआप भरले — कृपया खात्री करा',
+  'portal.routedTo': 'तुमची विनंती येथे पाठवली जाईल',
+  'portal.enableLocation': 'तुमच्या MLA आणि स्थानिक स्वराज्य संस्थेकडेही पाठवण्यासाठी स्थान सक्षम करा.',
+  'portal.recordLabel': 'आवाजाद्वारे विनंती रेकॉर्ड करा (कोणतीही भारतीय भाषा)',
+  'portal.tapToRecord': 'रेकॉर्ड करण्यासाठी टॅप करा',
+  'portal.recording': 'रेकॉर्ड होत आहे…',
+  'portal.voiceRecorded': 'आवाज क्लिप रेकॉर्ड झाली',
+  'portal.voiceLangs': 'हिंदी, तमिळ, बंगाली, इंग्रजी आणि अधिक',
+  'portal.lengthLimit': 'कालावधी: {duration}s (60s मर्यादा)',
+  'portal.readyToSubmit': 'नोंदवले. सादर करण्यास तयार.',
+  'portal.orWrite': 'किंवा तुमची विनंती लिहा',
+  'portal.writePlaceholder':
+    'उदा. बाजाराजवळील पाण्याची पाइपलाइन तुटली आहे; मुख्य रस्त्यावरील पथदिवे बंद आहेत…',
+  'portal.phone': 'फोन (पर्यायी)',
+  'portal.phonePlaceholder': 'उदा. +91 98XXXXXXXX',
+  'portal.photo': 'छायाचित्र (पर्यायी)',
+  'portal.attachImage': 'प्रतिमा जोडा',
+  'portal.gpsCaptured': 'GPS नोंदवले ({lat}, {lng})',
+  'portal.gpsWaiting': 'GPS ची प्रतीक्षा आहे…',
+  'portal.submit': 'माझ्या MP कडे सादर करा',
+  'portal.analysing': 'AI द्वारे विश्लेषण होत आहे…',
+  'portal.selectConstituencyAlert':
+    'कृपया तुमचे राज्य आणि मतदारसंघ निवडा जेणेकरून आम्ही तुमची विनंती योग्य MP कडे पाठवू शकू.',
+  'portal.describeAlert': 'कृपया वर्णन प्रविष्ट करा किंवा आवाज संदेश रेकॉर्ड करा.',
+  'portal.submitFail': 'सूचना सादर करता आली नाही. कृपया पुन्हा प्रयत्न करा.',
+  'portal.successTitle': 'तुमची विनंती नोंदवली गेली आहे!',
+  'portal.followedUp': 'तुमच्या विनंतीचा पाठपुरावा येथे केला जात आहे:',
+  'portal.routedToMp': 'तुमच्या MP कडे पाठवले',
+  'portal.yourReport': 'तुमचा अहवाल',
+  'portal.aiCategory': 'AI वर्ग',
+  'portal.sentimentLabel': 'भावना',
+  'portal.priorityScore': 'प्राधान्य गुण',
+  'portal.submitAnother': 'आणखी एक विनंती सादर करा',
+
+  // Routing tree
+  'tree.mpTier': 'संसद · लोकसभा (MP)',
+  'tree.mlaTier': 'राज्य · विधानसभा (MLA)',
+  'tree.localTier': 'स्थानिक स्वराज्य संस्था',
+  'tree.mpFallback': 'संसद सदस्य',
+  'tree.mlaUpdating': 'MLA — नोंद अद्यतनित केली जात आहे',
+  'tree.noInfo': 'तुमची विनंती कोण हाताळेल हे पाहण्यासाठी स्थान सक्षम करा.',
+
+  // Login
+  'login.title': 'शासकीय साइन इन',
+  'login.subtitle': 'PMO अधिकारी आणि संसद सदस्यांसाठी.',
+  'login.email': 'ईमेल पत्ता',
+  'login.password': 'पासवर्ड',
+  'login.signIn': 'साइन इन',
+  'login.signingIn': 'साइन इन होत आहे…',
+  'login.invalid': 'अवैध ईमेल किंवा पासवर्ड. कृपया पुन्हा प्रयत्न करा.',
+  'login.demoAccounts': 'डेमो खाती',
+
+  // MP dashboard
+  'dash.mpBadge': 'संसद सदस्य · 18वी लोकसभा',
+  'dash.requests': 'विनंत्या',
+  'dash.unresolved': 'निराकरण न झालेल्या',
+  'dash.sanctioned': 'मंजूर',
+  'dash.wikipedia': 'Wikipedia',
+  'dash.syncData': 'डेटा सिंक करा',
+  'dash.loading': 'मतदारसंघ मापदंड लोड होत आहेत…',
+  'dash.liveMap': 'थेट तक्रार नकाशा',
+  'dash.localReps': 'स्थानिक प्रतिनिधी — विधानसभा विभाग (MLAs)',
+  'dash.localRepsSub':
+    'या संसदीय जागेतील विनंत्या संबंधित MLA आणि स्थानिक स्वराज्य संस्थेकडेही पाठवल्या जातात.',
+  'dash.mlaToUpdate': 'MLA — अद्यतनित करावयाचे',
+
+  // Analytics
+  'analytics.totalSuggestions': 'एकूण सूचना',
+  'analytics.recommendedProjects': 'शिफारस केलेले प्रकल्प',
+  'analytics.unresolvedRate': 'निराकरण न झालेला दर',
+  'analytics.sectorDemand': 'क्षेत्रनिहाय तक्रार मागणी (मतदारसंघ मापदंड)',
+  'analytics.noDemand': 'अद्याप कोणतीही मागणी विनंती नोंदवली गेली नाही.',
+
+  // Project prioritizer
+  'proj.title': 'AI-प्राधान्यक्रमित विकास कामे',
+  'proj.subtitle': 'MPLADS निधी वाटप निकडीच्या मापदंडांनुसार गतिशीलपणे क्रमवारी लावले.',
+  'proj.runAI': 'AI प्राधान्यक्रम चालवा',
+  'proj.ranking': 'क्रमवारी लावत आहे…',
+  'proj.none1': 'अद्याप कोणतेही शिफारस केलेले प्रकल्प तयार झाले नाहीत.',
+  'proj.none2': 'नागरिकांच्या मागण्या तपासण्यासाठी वर "AI प्राधान्यक्रम चालवा" वर क्लिक करा.',
+  'proj.priority': 'प्राधान्य: {score}',
+  'proj.estCost': 'अंदाजित खर्च',
+  'proj.supporting': 'समर्थक याचिका',
+  'proj.citizens': '{count} नागरिक',
+  'proj.sanctionWork': 'काम मंजूर करा',
+  'proj.categoryLabel': 'वर्ग: {cat}',
+  'proj.aiDone': 'AI प्राधान्यक्रम मॉडेल पूर्ण झाले! नवीन प्रकल्प प्रस्ताव तयार झाले.',
+  'proj.aiFail': 'प्रकल्प सूचना तयार करता आल्या नाहीत.',
+  'proj.updateFail': 'प्रकल्प स्थिती अद्यतनित करता आली नाही.',
+
+  // PMO
+  'pmo.title': 'PMO कमांड सेंटर',
+  'pmo.subtitle': 'सर्व {count} मतदारसंघ आणि त्यांच्या संसद सदस्यांवर राष्ट्रीय देखरेख.',
+  'pmo.loading': 'राष्ट्रीय डॅशबोर्ड लोड होत आहे…',
+  'pmo.backToAll': 'सर्व MPs कडे परत',
+  'stats.mps': 'संसद सदस्य',
+  'stats.requests': 'नागरिक विनंत्या (राष्ट्रीय)',
+  'stats.sanctioned': 'मंजूर प्रकल्प',
+  'stats.unresolvedRate': 'निराकरण न झालेला दर',
+
+  // MP directory
+  'dir.searchPlaceholder': 'MP, मतदारसंघ किंवा राज्य शोधा…',
+  'dir.allStates': 'सर्व राज्ये',
+  'dir.onlyWithRequests': 'फक्त विनंत्या असलेले MPs',
+  'dir.showing': '{total} पैकी {shown} MPs दर्शवत आहे',
+  'dir.noMatch': 'या फिल्टरशी जुळणारे कोणतेही MPs नाहीत.',
+  'dir.sortPrefix': 'क्रमवारी: {label}',
+  'dir.sortRequests': 'सर्वाधिक विनंत्या',
+  'dir.sortWork': 'सर्वाधिक काम पूर्ण (मंजूर)',
+  'dir.sortResolved': 'सर्वाधिक निराकरण',
+  'dir.sortPending': 'सर्वाधिक प्रलंबित',
+  'dir.sortBacklog': 'सर्वाधिक अनुशेष %',
+  'dir.sortName': 'नाव (अ–ज्ञ)',
+  'dir.colMember': 'सदस्य',
+  'dir.colState': 'राज्य',
+  'dir.colRequests': 'विनंत्या',
+  'dir.colResolved': 'निराकरण',
+  'dir.colPending': 'प्रलंबित',
+  'dir.colDone': 'पूर्ण',
+  'card.requests': 'विनंत्या',
+  'card.resolved': 'निराकरण',
+  'card.pending': 'प्रलंबित',
+  'card.done': 'पूर्ण',
+
+  // Map popup
+  'map.issue': '{cat} समस्या',
+  'map.priority': 'प्राधान्य: {score}/100',
+  'map.status': 'स्थिती: {status}',
+
+  // Enumerated: categories
+  'category.Water': 'पाणी',
+  'category.Roads': 'रस्ते',
+  'category.Education': 'शिक्षण',
+  'category.Health': 'आरोग्य',
+  'category.Sanitation': 'स्वच्छता',
+  'category.Public Spaces': 'सार्वजनिक जागा',
+  'category.Electricity': 'वीज',
+  'category.Safety': 'सुरक्षा',
+  'category.General': 'सर्वसाधारण',
+
+  // Enumerated: statuses
+  'status.Submitted': 'सादर केले',
+  'status.Reviewed': 'पुनरावलोकन केले',
+  'status.Approved': 'मंजूर',
+  'status.Rejected': 'नाकारले',
+  'status.Proposed': 'प्रस्तावित',
+  'status.Sanctioned': 'मंजूर',
+  'status.Work In Progress': 'काम सुरू आहे',
+  'status.Completed': 'पूर्ण झाले',
+
+  // Enumerated: sentiment
+  'sentiment.Positive': 'सकारात्मक',
+  'sentiment.Negative': 'नकारात्मक',
+  'sentiment.Neutral': 'तटस्थ',
+};
+
+export default mr;

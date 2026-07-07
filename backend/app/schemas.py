@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -25,6 +25,8 @@ class UserCreate(UserBase):
 
 class UserOut(UserBase):
     id: int
+    role: Optional[str] = None
+    constituency_id: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -53,6 +55,7 @@ class SuggestionBase(BaseModel):
 
 class SuggestionCreate(SuggestionBase):
     language_code: Optional[str] = "en"
+    constituency_id: Optional[int] = None
 
 
 class SuggestionOut(BaseModel):
@@ -70,6 +73,8 @@ class SuggestionOut(BaseModel):
     priority_score: int
     status: str
     ward_id: Optional[int] = None
+    constituency_id: Optional[int] = None
+    assembly_constituency_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
@@ -80,7 +85,8 @@ class ProjectBase(BaseModel):
     title: str
     description: Optional[str] = None
     category: str
-    target_ward_id: int
+    target_ward_id: Optional[int] = None
+    constituency_id: Optional[int] = None
     estimated_cost: float
     priority_score: int
     supporting_suggestions_count: int
@@ -106,3 +112,91 @@ class AnalyticsSummary(BaseModel):
     category_counts: dict
     sentiment_distribution: dict
     unresolved_percentage: float
+
+
+# Constituency Schemas
+class ConstituencyOut(BaseModel):
+    id: int
+    name: str
+    state: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+# MP Schemas (includes computed progress metrics for the PMO command center)
+class MPOut(BaseModel):
+    id: int
+    constituency_id: int
+    constituency_name: Optional[str] = None
+    name: str
+    party: Optional[str] = None
+    party_abbr: Optional[str] = None
+    state: Optional[str] = None
+    photo_url: Optional[str] = None
+    email: Optional[str] = None
+    wikipedia_url: Optional[str] = None
+    # Progress metrics (computed per request, default 0)
+    total_suggestions: int = 0
+    resolved_suggestions: int = 0
+    pending_suggestions: int = 0
+    unresolved_percentage: float = 0.0
+    sanctioned_projects: int = 0
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Assembly (MLA) tier schemas
+class AssemblyConstituencyOut(BaseModel):
+    id: int
+    name: str
+    ac_no: Optional[int] = None
+    state: str
+    pc_name: Optional[str] = None
+    district: Optional[str] = None
+    parliamentary_constituency_id: Optional[int] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MLAOut(BaseModel):
+    id: int
+    assembly_constituency_id: int
+    assembly_constituency_name: Optional[str] = None
+    name: str
+    party: Optional[str] = None
+    party_abbr: Optional[str] = None
+    state: Optional[str] = None
+    photo_url: Optional[str] = None
+    wikipedia_url: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CivicOfficialOut(BaseModel):
+    id: int
+    body: str
+    zone: Optional[str] = None
+    role: str
+    name: Optional[str] = None
+    contact: Optional[str] = None
+    is_placeholder: bool = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+# The full representative hierarchy for a location (the routing tree).
+class HierParliamentary(BaseModel):
+    constituency: ConstituencyOut
+    mp: Optional[MPOut] = None
+
+
+class HierAssembly(BaseModel):
+    assembly_constituency: AssemblyConstituencyOut
+    mla: Optional[MLAOut] = None
+
+
+class HierCivic(BaseModel):
+    officials: List[CivicOfficialOut] = []
+
+
+class HierarchyOut(BaseModel):
+    parliamentary: Optional[HierParliamentary] = None
+    assembly: Optional[HierAssembly] = None
+    civic: Optional[HierCivic] = None

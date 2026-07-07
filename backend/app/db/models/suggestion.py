@@ -24,6 +24,12 @@ class Suggestion(Base):
     )  # "Submitted", "Processing", "Reviewed", "Approved", "Rejected"
 
     ward_id = Column(Integer, ForeignKey("wards.id"), nullable=True)
+    constituency_id = Column(
+        Integer, ForeignKey("constituencies.id"), nullable=True, index=True
+    )
+    assembly_constituency_id = Column(
+        Integer, ForeignKey("assembly_constituencies.id"), nullable=True, index=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

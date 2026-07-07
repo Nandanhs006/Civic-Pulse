@@ -13,25 +13,30 @@ router = APIRouter()
 @router.get("/", response_model=List[ProjectOut])
 def get_projects_list(
     category: Optional[str] = None,
+    constituency_id: Optional[int] = None,
     service: ProjectService = Depends(deps.get_project_service),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
-    Get recommended and sanctioned development works (Admin access required).
+    Get recommended and sanctioned development works. MPs are auto-scoped to their
+    own constituency; the PMO may pass constituency_id or see all.
     """
-    return service.get_projects(category=category)
+    scoped = deps.resolve_scope(current_user, constituency_id)
+    return service.get_projects(category=category, constituency_id=scoped)
 
 
 @router.post("/recommend", response_model=List[ProjectOut])
 def run_project_recommendations(
+    constituency_id: Optional[int] = None,
     service: ProjectService = Depends(deps.get_project_service),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
     Trigger the AI prioritization model to scan unresolved suggestions, calculate scores,
-    and generate project proposals (Admin access required).
+    and generate project proposals. MPs are scoped to their own constituency.
     """
-    return service.generate_recommendations()
+    scoped = deps.resolve_scope(current_user, constituency_id)
+    return service.generate_recommendations(constituency_id=scoped)
 
 
 @router.patch("/{id}", response_model=ProjectOut)

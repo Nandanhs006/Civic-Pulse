@@ -1,147 +1,123 @@
-from typing import List, Dict, Optional, Any, cast
+from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 from app.db.models.project import ProposedProject
-from app.db.models.ward import Ward
+from app.db.models.constituency import Constituency
 from app.db.models.suggestion import Suggestion
+
+
+# Rough per-category cost multipliers (INR) for the mock estimator.
+CATEGORY_COST = {
+    "Water": 8_000_000,
+    "Roads": 15_000_000,
+    "Education": 12_000_000,
+    "Health": 20_000_000,
+    "Sanitation": 6_000_000,
+    "Public Spaces": 5_000_000,
+    "Electricity": 10_000_000,
+    "Safety": 4_000_000,
+    "General": 5_000_000,
+}
 
 
 class ProjectService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_projects(self, category: Optional[str] = None) -> List[ProposedProject]:
+    def get_projects(
+        self,
+        category: Optional[str] = None,
+        constituency_id: Optional[int] = None,
+    ) -> List[ProposedProject]:
         query = self.db.query(ProposedProject)
         if category:
             query = query.filter(ProposedProject.category == category)
+        if constituency_id:
+            query = query.filter(ProposedProject.constituency_id == constituency_id)
         return query.order_by(ProposedProject.priority_score.desc()).all()
 
-    def generate_recommendations(self) -> List[ProposedProject]:
-        """
-        AI-assisted recommendation algorithm to generate and prioritize public projects
-        based on citizen request density, infrastructure gap database, and ward sizes.
-        """
-        # Step 1: Query all wards and current unresolved suggestions count
-        wards = self.db.query(Ward).all()
-        if not wards:
-            return []
+    def generate_recommendations(
+        self, constituency_id: Optional[int] = None
+    ) -> List[ProposedProject]:
+        """Generate prioritized project proposals per (constituency, category).
 
-        # Count suggestions by ward and category
-        suggestion_counts = (
+        Scored purely on citizen signal we actually have: request volume,
+        average AI priority, and the share of negative-sentiment requests.
+        """
+        # Aggregate unresolved suggestions by constituency + category.
+        q = (
             self.db.query(
-                Suggestion.ward_id,
+                Suggestion.constituency_id,
                 Suggestion.category,
-                func.count(Suggestion.id).label("total_count"),
+                func.count(Suggestion.id).label("total"),
+                func.avg(Suggestion.priority_score).label("avg_priority"),
+                func.sum(
+                    case((Suggestion.sentiment == "Negative", 1), else_=0)
+                ).label("negatives"),
             )
             .filter(Suggestion.status == "Submitted")
-            .group_by(Suggestion.ward_id, Suggestion.category)
-            .all()
+            .filter(Suggestion.constituency_id.isnot(None))
+            .group_by(Suggestion.constituency_id, Suggestion.category)
         )
+        if constituency_id:
+            q = q.filter(Suggestion.constituency_id == constituency_id)
+        rows = q.all()
 
-        # Structure counts into nested dictionaries: {ward_id: {category: count}}
-        counts_map: Dict[int, Dict[str, int]] = {}
-        for s_count in suggestion_counts:
-            w_id, cat, total = s_count
-            if w_id not in counts_map:
-                counts_map[w_id] = {}
-            counts_map[w_id][cat] = total
+        # Cache constituency names for titles.
+        cnames = {
+            c.id: c.name
+            for c in self.db.query(Constituency.id, Constituency.name).all()
+        }
 
-        recommendations = []
-        categories = [
-            "Water",
-            "Roads",
-            "Education",
-            "Health",
-            "Sanitation",
-            "Public Spaces",
-            "Electricity",
-            "Safety",
-        ]
+        recommendations: List[ProposedProject] = []
+        for c_id, category, total, avg_priority, negatives in rows:
+            if not category or total == 0:
+                continue
+            avg_priority = float(avg_priority or 50)
+            negatives = int(negatives or 0)
+            negative_ratio = negatives / total if total else 0.0
 
-        # Step 2: Run prioritization weights for each ward and category combo
-        for ward in wards:
-            ward_id = int(ward.id)
-            ward_counts = counts_map.get(ward_id, {})
-            infra_gaps: Dict[str, Any] = cast(
-                Dict[str, Any], ward.infrastructure_gaps or {}
+            demand_factor = min(total * 8, 40)
+            sentiment_factor = negative_ratio * 20
+            priority_score = int(
+                min(100, max(10, 0.5 * avg_priority + demand_factor + sentiment_factor))
             )
 
-            for category in categories:
-                # Calculate Suggestion Density
-                sug_count = ward_counts.get(category, 0)
-                if sug_count == 0:
-                    continue  # Only recommend if there is demand
+            cname = cnames.get(c_id, f"Constituency {c_id}")
+            title = f"{category} Development Works - {cname}"
 
-                area = float(ward.area_sq_km) if ward.area_sq_km else 1.0
-                suggestion_density = (sug_count / area) * 10.0  # scale factor
-
-                # Fetch category infrastructure gap index (scale 0 to 10)
-                infra_gap_index = 0.0
-                if category == "Water":
-                    hrs = float(infra_gaps.get("water_supply_hrs", 12))
-                    infra_gap_index = max(0.0, (24.0 - hrs) / 2.4)
-                elif category == "Roads":
-                    infra_gap_index = float(infra_gaps.get("pothole_index", 5))
-                elif category == "Education":
-                    infra_gap_index = (
-                        float(infra_gaps.get("school_ratio_deficit", 0.5)) * 10.0
-                    )
-                else:
-                    infra_gap_index = 5.0  # default gap
-
-                # Population factor (larger population needs more projects)
-                pop_score = min(float(ward.population) / 10000.0, 10.0)
-
-                # Prioritization formula: P = w1 * suggestion_density + w2 * gap + w3 * pop
-                priority_score = int(
-                    (0.4 * suggestion_density)
-                    + (0.4 * infra_gap_index * 10)
-                    + (0.2 * pop_score * 10)
+            existing = (
+                self.db.query(ProposedProject)
+                .filter(
+                    ProposedProject.title == title,
+                    ProposedProject.status == "Proposed",
                 )
-                priority_score = min(max(priority_score, 10), 100)
+                .first()
+            )
+            if existing:
+                continue
 
-                # Generate a proposed project if score matches priority target
-                title = f"{category} System Upgrade - {ward.name}"
-
-                # Simple mock cost estimates based on ward size & type
-                cost_estimate = 500000.00
-                if category == "Roads":
-                    cost_estimate = float(area) * 250000.00
-                elif category == "Water":
-                    cost_estimate = float(ward.population) * 15.00
-
-                justification = (
-                    f"Recommended upgrade for {category} due to a request volume of {sug_count} "
-                    f"unresolved issues in {ward.name}. The ward has an infrastructure gap index of "
-                    f"{infra_gap_index:.2f}/10 in this area, impacting a population of {ward.population}."
-                )
-
-                # Check if this recommendation already exists to avoid duplicates
-                existing = (
-                    self.db.query(ProposedProject)
-                    .filter(
-                        ProposedProject.title == title,
-                        ProposedProject.status == "Proposed",
-                    )
-                    .first()
-                )
-
-                if not existing:
-                    new_proj = ProposedProject(
-                        title=title,
-                        description=f"Automated suggestion based on constituency diagnostics: {justification}",
-                        category=category,
-                        target_ward_id=ward.id,
-                        estimated_cost=cost_estimate,
-                        priority_score=priority_score,
-                        supporting_suggestions_count=sug_count,
-                        ai_justification=justification,
-                        status="Proposed",
-                    )
-                    self.db.add(new_proj)
-                    recommendations.append(new_proj)
+            cost = float(CATEGORY_COST.get(category, 5_000_000)) * (1 + 0.1 * total)
+            justification = (
+                f"{total} unresolved '{category}' request(s) in {cname} with an average "
+                f"AI priority of {avg_priority:.0f}/100 and {negatives} negative-sentiment "
+                f"report(s). Recommended for sanction under constituency development funds."
+            )
+            new_proj = ProposedProject(
+                title=title,
+                description=f"Auto-generated from citizen demand analysis: {justification}",
+                category=category,
+                target_ward_id=None,
+                constituency_id=c_id,
+                estimated_cost=cost,
+                priority_score=priority_score,
+                supporting_suggestions_count=int(total),
+                ai_justification=justification,
+                status="Proposed",
+            )
+            self.db.add(new_proj)
+            recommendations.append(new_proj)
 
         if recommendations:
             self.db.commit()
-
         return recommendations

@@ -1,26 +1,31 @@
 import React, { useState } from 'react';
 import { ProposedProject } from '../../../types';
 import apiClient from '../../../services/apiClient';
-import { Briefcase, Zap, PlusCircle, Check, Loader2, IndianRupee } from 'lucide-react';
+import { useLang } from '../../../context/LanguageContext';
+import { Briefcase, Zap, Check, Loader2, IndianRupee } from 'lucide-react';
 
 interface ProjectPrioritizerProps {
   projects: ProposedProject[];
   onRefresh: () => void;
+  constituencyId?: number;
 }
 
-const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRefresh }) => {
+const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRefresh, constituencyId }) => {
+  const { t } = useLang();
   const [runningModel, setRunningModel] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   const triggerRecommendations = async () => {
     setRunningModel(true);
     try {
-      await apiClient.post('/api/v1/projects/recommend');
+      await apiClient.post('/api/v1/projects/recommend', null, {
+        params: constituencyId ? { constituency_id: constituencyId } : {},
+      });
       onRefresh();
-      alert('AI prioritization model completed! New project proposals generated.');
+      alert(t('proj.aiDone'));
     } catch (err) {
       console.error(err);
-      alert('Failed to generate project suggestions.');
+      alert(t('proj.aiFail'));
     } finally {
       setRunningModel(false);
     }
@@ -33,7 +38,7 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
       onRefresh();
     } catch (err) {
       console.error(err);
-      alert('Failed to update project status.');
+      alert(t('proj.updateFail'));
     } finally {
       setUpdatingId(null);
     }
@@ -53,10 +58,10 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
         <div>
           <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Briefcase size={18} color="var(--primary)" />
-            AI-Prioritized Development Works
+            {t('proj.title')}
           </h3>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            MPLADS fund allocations ranked dynamically by urgency metrics.
+            {t('proj.subtitle')}
           </p>
         </div>
         <button
@@ -68,12 +73,12 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
           {runningModel ? (
             <>
               <Loader2 size={16} className="animate-spin" />
-              Ranking...
+              {t('proj.ranking')}
             </>
           ) : (
             <>
               <Zap size={16} />
-              Run AI Prioritization
+              {t('proj.runAI')}
             </>
           )}
         </button>
@@ -82,8 +87,8 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
         {projects.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
-            <p>No recommended projects generated yet.</p>
-            <p style={{ fontSize: '12px', marginTop: '4px' }}>Click "Run AI Prioritization" above to scan citizen demands.</p>
+            <p>{t('proj.none1')}</p>
+            <p style={{ fontSize: '12px', marginTop: '4px' }}>{t('proj.none2')}</p>
           </div>
         ) : (
           projects.map((proj) => (
@@ -98,7 +103,7 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <h4 style={{ fontSize: '15px', color: 'var(--text-main)' }}>{proj.title}</h4>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Category: {proj.category}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t('proj.categoryLabel', { cat: t('category.' + proj.category) })}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{
@@ -109,7 +114,7 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
                     background: proj.priority_score > 75 ? 'hsla(346, 84%, 55%, 0.2)' : 'hsla(38, 92%, 50%, 0.2)',
                     color: proj.priority_score > 75 ? 'var(--danger)' : 'var(--warning)'
                   }}>
-                    Priority: {proj.priority_score}
+                    {t('proj.priority', { score: proj.priority_score })}
                   </span>
                   <span style={{
                     fontSize: '11px',
@@ -119,7 +124,7 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
                     color: proj.status === 'Sanctioned' ? 'var(--success)' : 'var(--text-muted)',
                     fontWeight: 600
                   }}>
-                    {proj.status}
+                    {t('status.' + proj.status)}
                   </span>
                 </div>
               </div>
@@ -138,16 +143,16 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
               }}>
                 <div style={{ display: 'flex', gap: '20px' }}>
                   <div>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>ESTIMATED COST</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>{t('proj.estCost')}</span>
                     <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center' }}>
                       <IndianRupee size={12} style={{ marginRight: '2px' }} />
                       {formatCost(proj.estimated_cost).replace('₹', '')}
                     </span>
                   </div>
                   <div>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>SUPPORTING PETITIONS</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>{t('proj.supporting')}</span>
                     <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--secondary)' }}>
-                      {proj.supporting_suggestions_count} Citizens
+                      {t('proj.citizens', { count: proj.supporting_suggestions_count })}
                     </span>
                   </div>
                 </div>
@@ -168,7 +173,7 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
                     }}
                   >
                     {updatingId === proj.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                    Sanction Work
+                    {t('proj.sanctionWork')}
                   </button>
                 )}
               </div>

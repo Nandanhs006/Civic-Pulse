@@ -10,7 +10,8 @@ _in_memory_cache: dict = {}
 def check_rate_limit(request: Request):
     """
     FastAPI dependency for sliding-window rate-limiting.
-    Permits up to 5 suggestions per hour for citizens, and 100 requests/min for general API.
+    Limits are configurable via settings (RATE_LIMIT_* env vars):
+    citizen submissions and general API each have their own max/window per IP.
     """
     client_ip = request.client.host if request.client else "unknown_ip"
     current_time = time.time()
@@ -20,8 +21,12 @@ def check_rate_limit(request: Request):
         request.url.path.endswith("/api/v1/suggestions/") and request.method == "POST"
     )
 
-    limit = 5 if is_submission else 100
-    window = 3600 if is_submission else 60
+    if is_submission:
+        limit = settings.RATE_LIMIT_SUBMISSION_MAX
+        window = settings.RATE_LIMIT_SUBMISSION_WINDOW
+    else:
+        limit = settings.RATE_LIMIT_API_MAX
+        window = settings.RATE_LIMIT_API_WINDOW
     key = f"rate_limit:{client_ip}:{request.url.path}"
 
     try:

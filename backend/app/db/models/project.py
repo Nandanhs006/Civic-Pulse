@@ -10,7 +10,10 @@ class ProposedProject(Base):
     title = Column(String(200), nullable=False)
     description = Column(Text)
     category = Column(String(50), nullable=False)
-    target_ward_id = Column(Integer, ForeignKey("wards.id"), nullable=False)
+    target_ward_id = Column(Integer, ForeignKey("wards.id"), nullable=True)
+    constituency_id = Column(
+        Integer, ForeignKey("constituencies.id"), nullable=True, index=True
+    )
     estimated_cost = Column(Numeric(12, 2), nullable=False)
     priority_score = Column(Integer, nullable=False)
     supporting_suggestions_count = Column(Integer, default=0)
