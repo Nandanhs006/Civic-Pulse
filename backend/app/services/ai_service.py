@@ -1,5 +1,6 @@
 import os
 import sys
+
 # Force fallback to pure Python protobuf to prevent Python 3.14 C-extension crashes
 sys.modules["google._upb"] = None  # type: ignore
 sys.modules["google._upb._message"] = None  # type: ignore

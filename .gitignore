@@ -39,3 +39,6 @@ htmlcov/
 # Local uploads and data
 backend/uploads/
 uploads/
+
+# Production releases and deployment packages
+deploy-bundle/
