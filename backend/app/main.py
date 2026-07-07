@@ -78,6 +78,14 @@ app.include_router(
     tags=["Hierarchy"],
 )
 
+import asyncio
+
+
+@app.get(f"{settings.API_V1_STR}/test-timeout", tags=["Debug"])
+async def debug_test_timeout(seconds: float = 35.0):
+    await asyncio.sleep(seconds)
+    return {"status": "success"}
+
 
 # Prometheus Instrumentation
 Instrumentator().instrument(app).expose(app)
