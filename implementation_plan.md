@@ -236,3 +236,82 @@ To generate a clean, standalone build folder ready for hosting or deployment:
    * Copy `backend/` into `deploy-bundle/backend/`.
    * Copy `frontend/dist/` into `deploy-bundle/frontend/dist/` (configured to be served as static files by the backend or via Nginx).
    * Bundle `docker-compose.yml` and a deploy script `deploy.sh` that pushes images to Google Artifact Registry and launches them on Google Cloud Run.
+
+---
+
+## Load Balancer & Timeout Implementation Plan
+
+To enhance system reliability, prevent resource exhaustion, and handle high citizen traffic, we propose adding a reverse proxy load balancer (Nginx) and strict request timeouts across both the server and client.
+
+### 1. Architectural Overview
+
+```mermaid
+graph TD
+    Client[React Frontend Client] -->|Request with 10s Timeout| LB[Nginx Load Balancer]
+    
+    subgraph Backend Replica Pool
+        LB -->|Round-Robin / 5s Connection Timeout| Backend1[FastAPI Instance 1]
+        LB -->|Round-Robin / 5s Connection Timeout| Backend2[FastAPI Instance 2]
+    end
+    
+    Backend1 -->|10s Processing Limit| DB[(Database / Cache)]
+```
+
+### 2. Proposed Changes
+
+#### A. Nginx Load Balancer Configuration (`frontend/nginx.conf` and `docker-compose.yml`)
+* Configure Nginx as a local load balancer distributing traffic between multiple backend container replicas.
+* Set Nginx timeouts:
+  * `proxy_connect_timeout 5s;` - Limit connection time to backend.
+  * `proxy_read_timeout 15s;` - Maximum time to wait for a backend response.
+  * `proxy_send_timeout 15s;` - Maximum time to transmit data to the backend.
+
+```nginx
+# frontend/nginx.conf
+upstream backend_servers {
+    server backend:8000;
+}
+
+server {
+    listen 80;
+    
+    location /api/ {
+        proxy_pass http://backend_servers;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 15s;
+        proxy_send_timeout 15s;
+    }
+}
+```
+
+#### B. FastAPI Timeout Middleware (`backend/app/middleware/timeout.py`)
+* Implement a custom ASGI Middleware that wraps request processing inside `asyncio.wait_for()`.
+* If processing takes longer than **10 seconds** (e.g. database deadlocks or slow AI API calls), raise an `HTTPException(status_code=504, detail="Gateway Timeout")`.
+
+```python
+import asyncio
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class TimeoutMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, timeout_seconds: float = 10.0):
+        super().__init__(app)
+        self.timeout_seconds = timeout_seconds
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        try:
+            return await asyncio.wait_for(call_next(request), timeout=self.timeout_seconds)
+        except asyncio.TimeoutError:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=504,
+                content={"detail": "Gateway Timeout: Request took too long to process."}
+            )
+```
+
+#### C. Frontend Axios Client Timeout (`frontend/src/services/api.ts`)
+* Add a global `timeout: 10000` (10 seconds) configuration to the Axios client instance to ensure the UI handles request hanging gracefully.
+
+### 3. Verification Plan
+* **Automated Tests**: Add a test endpoint `/api/v1/test/delay?seconds=12` that sleeps for 12 seconds, and assert it returns an HTTP 504.
+* **Manual Verification**: Launch the load balancer with 2 replicas via `docker compose up --scale backend=2` and observe Nginx round-robin routing logs.

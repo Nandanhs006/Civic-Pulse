@@ -36,3 +36,9 @@ def test_submit_audio_suggestion(client):
     assert data["audio_url"] is not None
     assert data["content"] != ""  # Auto-transcribed by mock Whisper AI
     assert data["status"] == "Submitted"
+
+
+def test_timeout_middleware_under_limit(client):
+    response = client.get("/api/v1/test-timeout?seconds=0.01")
+    assert response.status_code == 200
+    assert response.json() == {"status": "success"}

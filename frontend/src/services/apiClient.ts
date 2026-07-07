@@ -3,6 +3,7 @@ import axios from 'axios';
 // Create Axios client with dev proxy / direct fallback
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '',
+  timeout: 30000, // 30 seconds client timeout
   headers: {
     'Content-Type': 'application/json',
   },

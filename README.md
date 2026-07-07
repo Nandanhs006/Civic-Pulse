@@ -17,30 +17,33 @@ Civic Pulse is an enterprise-ready, multilingual civic engagement and decision-s
 
 ## System Architecture (MVP Flow)
 
-The following diagram illustrates how the system orchestrates requests, processes suggestions using Google Cloud resources, and serves dashboards using Google Maps Platform:
+The following diagram illustrates how the system load balances incoming requests across multiple backend replicas, enforces strict timeouts, uses Google Cloud resources, and serves dashboards:
 
 ```mermaid
 graph TB
     subgraph Client Layer
-        Citizen["Citizen Portal <br/> (React Web SPA)"]
-        Admin["MP Admin Dashboard <br/> (Google Maps Platform Heatmap)"]
+        Citizen["Citizen Portal <br/> (Axios Client with 30s Timeout)"]
+        Admin["MP Admin Dashboard <br/> (Google Maps & Axios 30s Timeout)"]
     end
 
-    subgraph API Gateways & Middleware
-        CloudRun["Google Cloud Run <br/> (Serverless Container Hosting)"]
-        Limiter["Rate Limiting Middleware <br/> (Redis Token Bucket)"]
+    subgraph Gateway & Load Balancer
+        Nginx["Nginx Reverse Proxy & Load Balancer <br/> (5s Connect / 30s Read Timeout)"]
     end
 
-    subgraph FastAPI Core Application
-        API["API Endpoints <br/> (app/api/v1)"]
-        AIService["AI Service <br/> (Gemini 1.5 Flash Multimodal)"]
-        FileService["File Service <br/> (GCS Storage SDK)"]
-        ProjService["Project Service <br/> (Prioritization Scoring)"]
+    subgraph FastAPI Backend Replica Pool
+        FastAPI1["FastAPI Instance 1 <br/> (30s Timeout Middleware)"]
+        FastAPI2["FastAPI Instance 2 <br/> (30s Timeout Middleware)"]
     end
 
-    subgraph Cloud Storage & Data Layer
-        CloudSQL[("Google Cloud SQL <br/> (PostgreSQL)")]
-        GCS[("Google Cloud Storage <br/> (Media Buckets)")]
+    subgraph Core Logic & Services
+        Limiter["Rate Limiter <br/> (Redis Token Bucket)"]
+        AIService["AI Service <br/> (Gemini 1.5 Flash API)"]
+        FileService["File Service <br/> (GCS Bucket Uploads)"]
+    end
+
+    subgraph Persistence & Cache
+        CloudSQL[("Google Cloud SQL / Postgres")]
+        GCS[("Google Cloud Storage")]
         Cache[("Redis Cache")]
     end
 
@@ -50,22 +53,22 @@ graph TB
     end
 
     %% Routing connections
-    Citizen -->|Voice/Text/Photo Suggestion| CloudRun
-    Admin -->|Dashboard & Google Maps API| CloudRun
+    Citizen -->|Voice/Text/Photo Suggestions| Nginx
+    Admin -->|Dashboard API Calls| Nginx
     
-    CloudRun -->|Routes Request| API
-    API -->|1. Check Limits| Limiter
-    Limiter -->|Query / Increment| Cache
+    Nginx -->|Round-Robin load balance| FastAPI1
+    Nginx -->|Round-Robin load balance| FastAPI2
     
-    API -->|2. Ingest Suggestion| ProjService
-    ProjService -->|Triggers Translation/Transcription| AIService
-    ProjService -->|Saves Media Attachments| FileService
+    FastAPI1 -->|1. Validate Rate Limits| Limiter
+    Limiter -->|Query bucket| Cache
     
-    FileService -->|Writes Blobs| GCS
-    AIService -->|Gemini multimodal analysis| GCS
-    API -->|Read/Write Records| CloudSQL
+    FastAPI1 -->|2. Ingest Suggestion| AIService
+    FastAPI1 -->|3. Save Attachments| FileService
     
-    API -->|Metrics Output| Prom
+    FileService -->|Store media| GCS
+    FastAPI1 -->|Read/Write Records| CloudSQL
+    
+    FastAPI1 -->|Metrics Output| Prom
     Prom -->|Scrape / Query| Grafana
 ```
 

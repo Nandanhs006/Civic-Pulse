@@ -90,14 +90,21 @@ gcloud run deploy civic-pulse-backend \
 
 Once the deploy completes, Google Cloud will output a live **Service URL** (e.g. `https://civic-pulse-backend-12345.a.run.app`). This is your **Deployed Prototype Link** to submit!
 
+## ⚡ Load Balancing & Request Timeouts
+The production configuration enforces strict timeouts to prevent hangs:
+* **Load Balancer**: Requests route through Nginx (`frontend/nginx.conf`) upstream pool.
+* **TCP Connection Handshake**: Nginx connect timeout is set to **5 seconds**.
+* **Request Processing / Read Timeout**: FastAPI middleware and Nginx proxy read timeouts are set to **30 seconds**.
+* **Client UI Timeout**: Axios requests time out in **30 seconds**.
+
 ## 🧪 Local Launch
 If running locally from this standalone directory:
 ```bash
-# 1. Start Postgres database and Redis services
-docker compose up -d postgres redis
+# 1. Start Postgres database, Redis, and Nginx proxy
+docker compose up -d
 
-# 2. Run backend (runs SQLite if Postgres env is omitted)
-POSTGRES_PASSWORD="" PYTHONPATH=backend python3 -m uvicorn app.main:app --port 8001 --reload
+# 2. Scale backend instances to run with Nginx load balancing
+docker compose up -d --scale backend=2
 ```
 EOF
 
