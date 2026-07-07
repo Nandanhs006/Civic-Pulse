@@ -1,39 +1,7 @@
-# Task List: Civic Pulse - Phase 1 & 2
-
-- `[x]` Initialize Frontend Project
-  - `[x]` Create Vite React TypeScript base
-  - `[x]` Configure ESLint, Prettier, and TypeScript configurations
-  - `[x]` Set up HSL colors, CSS variables, and Glassmorphism style layouts
-- `[x]` Initialize Backend Project
-  - `[x]` Set up folder structures (app/core, app/db, app/api, app/services, app/utils)
-  - `[x]` Create `requirements.txt` with FastAPI, SQLAlchemy, Alembic, Redis, and Prometheus
-  - `[x]` Set up Pydantic settings config, logging, and security JWT helpers
-- `[x]` Database & Storage Configuration
-  - `[x]` Write SQLAlchemy ORM models (User, Ward, Suggestion, ProposedProject)
-  - `[x]` Set up Alembic and run initial migrations script
-  - `[x]` Implement local filesystem/mock S3 FileService for voice/photo uploads
-- `[x]` Backend Logic & Services
-  - `[x]` Implement mock AI Service (transcription & sentiment/classification)
-  - `[x]` Implement suggestion processing logic & project priority score algorithm
-  - `[x]` Create Redis token-bucket rate limiter dependency
-- `[x]` Backend REST API & Documentation
-  - `[x]` Implement API authentication (login, profiles)
-  - `[x]` Implement suggestions endpoints & project recommendation endpoints
-  - `[x]` Custom configure OpenAPI Swagger tags and Bearer Auth metadata
-- `[x]` Prometheus Instrumentation & Docker Setup
-  - `[x]` Configure `prometheus-fastapi-instrumentator` middleware
-  - `[x]` Build local `docker-compose.yml` for Postgres, Redis, Prometheus, and Grafana
-- `[x]` Frontend Views & State Management
-  - `[x]` Build App route layout and Left Sidebar Navigation
-  - `[x]` Build Multilingual Citizen Feedback Form with mock voice recorder captures
-  - `[x]` Build MP Dashboard (Heatmap grid, priority cards list, status trackers)
-  - `[x]` Connect frontend components to backend APIs with type-safe handlers
-- `[x]` Quality Assurance Verification
-  - `[x]` Write Pytest suites for API endpoints (auth, suggestions, projects)
-  - `[x]` Write Vitest component checks for core form submissions
-- `[x]` Hackathon Google Cloud Integration
-  - `[x]` Refactor AI Service to integrate Gemini 1.5 Flash API with local heuristics fallback
-  - `[x]` Refactor File Service to support Google Cloud Storage uploads with local fallback
-  - `[x]` Resolve Python 3.14 Protobuf compatibility using programmatic sys.modules overrides
-  - `[x]` Recreate local virtual environment running on stable Python 3.12.13
-  - `[x]` Compile production React Vite build and assemble release folder
+- `[x]` Create database models (`GridOfficer` and modify `Suggestion`)
+- `[x]` Implement backend endpoints for grid metadata, lookup, and dispatch actions
+- `[x]` Add frontend navigation link in TopBar and register the route in App.tsx
+- `[x]` Build the interactive Participate sub-app views (Map overlay, Officer Directory, Admin Dispatch Panel, Citizen location lookup)
+- `[x]` Seed mock Grid Officers at startup
+- `[x]` Write automated test cases for dispatching and verification
+- `[x]` Run test suite, linters, static type checks, and recompile build package

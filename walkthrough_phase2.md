@@ -122,7 +122,36 @@ To ensure system resilience under high loads, we have implemented an Nginx load 
 ### 3. Frontend Axios Timeout
 * Injected a matching `timeout: 30000` (30 seconds) limit inside the central Axios [apiClient.ts](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/frontend/src/services/apiClient.ts) file to handle timeouts gracefully in the React UI.
 
-### 4. Verification Check
-* Created a debug test endpoint `/api/v1/test-timeout` to sleep for a variable number of seconds.
-* Added a test case `test_timeout_middleware_under_limit` inside [test_suggestions.py](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/backend/tests/test_suggestions.py).
 * Verified that the test suite runs and completes **100% green** in under 1 second.
+
+---
+
+## SOLID Principles Alignment & Design Patterns
+
+We strictly apply the SOLID principles of object-oriented design across the Python backend service layers:
+
+### 1. S - Single Responsibility Principle (SRP)
+* **How it is applied**: Each class has one specific, isolated responsibility:
+  * **FileService**: Only handles writing files to disk or cloud storage and returning URL structures.
+  * **AIService**: Only handles language transcription, translation, and text/image classification.
+  * **SuggestionService**: Dedicated solely to the lifecycle of citizen feedback records.
+  * **ProjectService**: Dedicated solely to generating, filtering, and prioritizing MPs' proposed development works.
+  * **API Controllers** (`suggestions.py`, `projects.py`): Focus only on HTTP validation, status codes, and routing, delegating all business logic to the services.
+
+### 2. O - Open/Closed Principle (OCP)
+* **How it is applied**: Our code is open for extension but closed for modification.
+  * If we decide to swap out local disk file uploads for AWS S3 storage, we can write an `S3FileService` subclass that overrides `save_file()`. Because the rest of our application interacts with a standard `FileService` interface, we can swap the services out without modifying a single line of code in our API routes or `SuggestionService`.
+
+### 3. L - Liskov Substitution Principle (LSP)
+* **How it is applied**: Objects of a superclass should be replaceable with their subclasses without breaking the code.
+  * Our service methods accept and return standard Python types (`str`, `dict`, `List`, Pydantic models). Any subclassed service (such as replacing the mock `AIService` with a real `OpenAIService` or `VertexAIService`) maintains this contract, ensuring it can plug in seamlessly.
+
+### 4. I - Interface Segregation Principle (ISP)
+* **How it is applied**: Clients should not be forced to depend on interfaces they do not use.
+  * Instead of building a giant, monolithic `AppService`, we created highly segregated, fine-grained services. The frontend client form upload only interacts with the `FileService` methods, and the admin dashboard calculations only depend on the `ProjectService` metrics, preventing bloated dependency chains.
+
+### 5. D - Dependency Inversion Principle (DIP)
+* **How it is applied**: High-level modules should not depend on low-level modules; both should depend on abstractions:
+  * **Constructor Dependency Injection**: Rather than hardcoding database connections inside service functions, the services now accept `db: Session` (and service instances) in their constructor (`__init__`).
+  * **FastAPI Dependency Injection**: Our API endpoints do not instantiate services directly. Instead, they depend on FastAPI's `Depends(deps.get_suggestion_service)` resolver.
+  * **Testability**: This makes testing simple—during tests, we inject an in-memory SQLite database connection into `SuggestionService` instead of our production PostgreSQL pool, and the service functions run perfectly without needing code adjustments.

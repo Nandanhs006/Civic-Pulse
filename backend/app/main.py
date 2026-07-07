@@ -13,6 +13,7 @@ from app.api.v1 import (
     constituencies,
     mps,
     hierarchy,
+    grid,
 )
 from app.db.session import engine, SessionLocal
 from app.db.base import Base
@@ -20,6 +21,7 @@ from app.db.models.ward import Ward
 from app.db.models.user import User
 from app.db.models.suggestion import Suggestion
 from app.db.models.project import ProposedProject
+from app.db.models.grid_officer import GridOfficer
 from app.core.security import get_password_hash
 from app.middleware.rate_limit import check_rate_limit
 from app.middleware.timeout import TimeoutMiddleware
@@ -76,6 +78,11 @@ app.include_router(
     hierarchy.router,
     prefix=f"{settings.API_V1_STR}/hierarchy",
     tags=["Hierarchy"],
+)
+app.include_router(
+    grid.router,
+    prefix=f"{settings.API_V1_STR}/grid",
+    tags=["Grid"],
 )
 
 import asyncio
@@ -167,6 +174,50 @@ async def startup_event():
             db.add_all(mock_wards)
             db.commit()
             print("[Seed] Successfully populated default Wards dataset.")
+
+        # Seed Grid Officers
+        if db.query(GridOfficer).count() == 0:
+            mock_officers = [
+                GridOfficer(
+                    id=1,
+                    name="Arjun Mehta",
+                    email="arjun.mehta@civicpulse.gov",
+                    phone="+91-98765-43210",
+                    avatar_url="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+                    is_active=True,
+                    ward_id=1,
+                ),
+                GridOfficer(
+                    id=2,
+                    name="Priya Sharma",
+                    email="priya.sharma@civicpulse.gov",
+                    phone="+91-98765-43211",
+                    avatar_url="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+                    is_active=True,
+                    ward_id=2,
+                ),
+                GridOfficer(
+                    id=3,
+                    name="Rohan Das",
+                    email="rohan.das@civicpulse.gov",
+                    phone="+91-98765-43212",
+                    avatar_url="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150",
+                    is_active=True,
+                    ward_id=3,
+                ),
+                GridOfficer(
+                    id=4,
+                    name="Anjali Nair",
+                    email="anjali.nair@civicpulse.gov",
+                    phone="+91-98765-43213",
+                    avatar_url="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150",
+                    is_active=True,
+                    ward_id=4,
+                ),
+            ]
+            db.add_all(mock_officers)
+            db.commit()
+            print("[Seed] Successfully populated default Grid Officers dataset.")
 
         # 3. Seed Suggestions
         if db.query(Suggestion).count() == 0:
