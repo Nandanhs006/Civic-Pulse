@@ -77,3 +77,27 @@ POSTGRES_PASSWORD="" PYTHONPATH=backend ./venv/bin/pytest backend/tests
 ./venv/bin/mypy backend/app --ignore-missing-imports
 ```
 *(Successfully completes checks with zero warnings).*
+
+---
+
+## Google Cloud Integration & Build Bundle Upgrades (Hackathon Phase)
+
+Following the official Google Cloud Hackathon requirements, we have integrated active Google Cloud resources into the application and created a compiler script to assemble a deployable package for submission.
+
+### 1. Google Cloud Integrations Added
+
+* **Gemini 1.5 Flash API**:
+  * Integrated inside [ai_service.py](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/backend/app/services/ai_service.py) using the official `google-generativeai` SDK.
+  * Translates multi-language grievances, tags categories, tracks sentiment, and scores priority levels dynamically from 1 to 100 based on urgency.
+  * Retains a heuristic rule fallback if no key is present to guarantee offline local test suites pass.
+* **Google Cloud Storage (GCS)**:
+  * Integrated inside [file_service.py](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/backend/app/services/file_service.py) using the official `google-cloud-storage` SDK.
+  * Saves citizen media files (uploaded audio and photos) directly to GCS buckets when configured, with automatic fallback to local directory saving for dev.
+
+### 2. Python 3.12 Virtual Environment
+* Rebuilt the local virtual environment (`venv`) to run on **Python 3.12.13** (matching the production container base image).
+* Ran all pytest suites and static typing checks, ensuring 100% test compatibility and stability.
+
+### 3. Production Compilation & Assembled Build Bundle
+* Created [build_deploy_bundle.sh](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/build_deploy_bundle.sh), which automates compiling React frontend assets (`npm run build`) and packaging the backend + frontend files into a standalone `/deploy-bundle/` folder.
+* Generated a copy-pasteable guide [README_DEPLOY.md](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/deploy-bundle/README_DEPLOY.md) inside the bundle mapping how to deploy the container to **Google Artifact Registry** and **Google Cloud Run**.
