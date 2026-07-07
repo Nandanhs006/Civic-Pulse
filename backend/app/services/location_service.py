@@ -2,18 +2,24 @@
 
 Primary path: an explicit constituency_id chosen via the State -> Constituency
 picker on the portal. Fallback: nearest constituency centroid to the given
-lat/long (only usable once centroids are populated; returns None otherwise).
+lat/long.
 """
 
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.db.models.constituency import Constituency
-from app.services.geo_service import GeoService
 
 
 class LocationService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, geo_srv=None):
         self.db = db
+        # Dependency Inversion Principle (DIP)
+        if geo_srv is None:
+            from app.services.geo_service import GeoService
+
+            self.geo_service = GeoService(self.db)
+        else:
+            self.geo_service = geo_srv
 
     def resolve_constituency(
         self,
@@ -33,7 +39,7 @@ class LocationService:
 
         # 2. Precise GPS -> constituency via boundary point-in-polygon.
         if latitude is not None and longitude is not None:
-            located = GeoService(self.db).locate_constituency_id(latitude, longitude)
+            located = self.geo_service.locate_constituency_id(latitude, longitude)
             if located:
                 return located
 

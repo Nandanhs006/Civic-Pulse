@@ -3,15 +3,47 @@ from sqlalchemy.orm import Session
 from fastapi import UploadFile
 from app.db.models.suggestion import Suggestion
 from app.db.models.ward import Ward
-from app.services.file_service import file_service
-from app.services.ai_service import ai_service
-from app.services.location_service import LocationService
-from app.services.geo_service import GeoService
 
 
 class SuggestionService:
-    def __init__(self, db: Session):
+    def __init__(
+        self,
+        db: Session,
+        file_srv=None,
+        ai_srv=None,
+        location_srv=None,
+        geo_srv=None,
+    ):
         self.db = db
+
+        # Dependency Inversion Principle (DIP) - Injecting dependencies with defaults
+        if file_srv is None:
+            from app.services.file_service import file_service
+
+            self.file_service = file_service
+        else:
+            self.file_service = file_srv
+
+        if ai_srv is None:
+            from app.services.ai_service import ai_service
+
+            self.ai_service = ai_service
+        else:
+            self.ai_service = ai_srv
+
+        if location_srv is None:
+            from app.services.location_service import LocationService
+
+            self.location_service = LocationService(self.db)
+        else:
+            self.location_service = location_srv
+
+        if geo_srv is None:
+            from app.services.geo_service import GeoService
+
+            self.geo_service = GeoService(self.db)
+        else:
+            self.geo_service = geo_srv
 
     def create_suggestion(
         self,
@@ -29,14 +61,14 @@ class SuggestionService:
         image_url = None
 
         if audio_file:
-            audio_url = file_service.save_file(audio_file, subfolder="audio")
+            audio_url = self.file_service.save_file(audio_file, subfolder="audio")
         if image_file:
-            image_url = file_service.save_file(image_file, subfolder="images")
+            image_url = self.file_service.save_file(image_file, subfolder="images")
 
         # Ingest text or run transcription
         transcription_result = {}
         if audio_url:
-            transcription_result = ai_service.transcribe_audio(audio_url)
+            transcription_result = self.ai_service.transcribe_audio(audio_url)
             content = transcription_result.get("raw_text", "")
             english_translation = transcription_result.get("english_translation", "")
             language_code = transcription_result.get("language_code", "en")
@@ -44,27 +76,26 @@ class SuggestionService:
             sentiment = transcription_result.get("sentiment", "Neutral")
             priority_score = transcription_result.get("priority_score", 50)
         else:
-            english_translation = content
             # Run text NLP analysis
-            nlp_result = ai_service.analyze_text(content or "", language_code)
+            nlp_result = self.ai_service.analyze_text(content or "", language_code)
             english_translation = nlp_result.get("english_translation", content)
             category = nlp_result.get("category", "General")
             sentiment = nlp_result.get("sentiment", "Neutral")
             priority_score = nlp_result.get("priority_score", 50)
 
         # Route the request to a parliamentary constituency (the MP's unit).
-        resolved_constituency_id = LocationService(self.db).resolve_constituency(
+        resolved_constituency_id = self.location_service.resolve_constituency(
             constituency_id=constituency_id,
             latitude=latitude,
             longitude=longitude,
         )
 
-        # Also route to the assembly constituency (the MLA's unit) from GPS.
+        # Route to the assembly constituency (the MLA's unit) from GPS.
         assembly_constituency_id = None
         if latitude is not None and longitude is not None:
-            assembly_constituency_id = GeoService(
-                self.db
-            ).locate_assembly_constituency_id(float(latitude), float(longitude))
+            assembly_constituency_id = self.geo_service.locate_assembly_constituency_id(
+                float(latitude), float(longitude)
+            )
 
         # Legacy ward mapping retained for the demographic analytics cards.
         ward_id = None

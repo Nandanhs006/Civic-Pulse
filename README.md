@@ -17,30 +17,30 @@ Civic Pulse is an enterprise-ready, multilingual civic engagement and decision-s
 
 ## System Architecture (MVP Flow)
 
-The following diagram illustrates how the Phase 1 local MVP orchestrates requests and runs priorities:
+The following diagram illustrates how the system orchestrates requests, processes suggestions using Google Cloud resources, and serves dashboards using Google Maps Platform:
 
 ```mermaid
 graph TB
     subgraph Client Layer
-        Citizen["Citizen Portal <br/> (Voice/Text/Photo)"]
-        Admin["MP Admin Dashboard <br/> (Priority Map & Analytics)"]
+        Citizen["Citizen Portal <br/> (React Web SPA)"]
+        Admin["MP Admin Dashboard <br/> (Google Maps Platform Heatmap)"]
     end
 
-    subgraph Gateway & Middleware
-        Nginx["Nginx Reverse Proxy"]
+    subgraph API Gateways & Middleware
+        CloudRun["Google Cloud Run <br/> (Serverless Container Hosting)"]
         Limiter["Rate Limiting Middleware <br/> (Redis Token Bucket)"]
     end
 
     subgraph FastAPI Core Application
         API["API Endpoints <br/> (app/api/v1)"]
-        AIService["AI Service <br/> (Whisper & NLP Tagging)"]
-        FileService["File Service <br/> (Disk/S3 Uploads)"]
+        AIService["AI Service <br/> (Gemini 1.5 Flash Multimodal)"]
+        FileService["File Service <br/> (GCS Storage SDK)"]
         ProjService["Project Service <br/> (Prioritization Scoring)"]
     end
 
-    subgraph Data & Storage Layer
-        DB[("PostgreSQL Database <br/> (with SQLite fallback)")]
-        Storage[("Local Storage <br/> (/uploads directory)")]
+    subgraph Cloud Storage & Data Layer
+        CloudSQL[("Google Cloud SQL <br/> (PostgreSQL)")]
+        GCS[("Google Cloud Storage <br/> (Media Buckets)")]
         Cache[("Redis Cache")]
     end
 
@@ -50,10 +50,10 @@ graph TB
     end
 
     %% Routing connections
-    Citizen -->|HTTP Requests| Nginx
-    Admin -->|API Requests & JWT Auth| Nginx
+    Citizen -->|Voice/Text/Photo Suggestion| CloudRun
+    Admin -->|Dashboard & Google Maps API| CloudRun
     
-    Nginx -->|Route Request| API
+    CloudRun -->|Routes Request| API
     API -->|1. Check Limits| Limiter
     Limiter -->|Query / Increment| Cache
     
@@ -61,8 +61,9 @@ graph TB
     ProjService -->|Triggers Translation/Transcription| AIService
     ProjService -->|Saves Media Attachments| FileService
     
-    FileService -->|Writes Files| Storage
-    API -->|Read/Write Records| DB
+    FileService -->|Writes Blobs| GCS
+    AIService -->|Gemini multimodal analysis| GCS
+    API -->|Read/Write Records| CloudSQL
     
     API -->|Metrics Output| Prom
     Prom -->|Scrape / Query| Grafana
@@ -129,15 +130,22 @@ docker compose up --build
 
 ### Option B: Manual Local Setup (Without Docker)
 
-#### 1. Backend Service Setup
+#### 1. Python Environment Setup (Python 3.12)
+Ensure you have Python 3.12 installed on your system. Run these commands from the repository root:
 ```bash
-cd backend
-python3 -m venv venv
+# 1. Create a virtual environment using Python 3.12
+python3.12 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+
+# 2. Install all required dependencies
+pip install -r backend/requirements.txt
+
+# 3. Start the FastAPI development server
+POSTGRES_PASSWORD="" PYTHONPATH=backend uvicorn app.main:app --reload --port 8001
 ```
-*Note: Automatically falls back to an in-memory SQLite database (`sqlite:///./civic_pulse.db`) and localized memory cache for rate-limiting if PostgreSQL and Redis instances are unreachable.*
+*Note: Automatically falls back to local SQLite (`sqlite:///./civic_pulse.db`) if no PostgreSQL password/host is defined. Set environment variables to enable Google Cloud integrations:*
+* `GEMINI_API_KEY`: Set this to your Google AI Studio or Vertex AI Gemini API key to enable active LLM issue translation, classification, and scoring.
+* `GCS_BUCKET_NAME`: Set this to your Google Cloud Storage bucket name to upload citizen images and voice clips directly to the cloud.
 
 #### 2. Frontend React Setup
 ```bash
@@ -145,6 +153,16 @@ cd frontend
 npm install
 npm run dev
 ```
+
+---
+
+## Standalone Production Deployment Bundle
+
+To package the entire platform (compiled React static build, backend services, Helm charts, and container configuration) into a standalone release:
+```bash
+./build_deploy_bundle.sh
+```
+This creates a separate `/deploy-bundle` directory that you can zip and submit. It includes a custom `README_DEPLOY.md` showing how to build and host the app on serverless **Google Cloud Run** and **Cloud SQL**.
 
 ---
 
