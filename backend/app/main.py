@@ -22,6 +22,7 @@ from app.db.models.suggestion import Suggestion
 from app.db.models.project import ProposedProject
 from app.core.security import get_password_hash
 from app.middleware.rate_limit import check_rate_limit
+from app.middleware.timeout import TimeoutMiddleware
 
 # Create database tables directly if running without Alembic
 Base.metadata.create_all(bind=engine)
@@ -43,6 +44,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Timeout middleware (5s connection, 30s read limit)
+app.add_middleware(TimeoutMiddleware, timeout_seconds=30.0)
 
 # Ensure upload directory exists
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
@@ -73,6 +77,14 @@ app.include_router(
     prefix=f"{settings.API_V1_STR}/hierarchy",
     tags=["Hierarchy"],
 )
+
+import asyncio
+
+
+@app.get(f"{settings.API_V1_STR}/test-timeout", tags=["Debug"])
+async def debug_test_timeout(seconds: float = 35.0):
+    await asyncio.sleep(seconds)
+    return {"status": "success"}
 
 
 # Prometheus Instrumentation

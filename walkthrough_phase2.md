@@ -101,3 +101,28 @@ Following the official Google Cloud Hackathon requirements, we have integrated a
 ### 3. Production Compilation & Assembled Build Bundle
 * Created [build_deploy_bundle.sh](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/build_deploy_bundle.sh), which automates compiling React frontend assets (`npm run build`) and packaging the backend + frontend files into a standalone `/deploy-bundle/` folder.
 * Generated a copy-pasteable guide [README_DEPLOY.md](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/deploy-bundle/README_DEPLOY.md) inside the bundle mapping how to deploy the container to **Google Artifact Registry** and **Google Cloud Run**.
+
+---
+
+## Load Balancer & Strict Timeout Implementation
+
+To ensure system resilience under high loads, we have implemented an Nginx load balancer and comprehensive request timeouts across the entire platform.
+
+### 1. Nginx Reverse Proxy & Load Balancer
+* Updated [nginx.conf](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/frontend/nginx.conf) in the frontend to route requests through an `upstream backend_servers` group.
+* Added timeout boundaries inside Nginx:
+  * `proxy_connect_timeout 5s;` (Establishes fast failover if a backend container replica crashes)
+  * `proxy_read_timeout 30s;` and `proxy_send_timeout 30s;` (Headroom for processing slow queries/operations)
+
+### 2. FastAPI ASGI Timeout Middleware
+* Created a custom [TimeoutMiddleware](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/backend/app/middleware/timeout.py) using `asyncio.wait_for()` to limit internal backend processing times to **30.0 seconds**.
+* Returns a structured `HTTP 504 Gateway Timeout` JSON response to the client if the request exceeds this limit.
+* Registered the middleware inside [main.py](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/backend/app/main.py).
+
+### 3. Frontend Axios Timeout
+* Injected a matching `timeout: 30000` (30 seconds) limit inside the central Axios [apiClient.ts](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/frontend/src/services/apiClient.ts) file to handle timeouts gracefully in the React UI.
+
+### 4. Verification Check
+* Created a debug test endpoint `/api/v1/test-timeout` to sleep for a variable number of seconds.
+* Added a test case `test_timeout_middleware_under_limit` inside [test_suggestions.py](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/backend/tests/test_suggestions.py).
+* Verified that the test suite runs and completes **100% green** in under 1 second.
