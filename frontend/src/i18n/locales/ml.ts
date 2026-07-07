@@ -181,6 +181,33 @@ const ml: Record<string, string> = {
   'sentiment.Positive': 'അനുകൂലം',
   'sentiment.Negative': 'പ്രതികൂലം',
   'sentiment.Neutral': 'നിഷ്പക്ഷം',
+
+  // Live map
+  'nav.liveMap': 'തത്സമയ ഭൂപടം',
+  'map.title': 'തത്സമയ പ്രശ്‌ന ഭൂപടം',
+  'map.backToApp': 'ആപ്പിലേക്ക് മടങ്ങുക',
+  'map.loading': 'പ്രശ്‌നങ്ങൾ ലോഡ് ചെയ്യുന്നു…',
+  'map.issuesShown': '{total}-ൽ {shown} പ്രശ്‌നങ്ങൾ',
+  'map.filters': 'ഫിൽട്ടറുകൾ',
+  'map.severity': 'തീവ്രത',
+  'map.category': 'വിഭാഗം',
+  'map.state': 'സംസ്ഥാനം',
+  'map.allCategories': 'എല്ലാ വിഭാഗങ്ങളും',
+  'map.allStatuses': 'എല്ലാ അവസ്ഥകളും',
+  'map.allStates': 'എല്ലാ സംസ്ഥാനങ്ങളും',
+  'map.reset': 'പുനഃസജ്ജമാക്കുക',
+  'map.legend': 'സൂചിക',
+  'sev.critical': 'ഗുരുതരം',
+  'sev.moderate': 'മിതമായത്',
+  'sev.low': 'കുറഞ്ഞത്',
+  'sev.resolved': 'പരിഹരിച്ചു',
+  'map.reported': 'റിപ്പോർട്ട് ചെയ്തു',
+  'map.priorityLabel': 'മുൻഗണന',
+  'map.statusLabel': 'അവസ്ഥ',
+  'map.noPhoto': 'ഫോട്ടോ ഘടിപ്പിച്ചിട്ടില്ല',
+  'map.representatives': 'ഈ സ്ഥലത്തിനുള്ള പ്രതിനിധികൾ',
+  'map.close': 'അടയ്ക്കുക',
+  'map.zoomHint': 'കൃത്യമായ സ്ഥലങ്ങളിലേക്ക് പോകാൻ സൂം ഇൻ ചെയ്യുക',
 };
 
 export default ml;

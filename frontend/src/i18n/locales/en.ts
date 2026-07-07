@@ -183,6 +183,33 @@ const en = {
   'sentiment.Positive': 'Positive',
   'sentiment.Negative': 'Negative',
   'sentiment.Neutral': 'Neutral',
+
+  // Live map
+  'nav.liveMap': 'Live Map',
+  'map.title': 'Live Issues Map',
+  'map.backToApp': 'Back to app',
+  'map.loading': 'Loading issues…',
+  'map.issuesShown': '{shown} of {total} issues',
+  'map.filters': 'Filters',
+  'map.severity': 'Severity',
+  'map.category': 'Category',
+  'map.state': 'State',
+  'map.allCategories': 'All categories',
+  'map.allStatuses': 'All statuses',
+  'map.allStates': 'All states',
+  'map.reset': 'Reset',
+  'map.legend': 'Legend',
+  'sev.critical': 'Critical',
+  'sev.moderate': 'Moderate',
+  'sev.low': 'Low',
+  'sev.resolved': 'Resolved',
+  'map.reported': 'Reported',
+  'map.priorityLabel': 'Priority',
+  'map.statusLabel': 'Status',
+  'map.noPhoto': 'No photo attached',
+  'map.representatives': 'Representatives for this location',
+  'map.close': 'Close',
+  'map.zoomHint': 'Zoom in to drill down to exact locations',
 };
 
 export default en;

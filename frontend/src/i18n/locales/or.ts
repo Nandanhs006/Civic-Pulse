@@ -183,6 +183,33 @@ const or: Record<string, string> = {
   'sentiment.Positive': 'ସକାରାତ୍ମକ',
   'sentiment.Negative': 'ନକାରାତ୍ମକ',
   'sentiment.Neutral': 'ନିରପେକ୍ଷ',
+
+  // Live Map
+  'nav.liveMap': 'ଲାଇଭ୍ ମାନଚିତ୍ର',
+  'map.title': 'ଲାଇଭ୍ ସମସ୍ୟା ମାନଚିତ୍ର',
+  'map.backToApp': 'ଆପକୁ ଫେରନ୍ତୁ',
+  'map.loading': 'ସମସ୍ୟାଗୁଡ଼ିକ ଲୋଡ୍ ହେଉଛି…',
+  'map.issuesShown': '{total} ମଧ୍ୟରୁ {shown} ସମସ୍ୟା',
+  'map.filters': 'ଫିଲ୍ଟର',
+  'map.severity': 'ଗମ୍ଭୀରତା',
+  'map.category': 'ବର୍ଗ',
+  'map.state': 'ରାଜ୍ୟ',
+  'map.allCategories': 'ସମସ୍ତ ବର୍ଗ',
+  'map.allStatuses': 'ସମସ୍ତ ସ୍ଥିତି',
+  'map.allStates': 'ସମସ୍ତ ରାଜ୍ୟ',
+  'map.reset': 'ରିସେଟ୍',
+  'map.legend': 'କିମ୍ବଦନ୍ତୀ',
+  'sev.critical': 'ଗୁରୁତର',
+  'sev.moderate': 'ମଧ୍ୟମ',
+  'sev.low': 'କମ୍',
+  'sev.resolved': 'ସମାଧାନ ହୋଇଛି',
+  'map.reported': 'ରିପୋର୍ଟ ହୋଇଛି',
+  'map.priorityLabel': 'ପ୍ରାଥମିକତା',
+  'map.statusLabel': 'ସ୍ଥିତି',
+  'map.noPhoto': 'କୌଣସି ଫଟୋ ସଂଲଗ୍ନ ନାହିଁ',
+  'map.representatives': 'ଏହି ଅବସ୍ଥାନ ପାଇଁ ପ୍ରତିନିଧିମାନେ',
+  'map.close': 'ବନ୍ଦ କରନ୍ତୁ',
+  'map.zoomHint': 'ସଠିକ୍ ଅବସ୍ଥାନକୁ ଡ୍ରିଲ୍ ଡାଉନ୍ କରିବାକୁ ଜୁମ୍ ଇନ୍ କରନ୍ତୁ',
 };
 
 export default or;

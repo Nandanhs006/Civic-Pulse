@@ -5,6 +5,7 @@ import Portal from './pages/Portal';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Pmo from './pages/Pmo';
+import LiveMap from './pages/LiveMap';
 import RequireRole from './components/common/RequireRole';
 import { useIsMobile } from './hooks/useIsMobile';
 
@@ -22,6 +23,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     </div>
   );
 };
+
+// Same app navbar, but the map fills the rest of the viewport full-bleed (no padded main).
+const MapLayout: React.FC = () => (
+  <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-app)' }}>
+    <TopBar />
+    <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+      <LiveMap />
+    </div>
+  </div>
+);
 
 const App: React.FC = () => (
   <Routes>
@@ -43,6 +54,8 @@ const App: React.FC = () => (
         </RequireRole>
       }
     />
+    {/* Live map keeps the app navbar; the map fills the rest of the screen */}
+    <Route path="/map" element={<MapLayout />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 );

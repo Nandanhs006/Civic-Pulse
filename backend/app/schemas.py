@@ -80,6 +80,23 @@ class SuggestionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# Public map issue (no citizen phone / PII)
+class MapIssueOut(BaseModel):
+    id: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    category: Optional[str] = None
+    priority_score: int
+    status: str
+    sentiment: Optional[str] = None
+    content: str
+    english_translation: Optional[str] = None
+    image_url: Optional[str] = None
+    constituency_id: Optional[int] = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
 # Project Schemas
 class ProjectBase(BaseModel):
     title: str

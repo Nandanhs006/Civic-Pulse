@@ -181,6 +181,33 @@ const te: Record<string, string> = {
   'sentiment.Positive': 'సానుకూల',
   'sentiment.Negative': 'ప్రతికూల',
   'sentiment.Neutral': 'తటస్థ',
+
+  // Live Map
+  'nav.liveMap': 'లైవ్ మ్యాప్',
+  'map.title': 'లైవ్ సమస్యల మ్యాప్',
+  'map.backToApp': 'యాప్‌కు తిరిగి వెళ్లండి',
+  'map.loading': 'సమస్యలు లోడ్ అవుతున్నాయి…',
+  'map.issuesShown': '{total} సమస్యల్లో {shown}',
+  'map.filters': 'ఫిల్టర్‌లు',
+  'map.severity': 'తీవ్రత',
+  'map.category': 'వర్గం',
+  'map.state': 'రాష్ట్రం',
+  'map.allCategories': 'అన్ని వర్గాలు',
+  'map.allStatuses': 'అన్ని స్థితులు',
+  'map.allStates': 'అన్ని రాష్ట్రాలు',
+  'map.reset': 'రీసెట్',
+  'map.legend': 'లెజెండ్',
+  'sev.critical': 'తీవ్రమైన',
+  'sev.moderate': 'మధ్యస్థ',
+  'sev.low': 'తక్కువ',
+  'sev.resolved': 'పరిష్కరించబడింది',
+  'map.reported': 'నివేదించబడింది',
+  'map.priorityLabel': 'ప్రాధాన్యత',
+  'map.statusLabel': 'స్థితి',
+  'map.noPhoto': 'ఫోటో జతచేయబడలేదు',
+  'map.representatives': 'ఈ ప్రాంతానికి ప్రతినిధులు',
+  'map.close': 'మూసివేయండి',
+  'map.zoomHint': 'ఖచ్చితమైన ప్రదేశాలను చూడటానికి జూమ్ ఇన్ చేయండి',
 };
 
 export default te;

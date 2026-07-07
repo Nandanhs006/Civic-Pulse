@@ -120,3 +120,13 @@ class SuggestionService:
         return (
             query.order_by(Suggestion.created_at.desc()).offset(skip).limit(limit).all()
         )
+
+    def get_map_issues(self, limit: int = 5000) -> List[Suggestion]:
+        """All geolocated issues for the public live map (no PII fields)."""
+        return (
+            self.db.query(Suggestion)
+            .filter(Suggestion.latitude.isnot(None), Suggestion.longitude.isnot(None))
+            .order_by(Suggestion.created_at.desc())
+            .limit(limit)
+            .all()
+        )

@@ -5,7 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useLang } from '../../context/LanguageContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import LanguageSwitcher from '../common/LanguageSwitcher';
-import { Landmark, Sun, Moon, LogOut, LogIn, LayoutDashboard, Radio, Command } from 'lucide-react';
+import { Landmark, Sun, Moon, LogOut, LogIn, LayoutDashboard, Radio, Command, MapPinned } from 'lucide-react';
 
 const navLinkStyle = ({ isActive }: { isActive: boolean }): React.CSSProperties => ({
   display: 'flex',
@@ -81,6 +81,10 @@ const TopBar: React.FC = () => {
         <nav style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px' }}>
           <NavLink to="/" style={navLinkStyle} end title={t('nav.portal')}>
             <Radio size={16} /> {!isMobile && t('nav.portal')}
+          </NavLink>
+
+          <NavLink to="/map" style={navLinkStyle} title={t('nav.liveMap')}>
+            <MapPinned size={16} /> {!isMobile && t('nav.liveMap')}
           </NavLink>
 
           {user?.role === 'mp' && (

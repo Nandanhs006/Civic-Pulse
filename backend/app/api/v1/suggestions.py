@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile, status
 from sqlalchemy.orm import Session
 from app.api import deps
-from app.schemas import SuggestionOut
+from app.schemas import SuggestionOut, MapIssueOut
 from app.services.suggestion_service import SuggestionService
 from app.db.models.suggestion import Suggestion
 from app.db.models.user import User
@@ -70,6 +70,18 @@ def get_suggestions_list(
         skip=skip,
         limit=limit,
     )
+
+
+@router.get("/map", response_model=List[MapIssueOut])
+def get_map_issues(
+    limit: int = 5000,
+    service: SuggestionService = Depends(deps.get_suggestion_service),
+) -> Any:
+    """
+    Public: all geolocated citizen issues for the live map.
+    Excludes personal fields (no citizen phone).
+    """
+    return service.get_map_issues(limit=limit)
 
 
 @router.get("/{id}", response_model=SuggestionOut)

@@ -183,6 +183,33 @@ const pa: Record<string, string> = {
   'sentiment.Positive': 'ਸਕਾਰਾਤਮਕ',
   'sentiment.Negative': 'ਨਕਾਰਾਤਮਕ',
   'sentiment.Neutral': 'ਨਿਰਪੱਖ',
+
+  // Live map
+  'nav.liveMap': 'ਲਾਈਵ ਨਕਸ਼ਾ',
+  'map.title': 'ਲਾਈਵ ਮੁੱਦੇ ਨਕਸ਼ਾ',
+  'map.backToApp': 'ਐਪ ਤੇ ਵਾਪਸ',
+  'map.loading': 'ਮੁੱਦੇ ਲੋਡ ਹੋ ਰਹੇ ਹਨ…',
+  'map.issuesShown': '{total} ਵਿੱਚੋਂ {shown} ਮੁੱਦੇ',
+  'map.filters': 'ਫਿਲਟਰ',
+  'map.severity': 'ਗੰਭੀਰਤਾ',
+  'map.category': 'ਸ਼੍ਰੇਣੀ',
+  'map.state': 'ਰਾਜ',
+  'map.allCategories': 'ਸਾਰੀਆਂ ਸ਼੍ਰੇਣੀਆਂ',
+  'map.allStatuses': 'ਸਾਰੀਆਂ ਸਥਿਤੀਆਂ',
+  'map.allStates': 'ਸਾਰੇ ਰਾਜ',
+  'map.reset': 'ਰੀਸੈੱਟ',
+  'map.legend': 'ਸੰਕੇਤ ਸੂਚੀ',
+  'sev.critical': 'ਨਾਜ਼ੁਕ',
+  'sev.moderate': 'ਦਰਮਿਆਨਾ',
+  'sev.low': 'ਘੱਟ',
+  'sev.resolved': 'ਹੱਲ ਕੀਤਾ',
+  'map.reported': 'ਰਿਪੋਰਟ ਕੀਤਾ',
+  'map.priorityLabel': 'ਤਰਜੀਹ',
+  'map.statusLabel': 'ਸਥਿਤੀ',
+  'map.noPhoto': 'ਕੋਈ ਫੋਟੋ ਨੱਥੀ ਨਹੀਂ',
+  'map.representatives': 'ਇਸ ਸਥਾਨ ਲਈ ਪ੍ਰਤੀਨਿਧੀ',
+  'map.close': 'ਬੰਦ ਕਰੋ',
+  'map.zoomHint': 'ਸਹੀ ਸਥਾਨਾਂ ਤੱਕ ਪਹੁੰਚਣ ਲਈ ਜ਼ੂਮ ਇਨ ਕਰੋ',
 };
 
 export default pa;

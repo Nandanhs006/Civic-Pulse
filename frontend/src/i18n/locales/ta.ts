@@ -183,6 +183,33 @@ const ta: Record<string, string> = {
   'sentiment.Positive': 'நேர்மறை',
   'sentiment.Negative': 'எதிர்மறை',
   'sentiment.Neutral': 'நடுநிலை',
+
+  // Live map
+  'nav.liveMap': 'நேரடி வரைபடம்',
+  'map.title': 'நேரடி பிரச்சினைகள் வரைபடம்',
+  'map.backToApp': 'செயலிக்குத் திரும்பு',
+  'map.loading': 'பிரச்சினைகள் ஏற்றப்படுகின்றன…',
+  'map.issuesShown': '{total} இல் {shown} பிரச்சினைகள்',
+  'map.filters': 'வடிகட்டிகள்',
+  'map.severity': 'தீவிரம்',
+  'map.category': 'வகை',
+  'map.state': 'மாநிலம்',
+  'map.allCategories': 'அனைத்து வகைகள்',
+  'map.allStatuses': 'அனைத்து நிலைகள்',
+  'map.allStates': 'அனைத்து மாநிலங்கள்',
+  'map.reset': 'மீட்டமை',
+  'map.legend': 'விளக்கக்குறிப்பு',
+  'sev.critical': 'மிகக் கடுமையானது',
+  'sev.moderate': 'மிதமானது',
+  'sev.low': 'குறைவு',
+  'sev.resolved': 'தீர்க்கப்பட்டது',
+  'map.reported': 'தெரிவிக்கப்பட்டது',
+  'map.priorityLabel': 'முன்னுரிமை',
+  'map.statusLabel': 'நிலை',
+  'map.noPhoto': 'புகைப்படம் இணைக்கப்படவில்லை',
+  'map.representatives': 'இந்த இடத்திற்கான பிரதிநிதிகள்',
+  'map.close': 'மூடு',
+  'map.zoomHint': 'சரியான இடங்களைக் காண பெரிதாக்கவும்',
 };
 
 export default ta;

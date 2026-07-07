@@ -128,6 +128,21 @@ export interface ProposedProject {
   created_at: string;
 }
 
+export interface MapIssue {
+  id: string;
+  latitude: number | null;
+  longitude: number | null;
+  category: string | null;
+  priority_score: number;
+  status: string;
+  sentiment: string | null;
+  content: string;
+  english_translation: string | null;
+  image_url: string | null;
+  constituency_id: number | null;
+  created_at: string;
+}
+
 export interface AnalyticsSummary {
   total_suggestions: number;
   total_projects: number;
