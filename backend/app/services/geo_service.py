@@ -153,8 +153,10 @@ class GeoService:
             return _name_map
         m: dict = {}
         for c in self.db.query(Constituency).all():
-            m[_norm(str(c.state)) + "|" + _norm(str(c.name))] = c.id
-            m.setdefault(_norm(str(c.name)), c.id)  # name-only fallback
+            state_str = str(c.state) if c.state is not None else ""
+            name_str = str(c.name) if c.name is not None else ""
+            m[_norm(state_str) + "|" + _norm(name_str)] = c.id
+            m.setdefault(_norm(name_str), c.id)  # name-only fallback
         _name_map = m
         return m
 
@@ -191,8 +193,10 @@ class GeoService:
 
         m: dict = {}
         for ac in self.db.query(AssemblyConstituency).all():
-            m[_norm(str(ac.state)) + "|" + _norm(str(ac.name))] = ac.id
-            m.setdefault(_norm(str(ac.name)), ac.id)
+            state_str = str(ac.state) if ac.state is not None else ""
+            name_str = str(ac.name) if ac.name is not None else ""
+            m[_norm(state_str) + "|" + _norm(name_str)] = ac.id
+            m.setdefault(_norm(name_str), ac.id)
         _ac_name_map = m
         return m
 

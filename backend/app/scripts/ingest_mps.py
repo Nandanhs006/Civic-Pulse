@@ -378,6 +378,11 @@ def ingest(members: List[Dict]) -> None:
 
 
 def main() -> None:
+    if os.path.exists(CSV_PATH):
+        print(f"[cache] loading cached Lok Sabha members from {CSV_PATH}...")
+        members = load_csv()
+        ingest(members)
+        return
     members = get_members()
     ingest(members)
 

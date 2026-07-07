@@ -263,6 +263,15 @@ def ingest(rows: List[Dict]) -> None:
 
 
 def main() -> None:
+    if os.path.exists(CSV_PATH):
+        print(f"[cache] loading cached Karnataka MLAs from {CSV_PATH}...")
+        import csv
+
+        with open(CSV_PATH, newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        ingest(rows)
+        return
+
     acs = load_acs()
     print(f"[geo] {len(acs)} Karnataka ACs loaded")
     try:

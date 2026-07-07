@@ -58,7 +58,8 @@ def resolve_scope(current_user: User, constituency_id: Optional[int]) -> Optiona
     - PMO users may pass a specific constituency_id, or None to view all.
     """
     if getattr(current_user, "role", None) == "mp":
-        return current_user.constituency_id  # type: ignore[return-value]
+        cid = getattr(current_user, "constituency_id", None)
+        return int(cid) if cid is not None else None
     return constituency_id
 
 

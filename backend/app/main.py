@@ -18,6 +18,8 @@ from app.db.session import engine, SessionLocal
 from app.db.base import Base
 from app.db.models.ward import Ward
 from app.db.models.user import User
+from app.db.models.suggestion import Suggestion
+from app.db.models.project import ProposedProject
 from app.core.security import get_password_hash
 from app.middleware.rate_limit import check_rate_limit
 
@@ -153,6 +155,96 @@ async def startup_event():
             db.add_all(mock_wards)
             db.commit()
             print("[Seed] Successfully populated default Wards dataset.")
+
+        # 3. Seed Suggestions
+        if db.query(Suggestion).count() == 0:
+            mock_suggestions = [
+                Suggestion(
+                    citizen_phone="+123456789",
+                    content="Severe road cracks and deep potholes on the main avenue near the market.",
+                    english_translation="Severe road cracks and deep potholes on the main avenue near the market.",
+                    language_code="en",
+                    latitude=12.9716,
+                    longitude=77.5946,
+                    category="Roads",
+                    sentiment="Negative",
+                    priority_score=75,
+                    status="Submitted",
+                    ward_id=1,
+                ),
+                Suggestion(
+                    citizen_phone="+123456780",
+                    content="Water is dirty and only running for 3 hours in the morning. Please fix.",
+                    english_translation="Water is dirty and only running for 3 hours in the morning. Please fix.",
+                    language_code="en",
+                    latitude=12.9820,
+                    longitude=77.6010,
+                    category="Water",
+                    sentiment="Negative",
+                    priority_score=85,
+                    status="Submitted",
+                    ward_id=2,
+                ),
+                Suggestion(
+                    citizen_phone="+123456781",
+                    content="Primary school building needs maintenance, structural safety check, and new desks.",
+                    english_translation="Primary school building needs maintenance, structural safety check, and new desks.",
+                    language_code="en",
+                    latitude=12.9550,
+                    longitude=77.6100,
+                    category="Education",
+                    sentiment="Neutral",
+                    priority_score=60,
+                    status="Submitted",
+                    ward_id=3,
+                ),
+                Suggestion(
+                    citizen_phone="+123456782",
+                    content="Dark alleys near the public park have no streetlights, making it unsafe after sunset.",
+                    english_translation="Dark alleys near the public park have no streetlights, making it unsafe after sunset.",
+                    language_code="en",
+                    latitude=12.9730,
+                    longitude=77.5960,
+                    category="Safety",
+                    sentiment="Negative",
+                    priority_score=72,
+                    status="Submitted",
+                    ward_id=1,
+                ),
+            ]
+            db.add_all(mock_suggestions)
+            db.commit()
+            print("[Seed] Successfully populated default Suggestions dataset.")
+
+        # 4. Seed Proposed Projects
+        if db.query(ProposedProject).count() == 0:
+            mock_projects = [
+                ProposedProject(
+                    title="Water Treatment and Pipe Extension - Ward 2",
+                    description="Automated proposal: Recommended upgrade for Water due to high request volumes and a low infrastructure water supply rating.",
+                    category="Water",
+                    target_ward_id=2,
+                    estimated_cost=350000.00,
+                    priority_score=88,
+                    supporting_suggestions_count=1,
+                    ai_justification="The water supply runs only 4 hours daily in Ward 2. High concentrations of citizen grievances emphasize immediate contamination risks.",
+                    status="Proposed",
+                ),
+                ProposedProject(
+                    title="Main Market Road Restoration - Ward 1",
+                    description="Automated proposal: Pavement upgrade and potholes patching to improve market transit speeds and safety.",
+                    category="Roads",
+                    target_ward_id=1,
+                    estimated_cost=120000.00,
+                    priority_score=72,
+                    supporting_suggestions_count=2,
+                    ai_justification="Heavy commercial zone reports significant pothole indexes (4.2/10) with major commercial vehicle transit blocks.",
+                    status="Proposed",
+                ),
+            ]
+            db.add_all(mock_projects)
+            db.commit()
+            print("[Seed] Successfully populated default Proposed Projects dataset.")
     except Exception as e:
         print(f"[Seed] Error seeding data: {e}")
         db.rollback()

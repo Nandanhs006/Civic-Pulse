@@ -7,7 +7,6 @@ from app.schemas import (
     HierParliamentary,
     HierAssembly,
     HierCivic,
-    CivicOfficialOut,
 )
 from app.services.geo_service import GeoService
 from app.db.models.constituency import Constituency
@@ -48,9 +47,7 @@ def locate_hierarchy(lat: float, lng: float, db: Session = Depends(deps.get_db))
             .all()
         )
         if officials:
-            out["civic"] = HierCivic(
-                officials=[CivicOfficialOut.model_validate(o) for o in officials]
-            )
+            out["civic"] = HierCivic(officials=officials)  # type: ignore
 
     return out
 
