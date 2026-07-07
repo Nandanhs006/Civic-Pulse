@@ -3,9 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/apiClient';
 import { MapContainer, TileLayer, Popup, Marker, CircleMarker } from 'react-leaflet';
 import { LatLngExpression } from 'leaflet';
-import { 
-  ArrowLeft, Brain, ThumbsUp, Sliders
-} from 'lucide-react';
+import { ArrowLeft, Brain, ThumbsUp, Sliders } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 
 // Pydantic Schema interfaces
@@ -162,7 +160,6 @@ const Participate: React.FC = () => {
     if (!cpgText) return;
     setLoading(true);
     try {
-      // Post as a regular suggestion, but catch the response score and values to display
       const res = await apiClient.post<Suggestion>('/api/v1/suggestions/', {
         content: cpgText,
         citizen_phone: '+919000000000',
@@ -213,7 +210,6 @@ const Participate: React.FC = () => {
       ...prev
     ]);
     
-    // Demonstrate automated system dispatch coordination
     setTimeout(() => {
       setCityBrainAlerts(prev => [
         { id: Date.now() + 1, msg: 'City Brain Dispatch: Plumber team dispatched to Grid 2', type: 'dispatch', grid: 2 },
@@ -259,24 +255,24 @@ const Participate: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
               <Sliders size={28} color="var(--primary)" />
               <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: '24px' }}>
-                Participate: Global Civic Tech Hub
+                Participate: Civic Innovation Portal
               </h1>
             </div>
             <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.5 }}>
-              Choose a localized platform model below. Each section represents a leading global paradigm for citizen engagement, AI routing, and smart city administration.
+              Launch an interactive utility below. Each section represents a modern citizen-engagement interface, automated AI routing engine, or smart city coordination simulator.
             </p>
           </div>
 
           {/* 3x3 Grid of Platforms */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
             
-            {/* Card 1: FixMyStreet */}
+            {/* Card 1: StreetMapper */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>🇬🇧 UNITED KINGDOM</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
                 <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--primary)' }}>Geospatial</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>FixMyStreet</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>StreetMapper</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Map-based report system. Drop a coordinates pin to report infrastructure damage with auto-routing to grid officers.
               </p>
@@ -285,13 +281,13 @@ const Participate: React.FC = () => {
               </button>
             </div>
 
-            {/* Card 2: Decidim */}
+            {/* Card 2: CivicFund */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>🇪🇸 SPAIN</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
                 <span className="badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>Budgeting</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Decidim</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>CivicFund</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Participatory budget and policy support center. Citizens support proposals and influence project sanctions.
               </p>
@@ -300,13 +296,13 @@ const Participate: React.FC = () => {
               </button>
             </div>
 
-            {/* Card 3: CPGRAMS */}
+            {/* Card 3: Aegis AI Redress */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>🇮🇳 INDIA</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
                 <span className="badge" style={{ background: 'rgba(249,115,22,0.1)', color: 'var(--saffron)' }}>AI Redressal</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>CPGRAMS</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Aegis AI Redress</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Centralized grievance tracker. Submissions are classified, translated, and scored for priority by Gemini AI.
               </p>
@@ -315,13 +311,13 @@ const Participate: React.FC = () => {
               </button>
             </div>
 
-            {/* Card 4: SeeClickFix */}
+            {/* Card 4: CivicTimeline */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>🇺🇸 UNITED STATES</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
                 <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--primary)' }}>Issue Tracking</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>SeeClickFix</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>CivicTimeline</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Community ticket timeline. Track status changes {"(Submitted → Dispatched → Resolved)"} and review public analytics.
               </p>
@@ -330,13 +326,13 @@ const Participate: React.FC = () => {
               </button>
             </div>
 
-            {/* Card 5: Ushahidi */}
+            {/* Card 5: Hotspot Tracker */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>🇰🇪 KENYA</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
                 <span className="badge" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>Crisis Map</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Ushahidi</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Hotspot Tracker</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Crowdsourced incident locator. Heatmaps highlight active grievances and pinpoint infrastructure distress hotspots.
               </p>
@@ -345,13 +341,13 @@ const Participate: React.FC = () => {
               </button>
             </div>
 
-            {/* Card 6: 12345 Hotline */}
+            {/* Card 6: Command Dispatch */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>🇨🇳 CHINA</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
                 <span className="badge" style={{ background: 'rgba(168,85,247,0.1)', color: 'var(--primary)' }}>Unified Dispatch</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>12345 Hotline</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Command Dispatch</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Unified admin dispatch board. Review reports and allocate tasks directly to local grid managers in real-time.
               </p>
@@ -360,13 +356,13 @@ const Participate: React.FC = () => {
               </button>
             </div>
 
-            {/* Card 7: Grid Governance */}
+            {/* Card 7: Sector Directory */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>🇨🇳 CHINA</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
                 <span className="badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>Grid Network</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Grid Governance</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Sector Directory</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Grid officer roster. Review local representative contacts, emails, assigned sectors, and active workload monitors.
               </p>
@@ -375,13 +371,13 @@ const Participate: React.FC = () => {
               </button>
             </div>
 
-            {/* Card 8: City Brain */}
+            {/* Card 8: CityPulse IoT */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>🇨🇳 CHINA</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
                 <span className="badge" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>IoT Brain</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Hangzhou City Brain</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>CityPulse IoT</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Real-time smart city dashboard simulator. Monitors utility loads and coordinates emergency department alerts.
               </p>
@@ -390,13 +386,13 @@ const Participate: React.FC = () => {
               </button>
             </div>
 
-            {/* Card 9: Mayor's Mailbox */}
+            {/* Card 9: Constituency Mailbox */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>🇨🇳 CHINA</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
                 <span className="badge" style={{ background: 'rgba(249,115,22,0.1)', color: 'var(--saffron)' }}>Mayor Mailbox</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Mayor's / MP's Mailbox</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Constituency Mailbox</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 Direct consultation interface. Post long-term structural proposals and track planning replies from the MP.
               </p>
@@ -410,7 +406,7 @@ const Participate: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 1. FIXMYSTREET VIEW */}
+      {/* 1. STREETMAPPER VIEW */}
       {/* ========================================================= */}
       {activeApp === 'fixmystreet' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -423,8 +419,6 @@ const Participate: React.FC = () => {
             <div className="glass-panel" style={{ height: '480px', padding: 0, position: 'relative', overflow: 'hidden' }}>
               <MapContainer center={MAP_CENTER} zoom={14} style={{ width: '100%', height: '100%' }}>
                 <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-                
-                {/* Clickable map selector */}
                 <Marker position={fmsCoords} />
               </MapContainer>
               <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', zIndex: 100, border: '1px solid var(--border-color)' }}>
@@ -434,9 +428,9 @@ const Participate: React.FC = () => {
 
             {/* Form */}
             <div className="glass-panel" style={{ padding: '24px' }}>
-              <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Geospatial Report</h3>
+              <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>StreetMapper Geospatial Reporter</h3>
               <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                Double click or drag the map pin to point out the pothole or infrastructure issue. We will automatically route it to the grid.
+                Point out the pothole or infrastructure issue. We will automatically route it to the grid.
               </p>
 
               <form onSubmit={handleFmsSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -460,7 +454,7 @@ const Participate: React.FC = () => {
                 </div>
                 
                 <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
-                  File FixMyStreet Report
+                  File StreetMapper Report
                 </button>
               </form>
             </div>
@@ -469,7 +463,7 @@ const Participate: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 2. DECIDIM VIEW */}
+      {/* 2. CIVICFUND VIEW */}
       {/* ========================================================= */}
       {activeApp === 'decidim' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -478,7 +472,7 @@ const Participate: React.FC = () => {
           </button>
 
           <div className="glass-panel" style={{ padding: '24px' }}>
-            <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>Decidim Participatory Budgeting</h2>
+            <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>CivicFund Participatory Budgeting</h2>
             <p style={{ margin: '0 0 24px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
               Support development projects proposed for your constituency. Upvotes affect the prioritization scoring metric directly.
             </p>
@@ -488,7 +482,7 @@ const Participate: React.FC = () => {
                 <div key={project.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span className="badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{project.category}</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700 }}>Est: ${project.estimated_cost.toLocaleString()}</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700 }}>Est: ₹{project.estimated_cost.toLocaleString()}</span>
                   </div>
 
                   <div>
@@ -519,7 +513,7 @@ const Participate: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 3. CPGRAMS VIEW */}
+      {/* 3. AEGIS AI REDRESS VIEW */}
       {/* ========================================================= */}
       {activeApp === 'cpgrams' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -529,7 +523,7 @@ const Participate: React.FC = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
             <div className="glass-panel" style={{ padding: '24px' }}>
-              <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>AI Grievance Classification</h3>
+              <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Aegis AI Redress Engine</h3>
               <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
                 Submit a complaint in any language. The AI service will translate to English, predict the issue category, analyze sentiment, and compute a priority score.
               </p>
@@ -590,7 +584,7 @@ const Participate: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 4. SEECLICKFIX VIEW */}
+      {/* 4. CIVICTIMELINE VIEW */}
       {/* ========================================================= */}
       {activeApp === 'seeclickfix' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -599,7 +593,7 @@ const Participate: React.FC = () => {
           </button>
 
           <div className="glass-panel" style={{ padding: '24px' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Community Issue Board</h3>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>CivicTimeline Community Issue Board</h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {suggestions.map(s => (
@@ -626,7 +620,7 @@ const Participate: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 5. USHAHIDI VIEW */}
+      {/* 5. HOTSPOT TRACKER VIEW */}
       {/* ========================================================= */}
       {activeApp === 'ushahidi' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -636,7 +630,7 @@ const Participate: React.FC = () => {
 
           <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Ushahidi Hotspot Heatmap</h2>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Hotspot Tracker Map</h2>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
                 Glowing circular markers highlight regions with the highest density of unresolved citizen grievances.
               </p>
@@ -649,7 +643,6 @@ const Participate: React.FC = () => {
                 {suggestions.filter(s => s.latitude && s.longitude).map(s => {
                   const lat = Number(s.latitude);
                   const lng = Number(s.longitude);
-                  // High priority = larger glowing radius
                   const radius = s.priority_score > 70 ? 25 : 12;
                   return (
                     <CircleMarker 
@@ -674,7 +667,7 @@ const Participate: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 6. 12345 HOTLINE DISPATCH VIEW */}
+      {/* 6. COMMAND DISPATCH VIEW */}
       {/* ========================================================= */}
       {activeApp === 'hotline' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -683,7 +676,7 @@ const Participate: React.FC = () => {
           </button>
 
           <div className="glass-panel" style={{ padding: '24px' }}>
-            <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>12345 Hotline Command Console</h2>
+            <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>Command Dispatch Console</h2>
             <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
               Administrators review incoming grievances and route accountability directly to local grid managers.
             </p>
@@ -725,7 +718,7 @@ const Participate: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 7. GRID GOVERNANCE DIRECTORY VIEW */}
+      {/* 7. SECTOR DIRECTORY VIEW */}
       {/* ========================================================= */}
       {activeApp === 'grid' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -770,7 +763,7 @@ const Participate: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 8. CITY BRAIN IOT SIMULATOR VIEW */}
+      {/* 8. CITYPULSE IoT VIEW */}
       {/* ========================================================= */}
       {activeApp === 'citybrain' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -779,12 +772,11 @@ const Participate: React.FC = () => {
           </button>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
-            {/* Control panel */}
             <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <h3 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>City Brain IoT Event Monitor</h3>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>CityPulse IoT Event Monitor</h3>
                 <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-                  Simulates Alibaba-style real-time IoT coordination dispatches when infrastructure drops occur.
+                  Simulates automated coordination dispatches when infrastructure drops occur.
                 </p>
               </div>
 
@@ -811,7 +803,6 @@ const Participate: React.FC = () => {
               </button>
             </div>
 
-            {/* Simulated Alerts console */}
             <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <h3 style={{ margin: 0, fontSize: '16px' }}>Dispatch Logs</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '340px' }}>
@@ -836,7 +827,7 @@ const Participate: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 9. MAYOR'S MAILBOX VIEW */}
+      {/* 9. CONSTITUENCY MAILBOX VIEW */}
       {/* ========================================================= */}
       {activeApp === 'mailbox' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -845,9 +836,8 @@ const Participate: React.FC = () => {
           </button>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            {/* Input card */}
             <div className="glass-panel" style={{ padding: '24px' }}>
-              <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Send Mail to MP / Mayor</h3>
+              <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Constituency Mailbox Manager</h3>
               <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
                 Suggest long-term structural or policy adjustments. The MP team reviews mailboxes periodically.
               </p>
@@ -865,7 +855,6 @@ const Participate: React.FC = () => {
               </form>
             </div>
 
-            {/* Suggestions list */}
             <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <h3 style={{ margin: 0, fontSize: '16px' }}>Mailbox History & Answers</h3>
               
