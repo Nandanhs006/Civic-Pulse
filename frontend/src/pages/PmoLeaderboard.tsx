@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Award, Search, ArrowUpDown, Filter, Star, User, ShieldCheck, Flame } from 'lucide-react';
 import apiClient from '../services/apiClient';
@@ -31,6 +31,10 @@ const PmoLeaderboard: React.FC = () => {
   const [sortBy, setSortBy] = useState<'score' | 'tat' | 'rate'>('score');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
+
   useEffect(() => {
     const fetchPerformance = async () => {
       try {
@@ -60,16 +64,17 @@ const PmoLeaderboard: React.FC = () => {
   const states = ['All', ...Array.from(new Set(data.map(item => item.state)))];
 
   // Process data (Search, Filter, Sort)
-  const processedData = data
-    .filter(item => {
+  const processedData = useMemo(() => {
+    const list = data.filter(item => {
       const matchesSearch =
         item.constituency_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.mp_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.mla_name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesState = selectedState === 'All' || item.state === selectedState;
       return matchesSearch && matchesState;
-    })
-    .sort((a, b) => {
+    });
+
+    list.sort((a, b) => {
       let comparison = 0;
       if (sortBy === 'score') {
         comparison = a.governance_score - b.governance_score;
@@ -80,6 +85,21 @@ const PmoLeaderboard: React.FC = () => {
       }
       return sortOrder === 'desc' ? comparison * -1 : comparison;
     });
+
+    return list;
+  }, [data, searchQuery, selectedState, sortBy, sortOrder]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedState, sortBy, sortOrder]);
+
+  const totalPages = Math.ceil(processedData.length / ITEMS_PER_PAGE);
+
+  const paginatedList = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return processedData.slice(start, start + ITEMS_PER_PAGE);
+  }, [processedData, currentPage]);
 
   if (loading) {
     return (
@@ -157,29 +177,9 @@ const PmoLeaderboard: React.FC = () => {
         </NavLink>
       </div>
 
-      {/* Leaderboard Cards Grid (Top 3 Performers) */}
+      {/* Leaderboard Cards Grid (Top 3 Performers in 1, 2, 3 Order) */}
       {selectedState === 'All' && searchQuery === '' && processedData.length >= 3 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-          {/* Rank 2 */}
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '4px solid #3b82f6', position: 'relative' }}>
-            <span style={{ position: 'absolute', top: '14px', right: '16px', fontSize: '11px', fontWeight: 800, opacity: 0.15 }}>RANK 2</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6', fontWeight: 700 }}>2</div>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '15px' }}>{processedData[1].mp_name}</h4>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>MP, {processedData[1].constituency_name}</span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '6px' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Governance Index</span>
-              <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{processedData[1].governance_score}/100</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Resolution Rate</span>
-              <span style={{ fontWeight: 700, color: '#22c55e' }}>{processedData[1].resolution_rate}%</span>
-            </div>
-          </div>
-
           {/* Rank 1 */}
           <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '4px solid var(--saffron)', transform: 'scale(1.02)', boxShadow: '0 8px 30px rgba(249,115,22,0.1)', position: 'relative' }}>
             <span style={{ position: 'absolute', top: '14px', right: '16px', fontSize: '11px', fontWeight: 800, color: 'var(--saffron)' }}>
@@ -199,6 +199,26 @@ const PmoLeaderboard: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
               <span style={{ color: 'var(--text-muted)' }}>Resolution Rate</span>
               <span style={{ fontWeight: 700, color: '#22c55e' }}>{processedData[0].resolution_rate}%</span>
+            </div>
+          </div>
+
+          {/* Rank 2 */}
+          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '4px solid #3b82f6', position: 'relative' }}>
+            <span style={{ position: 'absolute', top: '14px', right: '16px', fontSize: '11px', fontWeight: 800, opacity: 0.15 }}>RANK 2</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6', fontWeight: 700 }}>2</div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '15px' }}>{processedData[1].mp_name}</h4>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>MP, {processedData[1].constituency_name}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '6px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Governance Index</span>
+              <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{processedData[1].governance_score}/100</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Resolution Rate</span>
+              <span style={{ fontWeight: 700, color: '#22c55e' }}>{processedData[1].resolution_rate}%</span>
             </div>
           </div>
 
@@ -284,7 +304,7 @@ const PmoLeaderboard: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {processedData.map(item => {
+            {paginatedList.map(item => {
               const rank = data.findIndex(x => x.constituency_id === item.constituency_id) + 1;
               return (
                 <tr key={item.constituency_id} style={{ borderBottom: '1px solid var(--border-card)', transition: 'background 0.2s' }} className="hover-highlight">
@@ -364,6 +384,31 @@ const PmoLeaderboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Table Pagination controls */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '10px' }}>
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+            className="btn btn-secondary" 
+            style={{ padding: '6px 12px', fontSize: '13px' }}
+          >
+            Previous
+          </button>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button 
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+            className="btn btn-secondary" 
+            style={{ padding: '6px 12px', fontSize: '13px' }}
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 };
