@@ -30,6 +30,10 @@ const MpDirectory: React.FC<MpDirectoryProps> = ({ mps, onSelect }) => {
   const [onlyWithRequests, setOnlyWithRequests] = useState(true);
   const [view, setView] = useState<ViewMode>('grid');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
+
   const states = useMemo(
     () => Array.from(new Set(mps.map((m) => m.state).filter(Boolean))).sort() as string[],
     [mps]
@@ -55,6 +59,18 @@ const MpDirectory: React.FC<MpDirectoryProps> = ({ mps, onSelect }) => {
     });
     return list;
   }, [mps, query, stateFilter, sort, onlyWithRequests]);
+
+  // Reset page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [query, stateFilter, sort, onlyWithRequests]);
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+
+  const paginatedList = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filtered.slice(start, start + ITEMS_PER_PAGE);
+  }, [filtered, currentPage]);
 
   const toggleBtn = (mode: ViewMode, icon: React.ReactNode) => (
     <button
@@ -115,15 +131,39 @@ const MpDirectory: React.FC<MpDirectoryProps> = ({ mps, onSelect }) => {
 
       {view === 'grid' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-          {filtered.map((mp) => <MpCard key={mp.id} mp={mp} onClick={onSelect} />)}
+          {paginatedList.map((mp) => <MpCard key={mp.id} mp={mp} onClick={onSelect} />)}
         </div>
       ) : (
-        <MpList mps={filtered} onSelect={onSelect} />
+        <MpList mps={paginatedList} onSelect={onSelect} />
       )}
 
       {filtered.length === 0 && (
         <div className="glass-panel" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
           {t('dir.noMatch')}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '16px' }}>
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+            className="btn btn-secondary" 
+            style={{ padding: '6px 12px', fontSize: '13px' }}
+          >
+            Previous
+          </button>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button 
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+            className="btn btn-secondary" 
+            style={{ padding: '6px 12px', fontSize: '13px' }}
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

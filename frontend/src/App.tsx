@@ -7,6 +7,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Pmo from './pages/Pmo';
 import ConstituencyView from './pages/ConstituencyView';
+import PmoAnalytics from './pages/PmoAnalytics';
+import PmoLeaderboard from './pages/PmoLeaderboard';
 import LiveMap from './pages/LiveMap';
 import Participate from './pages/Participate';
 import RequireRole from './components/common/RequireRole';
@@ -68,6 +70,22 @@ const App: React.FC = () => (
         </RequireRole>
       }
     />
+    <Route
+      path="/pmo/analytics"
+      element={
+        <RequireRole role="pmo">
+          <Layout><PmoAnalytics /></Layout>
+        </RequireRole>
+      }
+    />
+    <Route
+      path="/pmo/leaderboard"
+      element={
+        <RequireRole role="pmo">
+          <Layout><PmoLeaderboard /></Layout>
+        </RequireRole>
+      }
+    />
     {/* Live map keeps the app navbar; the map fills the rest of the screen */}
     <Route path="/map" element={<MapLayout />} />
     <Route path="/participate" element={<Layout><Participate /></Layout>} />
@@ -77,7 +95,7 @@ const App: React.FC = () => (
     <Route path="/participate/civictimeline" element={<Layout><Participate activeApp="seeclickfix" /></Layout>} />
     <Route path="/participate/hotspot-tracker" element={<Layout><Participate activeApp="ushahidi" /></Layout>} />
     <Route path="/participate/command-dispatch" element={<Layout><Participate activeApp="hotline" /></Layout>} />
-    <Route path="/participate/sector-directory" element={<Layout><Participate activeApp="grid" /></Layout>} />
+    <Route path="/participate/ward-directory" element={<Layout><Participate activeApp="ward" /></Layout>} />
     <Route path="/participate/citypulse-iot" element={<Layout><Participate activeApp="citybrain" /></Layout>} />
     <Route path="/participate/constituency-mailbox" element={<Layout><Participate activeApp="mailbox" /></Layout>} />
     <Route path="*" element={<Navigate to="/" replace />} />

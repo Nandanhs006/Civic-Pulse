@@ -1,9 +1,12 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
 # In-memory SQLite option for easier local testing/fallback
-if settings.POSTGRES_SERVER == "localhost" and not settings.POSTGRES_PASSWORD:
+if (
+    settings.POSTGRES_SERVER == "localhost" and not settings.POSTGRES_PASSWORD
+) or os.getenv("USE_SQLITE", "false").lower() == "true":
     SQLALCHEMY_DATABASE_URL = "sqlite:///./civic_pulse.db"
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
