@@ -33,7 +33,8 @@ const MapLayout: React.FC = () => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-app)' }}>
     <TopBar />
     <Breadcrumbs />
-    <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+    {/* isolate: keep the map's overlays/zoom controls below the sticky navbar + menu */}
+    <div style={{ flex: 1, position: 'relative', minHeight: 0, isolation: 'isolate', zIndex: 0 }}>
       <LiveMap />
     </div>
   </div>

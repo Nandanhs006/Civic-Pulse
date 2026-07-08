@@ -86,8 +86,8 @@ const MapView: React.FC<MapViewProps> = ({
   };
 
   return (
-    <div style={{ height: '460px', width: '100%', position: 'relative', overflow: 'hidden', borderRadius: '12px' }}>
-      <MapContainer 
+    <div style={{ height: '460px', width: '100%', position: 'relative', overflow: 'hidden', borderRadius: '12px', isolation: 'isolate' }}>
+      <MapContainer
         center={defaultCenter} 
         zoom={zoomLevel} 
         scrollWheelZoom={true} 
