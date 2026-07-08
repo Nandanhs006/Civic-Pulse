@@ -86,6 +86,16 @@ app.include_router(
 )
 
 import asyncio
+import threading
+
+
+def _run_full_seed() -> None:
+    """Run the full seed pipeline in a background thread so startup is non-blocking."""
+    try:
+        from app.scripts import seed_all
+        seed_all.main()
+    except Exception as exc:
+        print(f"[Seed] Background seed failed: {exc}")
 
 
 @app.get(f"{settings.API_V1_STR}/test-timeout", tags=["Debug"])
@@ -313,6 +323,10 @@ async def startup_event():
         db.rollback()
     finally:
         db.close()
+
+    # Kick off full data pipeline (MPs, MLAs, demo issues) in background so
+    # the server is healthy immediately and seeding runs concurrently.
+    threading.Thread(target=_run_full_seed, daemon=True).start()
 
 
 @app.get("/health", tags=["Debug"])
