@@ -72,7 +72,7 @@ def test_get_bigquery_federated_analytics(client):
     )
     assert res.status_code == 200
     data = res.json()
-    assert data["connection_status"] == "BigQuery Federated Connection (Live on Cloud SQL)"
+    assert data["connection_status"] == "Dashboard Connection (Live Sync)"
     assert "avg_tat_days" in data
     assert "dispatch_saturation" in data
     assert "officer_load" in data

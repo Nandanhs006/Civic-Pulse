@@ -86,7 +86,7 @@ class BigQueryService:
             )
 
         return {
-            "connection_status": "BigQuery Federated Connection (Live on Cloud SQL)",
+            "connection_status": "Dashboard Connection (Live Sync)",
             "total_suggestions": total_suggestions,
             "total_projects": total_projects,
             "category_counts": category_counts,

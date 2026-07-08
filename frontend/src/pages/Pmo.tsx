@@ -106,7 +106,7 @@ const Pmo: React.FC = () => {
             transition: 'all 0.2s ease'
           })}
         >
-          BigQuery OLAP Analytics
+          Dashboard
         </NavLink>
       </div>
 

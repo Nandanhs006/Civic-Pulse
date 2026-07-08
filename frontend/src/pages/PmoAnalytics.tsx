@@ -53,7 +53,7 @@ const PmoNav: React.FC = () => {
           transition: 'all 0.2s ease'
         })}
       >
-        BigQuery OLAP Analytics
+        Dashboard
       </NavLink>
     </div>
   );
@@ -111,9 +111,9 @@ const PmoAnalytics: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '26px' }} className="animate-fade-in">
       <div>
-        <h1 style={{ fontSize: '30px', color: 'var(--text-main)' }}>BigQuery Analytics</h1>
+        <h1 style={{ fontSize: '30px', color: 'var(--text-main)' }}>Dashboard</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '2px' }}>
-          High-performance queries running over Cloud SQL transactional records in real-time.
+          High-performance analytical queries running over Cloud SQL transactional records in real-time.
         </p>
       </div>
 
