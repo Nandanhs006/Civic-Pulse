@@ -6,6 +6,7 @@ import Portal from './pages/Portal';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Pmo from './pages/Pmo';
+import ConstituencyView from './pages/ConstituencyView';
 import LiveMap from './pages/LiveMap';
 import Participate from './pages/Participate';
 import RequireRole from './components/common/RequireRole';
@@ -55,6 +56,14 @@ const App: React.FC = () => (
       element={
         <RequireRole role="pmo">
           <Layout><Pmo /></Layout>
+        </RequireRole>
+      }
+    />
+    <Route
+      path="/pmo/mp/:constituencyId"
+      element={
+        <RequireRole role="pmo">
+          <Layout><ConstituencyView /></Layout>
         </RequireRole>
       }
     />

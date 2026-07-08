@@ -10,6 +10,7 @@ const en = {
   'nav.staffLogin': 'Staff Login',
   'nav.signOut': 'Sign out',
   'nav.home': 'Home',
+  'crumb.constituency': 'Constituency',
   'nav.openMenu': 'Open menu',
   'nav.closeMenu': 'Close menu',
   'nav.lightMode': 'Light mode',

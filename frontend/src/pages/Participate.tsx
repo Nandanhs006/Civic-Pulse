@@ -5,6 +5,8 @@ import apiClient from '../services/apiClient';
 import { MapContainer, TileLayer, Popup, Marker, CircleMarker } from 'react-leaflet';
 import { LatLngExpression } from 'leaflet';
 import { ArrowLeft, Brain, ThumbsUp, Sliders } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { useIsMobile } from '../hooks/useIsMobile';
 import 'leaflet/dist/leaflet.css';
 
 // Pydantic Schema interfaces
@@ -151,7 +153,11 @@ interface ParticipateProps {
 const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const navigate = useNavigate();
   useAuth();
-  
+  const isMobile = useIsMobile();
+  const { theme } = useTheme();
+  // Theme-aware CARTO basemap (was hardcoded to dark).
+  const tileUrl = `https://{s}.basemaps.cartocdn.com/${theme === 'light' ? 'light_all' : 'dark_all'}/{z}/{x}/{y}{r}.png`;
+
   const [officers, setOfficers] = useState<GridOfficer[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [projects, setProjects] = useState<ProposedProject[]>([]);
@@ -507,14 +513,14 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '20px' }}>
             {/* Map selection */}
-            <div className="glass-panel" style={{ height: '480px', padding: 0, position: 'relative', overflow: 'hidden' }}>
+            <div className="glass-panel" style={{ height: isMobile ? '320px' : '480px', padding: 0, position: 'relative', overflow: 'hidden' }}>
               <MapContainer center={MAP_CENTER} zoom={14} style={{ width: '100%', height: '100%' }}>
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                <TileLayer key={theme} url={tileUrl} />
                 <Marker position={fmsCoords} />
               </MapContainer>
-              <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', zIndex: 100, border: '1px solid var(--border-color)' }}>
+              <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', zIndex: 100, border: '1px solid var(--border-card)' }}>
                 📍 Coordinates: {fmsCoords[0].toFixed(5)}, {fmsCoords[1].toFixed(5)}
               </div>
             </div>
@@ -533,7 +539,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     value={fmsContent}
                     onChange={(e) => setFmsContent(e.target.value)}
                     placeholder="E.g., Pothole near Central Market main gate..."
-                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '100px', fontSize: '13px' }}
+                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '100px', fontSize: '13px' }}
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -542,7 +548,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     value={fmsPhone}
                     onChange={(e) => setFmsPhone(e.target.value)}
                     placeholder="+91-98765-XXXXX"
-                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
+                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
                   />
                 </div>
                 
@@ -570,7 +576,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               Support development projects proposed for your constituency. Upvotes affect the prioritization scoring metric directly.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
               {projects.map(project => (
                 <div key={project.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -614,7 +620,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
             <div className="glass-panel" style={{ padding: '24px' }}>
               <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Aegis AI Redress Engine</h3>
               <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -626,7 +632,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   value={cpgText}
                   onChange={(e) => setCpgText(e.target.value)}
                   placeholder="E.g., सड़कों पर बहुत पानी भरा हुआ है, जिससे लोगों का चलना मुश्किल हो गया है..."
-                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
+                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
                 />
                 <button type="submit" className="btn btn-primary" disabled={loading || !cpgText}>
                   Analyze Grievance
@@ -690,7 +696,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {suggestions.map(s => (
-                <div key={s.id} style={{ padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={s.id} style={{ padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', color: 'var(--text-main)' }}>{s.content}</h4>
                     <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -729,9 +735,9 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               </p>
             </div>
 
-            <div style={{ height: '480px', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ height: isMobile ? '320px' : '480px', borderRadius: '8px', overflow: 'hidden' }}>
               <MapContainer center={MAP_CENTER} zoom={14} style={{ width: '100%', height: '100%' }}>
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                <TileLayer key={theme} url={tileUrl} />
                 
                 {suggestions.filter(s => s.latitude && s.longitude).map(s => {
                   const lat = Number(s.latitude);
@@ -776,7 +782,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {suggestions.filter(s => s.dispatch_status === 'Unassigned' || !s.dispatch_status).map(issue => (
-                <div key={issue.id} style={{ padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div key={issue.id} style={{ padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <p style={{ margin: 0, fontSize: '14px' }}>{issue.content}</p>
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
@@ -785,7 +791,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       <select 
                         value={selectedOfficer[issue.id] || ''}
                         onChange={(e) => setSelectedOfficer(prev => ({ ...prev, [issue.id]: Number(e.target.value) }))}
-                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px', borderRadius: '6px', fontSize: '12px' }}
+                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px', borderRadius: '6px', fontSize: '12px' }}
                       >
                         <option value="">-- Choose Officer --</option>
                         {officers.map(o => (
@@ -864,7 +870,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '20px' }}>
             <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
                 <h3 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>CityPulse IoT Event Monitor</h3>
@@ -873,14 +879,14 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 </p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '14px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-card)', textAlign: 'center' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Water Flow Rate</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, margin: '6px 0', color: '#22c55e' }}>92%</div>
                   <span style={{ fontSize: '10px', color: '#22c55e' }}>● Stable</span>
                 </div>
 
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-card)', textAlign: 'center' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Traffic Speed Avg</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, margin: '6px 0', color: 'var(--saffron)' }}>34 km/h</div>
                   <span style={{ fontSize: '10px', color: 'var(--saffron)' }}>● Delayed</span>
@@ -904,7 +910,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     padding: '10px 12px', 
                     borderRadius: '6px', 
                     fontSize: '12px',
-                    border: '1px solid var(--border-color)',
+                    border: '1px solid var(--border-card)',
                     background: alert.type === 'error' ? 'rgba(239,68,68,0.1)' : 
                                alert.type === 'dispatch' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)',
                     color: alert.type === 'error' ? '#ef4444' : 
@@ -928,7 +934,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
             <div className="glass-panel" style={{ padding: '24px' }}>
               <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Constituency Mailbox Manager</h3>
               <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -940,7 +946,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   value={mailContent}
                   onChange={(e) => setMailContent(e.target.value)}
                   placeholder="Type your development suggestion..."
-                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
+                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
                 />
                 <button type="submit" className="btn btn-primary" disabled={!mailContent}>
                   Deliver to MP Mailbox
@@ -953,7 +959,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', maxHeight: '340px' }}>
                 {mailBoxItems.map(item => (
-                  <div key={item.id} style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', fontSize: '13px' }}>
+                  <div key={item.id} style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', fontSize: '13px' }}>
                     <div style={{ color: 'var(--text-main)', fontWeight: 600 }}>{item.text}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Filed on {item.date}</div>
                     

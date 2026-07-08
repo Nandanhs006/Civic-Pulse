@@ -7,8 +7,10 @@ import ConstituencyPicker, { Autofill } from '../components/common/ConstituencyP
 import Avatar from '../components/common/Avatar';
 import RoutingTree from '../components/common/RoutingTree';
 import { useLang } from '../context/LanguageContext';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 const Portal: React.FC = () => {
+  const isMobile = useIsMobile();
   const [phone, setPhone] = useState('');
   const [content, setContent] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -236,7 +238,15 @@ const Portal: React.FC = () => {
         <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
           {/* Constituency routing */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: isMobile ? 'flex-start' : 'center',
+                justifyContent: 'space-between',
+                flexDirection: isMobile ? 'column' : 'row',
+                gap: isMobile ? '4px' : '8px',
+              }}
+            >
               <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>
                 {t('portal.step1')}
               </label>

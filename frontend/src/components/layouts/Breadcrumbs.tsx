@@ -43,7 +43,12 @@ const Breadcrumbs: React.FC = () => {
       crumbs.push({ label: t('nav.participate') });
     }
   } else if (top === 'pmo') {
-    crumbs.push({ label: t('nav.pmoCommand') });
+    if (segs[1] === 'mp' && segs[2]) {
+      crumbs.push({ label: t('nav.pmoCommand'), to: '/pmo' });
+      crumbs.push({ label: t('crumb.constituency') });
+    } else {
+      crumbs.push({ label: t('nav.pmoCommand') });
+    }
   } else if (top === 'mp') {
     crumbs.push({ label: t('nav.myConstituency') });
   } else if (top === 'login') {
