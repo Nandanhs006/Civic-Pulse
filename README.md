@@ -70,7 +70,8 @@ graph TB
     FastAPI1 -->|Read/Write Records| CloudSQL
     
     FastAPI1 -->|4. Query OLAP Analytics| BigQuery
-    BigQuery -->|EXTERNAL_QUERY Federated Bridge| CloudSQL
+    CloudSQL <---|EXTERNAL_QUERY Federated Bridge| BigQuery
+    CloudSQL <---|AI Categorization & Priority Mapping| AIService
     
     FastAPI1 -->|Metrics Output| Prom
     Prom -->|Scrape / Query| Grafana
