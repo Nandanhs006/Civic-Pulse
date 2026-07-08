@@ -4,6 +4,7 @@ const en = {
   // Brand / nav
   'brand.tagline': "Bharat · People's Priorities",
   'nav.portal': 'Citizen Portal',
+  'nav.participate': 'Participate',
   'nav.myConstituency': 'My Constituency',
   'nav.pmoCommand': 'PMO Command',
   'nav.staffLogin': 'Staff Login',
@@ -39,6 +40,8 @@ const en = {
   'portal.voiceLangs': 'Hindi, Tamil, Bengali, English & more',
   'portal.lengthLimit': 'Length: {duration}s (60s limit)',
   'portal.readyToSubmit': 'Captured. Ready to submit.',
+  'portal.reviewRecording': 'Review your recording:',
+  'portal.deleteRecording': 'Delete',
   'portal.orWrite': 'Or write your request',
   'portal.writePlaceholder':
     'e.g. The water pipeline near the market is broken; streetlights on the main road are not working…',

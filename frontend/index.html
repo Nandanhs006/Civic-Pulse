@@ -2,9 +2,52 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="icon" id="theme-favicon" />
+    <link rel="apple-touch-icon" href="/logo/logo.png" />
     <meta name="theme-color" content="#FF9933" />
+    <script>
+      (function(){
+        function getInitialTheme(){
+          var stored = null;
+          try{ stored = localStorage.getItem('theme'); }catch(e){}
+          if(stored === 'light' || stored === 'dark') return stored;
+          if(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+          return 'dark';
+        }
+
+        var favicon = document.getElementById('theme-favicon');
+        if(!favicon){
+          favicon = document.createElement('link');
+          favicon.rel = 'icon';
+          favicon.id = 'theme-favicon';
+          document.head.appendChild(favicon);
+        }
+
+        var lightPath = '/logo/logo.png';
+        var darkPath = '/logo/logo_dark.png';
+
+
+        var setFor = function(theme){
+          var target = theme === 'light' ? lightPath : darkPath;
+          favicon.href = target;
+        };
+
+        // Set initial (async check for files, fallback to embedded SVGs)
+        setFor(getInitialTheme());
+
+        // Observe theme changes on the document element
+        try{
+          var observer = new MutationObserver(function(mutations){
+            mutations.forEach(function(m){
+              if(m.attributeName === 'data-theme'){
+                setFor(document.documentElement.getAttribute('data-theme'));
+              }
+            });
+          });
+          observer.observe(document.documentElement, { attributes: true });
+        }catch(e){}
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Civic Pulse - People's Priorities</title>
     

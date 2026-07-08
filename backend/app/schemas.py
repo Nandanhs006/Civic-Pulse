@@ -75,6 +75,8 @@ class SuggestionOut(BaseModel):
     ward_id: Optional[int] = None
     constituency_id: Optional[int] = None
     assembly_constituency_id: Optional[int] = None
+    assigned_officer_id: Optional[int] = None
+    dispatch_status: Optional[str] = "Unassigned"
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
@@ -217,3 +219,20 @@ class HierarchyOut(BaseModel):
     parliamentary: Optional[HierParliamentary] = None
     assembly: Optional[HierAssembly] = None
     civic: Optional[HierCivic] = None
+
+
+class GridOfficerOut(BaseModel):
+    id: int
+    name: str
+    email: str
+    phone: str
+    avatar_url: Optional[str] = None
+    is_active: bool
+    ward_id: int
+    active_cases: int = 0
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GridDispatchInput(BaseModel):
+    suggestion_id: str
+    officer_id: int

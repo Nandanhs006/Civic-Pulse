@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import apiClient from '../services/apiClient';
-import { Mic, MicOff, Send, CheckCircle2, Image, MapPin, Loader2, UserCheck } from 'lucide-react';
+import { Mic, MicOff, Send, CheckCircle2, Image, MapPin, Loader2, UserCheck, Trash2 } from 'lucide-react';
 import { Suggestion, Constituency, MP, Hierarchy } from '../types';
 import ConstituencyPicker, { Autofill } from '../components/common/ConstituencyPicker';
 import Avatar from '../components/common/Avatar';
@@ -25,7 +25,15 @@ const Portal: React.FC = () => {
   const [successData, setSuccessData] = useState<Suggestion | null>(null);
   const [sentToMp, setSentToMp] = useState<MP | null>(null);
 
-  const { isRecording, audioBlob, duration, startRecording, stopRecording } = useAudioRecorder();
+  const { isRecording, audioBlob, duration, startRecording, stopRecording, deleteRecording } = useAudioRecorder();
+
+  // Object URL for reviewing the captured clip; revoked when the blob changes.
+  const audioUrl = useMemo(() => (audioBlob ? URL.createObjectURL(audioBlob) : null), [audioBlob]);
+  useEffect(() => {
+    return () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [audioUrl]);
   const { t } = useLang();
 
   // Tree follows the SELECTED constituency. The GPS-derived MLA/civic tiers are
@@ -150,6 +158,7 @@ const Portal: React.FC = () => {
       setContent('');
       setImageFile(null);
       setImagePreview(null);
+      deleteRecording();
     } catch (err) {
       console.error(err);
       alert('Failed to submit suggestion. Please try again.');
@@ -286,6 +295,44 @@ const Portal: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {audioBlob && !isRecording && audioUrl && (
+              <div
+                style={{
+                  ...softPanel,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                  {t('portal.reviewRecording')}
+                </span>
+                <audio controls src={audioUrl} style={{ flex: 1, minWidth: '180px', height: '36px' }} />
+                <button
+                  type="button"
+                  onClick={deleteRecording}
+                  title={t('portal.deleteRecording')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--danger)',
+                    background: 'transparent',
+                    color: 'var(--danger)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Trash2 size={16} />
+                  {t('portal.deleteRecording')}
+                </button>
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
