@@ -56,78 +56,108 @@ class SuggestionService:
         audio_file: Optional[UploadFile] = None,
         image_file: Optional[UploadFile] = None,
     ) -> Suggestion:
-        # Create directory paths
+        import uuid
+
+        # 1. Pre-generate UUID so files can be named after it
+        suggestion_id = str(uuid.uuid4())
+
         audio_url = None
         image_url = None
+        uploaded_urls = []
 
-        if audio_file:
-            audio_url = self.file_service.save_file(audio_file, subfolder="audio")
-        if image_file:
-            image_url = self.file_service.save_file(image_file, subfolder="images")
+        try:
+            # 2. Save files using the UUID prefix
+            if audio_file:
+                audio_url = self.file_service.save_file(
+                    audio_file, subfolder="audio", custom_name=f"{suggestion_id}_audio"
+                )
+                uploaded_urls.append(audio_url)
+            if image_file:
+                image_url = self.file_service.save_file(
+                    image_file, subfolder="images", custom_name=f"{suggestion_id}_image"
+                )
+                uploaded_urls.append(image_url)
 
-        # Ingest text or run transcription
-        transcription_result = {}
-        if audio_url:
-            transcription_result = self.ai_service.transcribe_audio(audio_url)
-            content = transcription_result.get("raw_text", "")
-            english_translation = transcription_result.get("english_translation", "")
-            language_code = transcription_result.get("language_code", "en")
-            category = transcription_result.get("category", "General")
-            sentiment = transcription_result.get("sentiment", "Neutral")
-            priority_score = transcription_result.get("priority_score", 50)
-        else:
-            # Run text NLP analysis
-            nlp_result = self.ai_service.analyze_text(content or "", language_code)
-            english_translation = nlp_result.get("english_translation", content)
-            category = nlp_result.get("category", "General")
-            sentiment = nlp_result.get("sentiment", "Neutral")
-            priority_score = nlp_result.get("priority_score", 50)
+            # Ingest text or run transcription
+            transcription_result = {}
+            if audio_url:
+                transcription_result = self.ai_service.transcribe_audio(audio_url)
+                content = transcription_result.get("raw_text", "")
+                english_translation = transcription_result.get(
+                    "english_translation", ""
+                )
+                language_code = transcription_result.get("language_code", "en")
+                category = transcription_result.get("category", "General")
+                sentiment = transcription_result.get("sentiment", "Neutral")
+                priority_score = transcription_result.get("priority_score", 50)
+            else:
+                # Run text NLP analysis
+                nlp_result = self.ai_service.analyze_text(content or "", language_code)
+                english_translation = nlp_result.get("english_translation", content)
+                category = nlp_result.get("category", "General")
+                sentiment = nlp_result.get("sentiment", "Neutral")
+                priority_score = nlp_result.get("priority_score", 50)
 
-        # Route the request to a parliamentary constituency (the MP's unit).
-        resolved_constituency_id = self.location_service.resolve_constituency(
-            constituency_id=constituency_id,
-            latitude=latitude,
-            longitude=longitude,
-        )
-
-        # Route to the assembly constituency (the MLA's unit) from GPS.
-        assembly_constituency_id = None
-        if latitude is not None and longitude is not None:
-            assembly_constituency_id = self.geo_service.locate_assembly_constituency_id(
-                float(latitude), float(longitude)
+            # Route the request to a parliamentary constituency (the MP's unit).
+            resolved_constituency_id = self.location_service.resolve_constituency(
+                constituency_id=constituency_id,
+                latitude=latitude,
+                longitude=longitude,
             )
 
-        # Legacy ward mapping retained for the demographic analytics cards.
-        ward_id = None
-        if latitude is not None and longitude is not None:
-            wards = self.db.query(Ward).all()
-            if wards:
-                ward_index = int((abs(latitude) + abs(longitude)) * 100) % len(wards)
-                ward_id = wards[ward_index].id
+            # Route to the assembly constituency (the MLA's unit) from GPS.
+            assembly_constituency_id = None
+            if latitude is not None and longitude is not None:
+                assembly_constituency_id = (
+                    self.geo_service.locate_assembly_constituency_id(
+                        float(latitude), float(longitude)
+                    )
+                )
 
-        # Construct and save Suggestion model
-        db_suggestion = Suggestion(
-            citizen_phone=citizen_phone,
-            content=content or "",
-            english_translation=english_translation,
-            language_code=language_code,
-            audio_url=audio_url,
-            image_url=image_url,
-            latitude=latitude,
-            longitude=longitude,
-            category=category,
-            sentiment=sentiment,
-            priority_score=priority_score,
-            ward_id=ward_id,
-            constituency_id=resolved_constituency_id,
-            assembly_constituency_id=assembly_constituency_id,
-            status="Submitted",
-        )
+            # Legacy ward mapping retained for the demographic analytics cards.
+            ward_id = None
+            if latitude is not None and longitude is not None:
+                wards = self.db.query(Ward).all()
+                if wards:
+                    ward_index = int((abs(latitude) + abs(longitude)) * 100) % len(
+                        wards
+                    )
+                    ward_id = wards[ward_index].id
 
-        self.db.add(db_suggestion)
-        self.db.commit()
-        self.db.refresh(db_suggestion)
-        return db_suggestion
+            # Construct and save Suggestion model
+            db_suggestion = Suggestion(
+                id=suggestion_id,
+                citizen_phone=citizen_phone,
+                content=content or "",
+                english_translation=english_translation,
+                language_code=language_code,
+                audio_url=audio_url,
+                image_url=image_url,
+                latitude=latitude,
+                longitude=longitude,
+                category=category,
+                sentiment=sentiment,
+                priority_score=priority_score,
+                ward_id=ward_id,
+                constituency_id=resolved_constituency_id,
+                assembly_constituency_id=assembly_constituency_id,
+                status="Submitted",
+            )
+
+            self.db.add(db_suggestion)
+            self.db.commit()
+            self.db.refresh(db_suggestion)
+            return db_suggestion
+
+        except Exception as ex:
+            # 3. Transactional rollback: roll back DB changes and delete uploaded files
+            self.db.rollback()
+            for url in uploaded_urls:
+                try:
+                    self.file_service.delete_file(url)
+                except Exception:
+                    pass
+            raise ex
 
     def get_suggestions(
         self,

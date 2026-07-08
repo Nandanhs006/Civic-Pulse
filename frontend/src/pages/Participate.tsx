@@ -19,7 +19,7 @@ const CATEGORIES = [
 ];
 
 // Pydantic Schema interfaces
-interface GridOfficer {
+interface WardOfficer {
   id: number;
   name: string;
   email: string;
@@ -72,7 +72,7 @@ const WARD_COLORS = {
   4: '#a855f7'  // Amethyst
 };
 
-const MOCK_OFFICERS: GridOfficer[] = [
+const MOCK_OFFICERS: WardOfficer[] = [
   {
     id: 1,
     name: "Arjun Mehta",
@@ -162,14 +162,14 @@ const MOCK_SUGGESTIONS: Suggestion[] = [
 ];
 
 interface ParticipateProps {
-  activeApp?: 'hub' | 'fixmystreet' | 'decidim' | 'cpgrams' | 'seeclickfix' | 'ushahidi' | 'hotline' | 'grid' | 'citybrain' | 'mailbox';
+  activeApp?: 'hub' | 'fixmystreet' | 'decidim' | 'cpgrams' | 'seeclickfix' | 'ushahidi' | 'hotline' | 'ward' | 'citybrain' | 'mailbox';
 }
 
 const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const navigate = useNavigate();
   useAuth();
   
-  const [officers, setOfficers] = useState<GridOfficer[]>([]);
+  const [officers, setOfficers] = useState<WardOfficer[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [projects, setProjects] = useState<ProposedProject[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -277,7 +277,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
     const noteText = resolveCommentText.trim() || 'Work completed and verified.';
     const newComment = {
       id: Date.now(),
-      author: assignedOfficerName || 'Grid Representative',
+      author: assignedOfficerName || 'Ward Officer',
       text: `✅ RESOLUTION: ${noteText}`,
       date: new Date().toISOString().split('T')[0],
       isOfficer: true
@@ -400,9 +400,9 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch grid officers (public/auth)
+      // 1. Fetch ward officers (public/auth)
       try {
-        const officersRes = await apiClient.get<GridOfficer[]>('/api/v1/grid/officers');
+        const officersRes = await apiClient.get<WardOfficer[]>('/api/v1/ward/officers');
         setOfficers(officersRes.data.length > 0 ? officersRes.data : MOCK_OFFICERS);
       } catch (e) {
         console.warn("Failed to fetch officers, using mock:", e);
@@ -471,7 +471,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
         longitude: fmsCoords[1],
         language_code: 'en'
       });
-      setSyncMsg('Report submitted and auto-routed to local Grid Officer!');
+      setSyncMsg('Report submitted and auto-routed to local Ward Officer!');
       setFmsContent('');
       setFmsPhone('');
       fetchData();
@@ -531,11 +531,11 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
     if (!officerId) return;
     setLoading(true);
     try {
-      await apiClient.post('/api/v1/grid/dispatch', {
+      await apiClient.post('/api/v1/ward/dispatch', {
         suggestion_id: suggestionId,
         officer_id: Number(officerId)
       });
-      setSyncMsg('Suggestion dispatched to grid representative successfully.');
+      setSyncMsg('Suggestion dispatched to ward officer successfully.');
       fetchData();
       setTimeout(() => setSyncMsg(''), 3000);
     } catch (err) {
@@ -617,7 +617,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               </div>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>StreetMapper</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                Map-based report system. Drop a coordinates pin to report infrastructure damage with auto-routing to grid officers.
+                Map-based report system. Drop a coordinates pin to report infrastructure damage with auto-routing to ward officers.
               </p>
               <button onClick={() => navigate('/participate/streetmapper')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
@@ -692,24 +692,24 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               </div>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Command Dispatch</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                Unified admin dispatch board. Review reports and allocate tasks directly to local grid managers in real-time.
+                Unified admin dispatch board. Review reports and allocate tasks directly to local ward officers in real-time.
               </p>
               <button onClick={() => navigate('/participate/command-dispatch')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
 
-            {/* Card 7: Sector Directory */}
+            {/* Card 7: Ward Directory */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
-                <span className="badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>Grid Network</span>
+                <span className="badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>Ward Committee Network</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Sector Directory</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Ward Directory</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                Grid officer roster. Review local representative contacts, emails, assigned sectors, and active workload monitors.
+                Ward officer roster. Review local representative contacts, emails, assigned wards, and active workload monitors.
               </p>
-              <button onClick={() => navigate('/participate/sector-directory')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
+              <button onClick={() => navigate('/participate/ward-directory')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
@@ -773,7 +773,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <div className="glass-panel" style={{ padding: '24px' }}>
               <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>StreetMapper Geospatial Reporter</h3>
               <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                Point out the pothole or infrastructure issue. We will automatically route it to the grid.
+                Point out the pothole or infrastructure issue. We will automatically route it to the ward.
               </p>
 
               <form onSubmit={handleFmsSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -1197,7 +1197,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                           </div>
                           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                             {stepDispatched ? (
-                              <span>Assigned to Grid Officer **{assignedOfficer?.name}** for inspection.</span>
+                              <span>Assigned to Ward Officer **{assignedOfficer?.name}** for inspection.</span>
                             ) : (
                               <span>Awaiting dispatch queue allocation.</span>
                             )}
@@ -1280,13 +1280,13 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
                     {/* Officer info */}
                     <div>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assigned Grid Representative</h4>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assigned Ward Officer</h4>
                       {assignedOfficer ? (
                         <div className="glass-panel" style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.01)' }}>
                           <img src={assignedOfficer.avatar_url} alt={assignedOfficer.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
                           <div style={{ display: 'flex', flexDirection: 'column', flex: '1' }}>
                             <span style={{ fontSize: '13px', fontWeight: 600 }}>{assignedOfficer.name}</span>
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Ward {assignedOfficer.ward_id} Grid Manager</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Ward {assignedOfficer.ward_id} Officer</span>
                           </div>
                           <a href={`tel:${assignedOfficer.phone}`} className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--primary)', fontSize: '10px', cursor: 'pointer', textDecoration: 'none' }}>
                             Contact
@@ -1364,7 +1364,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                                 Cancel
                               </button>
                               <button 
-                                onClick={() => handleResolveSubmit(issue.id, assignedOfficer?.name || 'Grid Representative')}
+                                onClick={() => handleResolveSubmit(issue.id, assignedOfficer?.name || 'Ward Officer')}
                                 className="btn btn-primary" 
                                 style={{ padding: '4px 10px', fontSize: '12px', background: '#22c55e', borderColor: '#22c55e' }}
                               >
@@ -1583,7 +1583,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
           <div className="glass-panel" style={{ padding: '24px' }}>
             <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>Command Dispatch Console</h2>
             <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-              Administrators review incoming grievances and route accountability directly to local grid managers.
+              Administrators review incoming grievances and route accountability directly to local ward officers.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -1623,9 +1623,9 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
       )}
 
       {/* ========================================================= */}
-      {/* 7. SECTOR DIRECTORY VIEW */}
+      {/* 7. WARD DIRECTORY VIEW */}
       {/* ========================================================= */}
-      {activeApp === 'grid' && (
+      {activeApp === 'ward' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowLeft size={16} /> Back to Hub
