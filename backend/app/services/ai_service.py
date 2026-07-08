@@ -44,9 +44,13 @@ class AIService:
                 )
         else:
             if settings.MOCK_AI_PIPELINE:
-                logger.info("[AI] Running with local mock NLP (MOCK_AI_PIPELINE is True).")
+                logger.info(
+                    "[AI] Running with local mock NLP (MOCK_AI_PIPELINE is True)."
+                )
             else:
-                logger.info("[AI] GEMINI_API_KEY not found. Running with local mock NLP.")
+                logger.info(
+                    "[AI] GEMINI_API_KEY not found. Running with local mock NLP."
+                )
 
     def transcribe_audio(self, file_path: str) -> Dict[str, Any]:
         """
@@ -58,12 +62,16 @@ class AIService:
                 # Resolve actual filesystem path
                 actual_path = file_path
                 if file_path.startswith("/static/"):
-                    actual_path = os.path.join(settings.UPLOAD_DIR, file_path[len("/static/") :])
-                
+                    actual_path = os.path.join(
+                        settings.UPLOAD_DIR, file_path[len("/static/") :]
+                    )
+
                 # Verify that file exists on disk
                 if os.path.exists(actual_path):
-                    logger.info(f"[AI] Transcribing audio file using Gemini inline data: {actual_path}")
-                    
+                    logger.info(
+                        f"[AI] Transcribing audio file using Gemini inline data: {actual_path}"
+                    )
+
                     mime_type = "audio/wav"
                     if actual_path.endswith(".mp3"):
                         mime_type = "audio/mp3"
@@ -74,7 +82,7 @@ class AIService:
 
                     with open(actual_path, "rb") as f:
                         audio_bytes = f.read()
-                    
+
                     prompt = (
                         "Analyze the attached audio file containing a citizen complaint. Perform the following:\n"
                         "1. Transcribe the audio exactly in its original language (as 'raw_text').\n"
@@ -85,15 +93,11 @@ class AIService:
                         "6. Rate urgency priority score: 1-100 (as 'priority_score').\n\n"
                         "Output strictly a JSON block with keys: 'raw_text', 'language_code', 'english_translation', 'category', 'sentiment', 'priority_score'."
                     )
-                    
-                    response = self.model.generate_content([
-                        {
-                            "mime_type": mime_type,
-                            "data": audio_bytes
-                        },
-                        prompt
-                    ])
-                    
+
+                    response = self.model.generate_content(
+                        [{"mime_type": mime_type, "data": audio_bytes}, prompt]
+                    )
+
                     cleaned_text = response.text.strip()
                     if cleaned_text.startswith("```json"):
                         cleaned_text = cleaned_text[7:]
@@ -101,7 +105,7 @@ class AIService:
                         cleaned_text = cleaned_text[:-3]
                     cleaned_text = cleaned_text.strip()
                     data = json.loads(cleaned_text)
-                    
+
                     return {
                         "raw_text": data.get("raw_text", ""),
                         "language_code": data.get("language_code", "en"),
@@ -113,7 +117,9 @@ class AIService:
                 else:
                     logger.warning(f"[AI] Audio file not found at: {actual_path}")
             except Exception as e:
-                logger.error(f"[AI] Gemini audio transcription failed: {e}. Falling back to mock transcription.")
+                logger.error(
+                    f"[AI] Gemini audio transcription failed: {e}. Falling back to mock transcription."
+                )
 
         mock_transcripts = [
             {

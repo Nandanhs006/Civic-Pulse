@@ -17,22 +17,22 @@ Civic Pulse is an enterprise-ready, multilingual civic engagement and decision-s
 
 ## System Architecture (MVP Flow)
 
-The following diagram illustrates how the system load balances incoming requests across multiple backend replicas, enforces strict timeouts, uses Google Cloud resources, and serves dashboards:
+The following diagram illustrates how the system load balances incoming requests across multiple backend replicas, uses Google Cloud resources, queries BigQuery federated data sources, and serves dashboards:
 
 ```mermaid
 graph TB
     subgraph Client Layer
-        Citizen["Citizen Portal <br/> (Axios Client with 30s Timeout)"]
-        Admin["MP Admin Dashboard <br/> (Google Maps & Axios 30s Timeout)"]
+        Citizen["Citizen Portal"]
+        Admin["MP & PMO Admin Dashboard"]
     end
 
     subgraph Gateway & Load Balancer
-        Nginx["Nginx Reverse Proxy & Load Balancer <br/> (5s Connect / 30s Read Timeout)"]
+        Nginx["Nginx Reverse Proxy & Load Balancer"]
     end
 
     subgraph FastAPI Backend Replica Pool
-        FastAPI1["FastAPI Instance 1 <br/> (30s Timeout Middleware)"]
-        FastAPI2["FastAPI Instance 2 <br/> (30s Timeout Middleware)"]
+        FastAPI1["FastAPI Instance 1"]
+        FastAPI2["FastAPI Instance 2"]
     end
 
     subgraph Core Logic & Services
@@ -45,6 +45,7 @@ graph TB
         CloudSQL[("Google Cloud SQL / Postgres")]
         GCS[("Google Cloud Storage")]
         Cache[("Redis Cache")]
+        BigQuery[("Google BigQuery Workspace <br/> (Federated Queries)")]
     end
 
     subgraph Observability
@@ -54,7 +55,7 @@ graph TB
 
     %% Routing connections
     Citizen -->|Voice/Text/Photo Suggestions| Nginx
-    Admin -->|Dashboard API Calls| Nginx
+    Admin -->|Dashboard API & Analytics Calls| Nginx
     
     Nginx -->|Round-Robin load balance| FastAPI1
     Nginx -->|Round-Robin load balance| FastAPI2
@@ -67,6 +68,9 @@ graph TB
     
     FileService -->|Store media| GCS
     FastAPI1 -->|Read/Write Records| CloudSQL
+    
+    FastAPI1 -->|4. Query OLAP Analytics| BigQuery
+    BigQuery -->|EXTERNAL_QUERY Federated Bridge| CloudSQL
     
     FastAPI1 -->|Metrics Output| Prom
     Prom -->|Scrape / Query| Grafana

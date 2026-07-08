@@ -42,3 +42,38 @@ def test_timeout_middleware_under_limit(client):
     response = client.get("/api/v1/test-timeout?seconds=0.01")
     assert response.status_code == 200
     assert response.json() == {"status": "success"}
+
+
+def test_get_bigquery_federated_analytics(client):
+    # Register admin/PMO user
+    reg_res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "pmoadmin@civicpulse.gov",
+            "password": "pmopassword123",
+            "full_name": "PMO Admin",
+            "is_admin": True,
+        },
+    )
+    assert reg_res.status_code == 200
+
+    # Login to get JWT
+    login_res = client.post(
+        "/api/v1/auth/login",
+        data={"username": "pmoadmin@civicpulse.gov", "password": "pmopassword123"},
+    )
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+
+    # Query BigQuery Analytics endpoint
+    res = client.get(
+        "/api/v1/analytics/bigquery",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["connection_status"] == "Dashboard Connection (Live Sync)"
+    assert "avg_tat_days" in data
+    assert "dispatch_saturation" in data
+    assert "officer_load" in data
+
