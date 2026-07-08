@@ -8,6 +8,7 @@ from app.db.models.suggestion import Suggestion
 from app.db.models.project import ProposedProject
 from app.db.models.ward import Ward
 from app.db.models.user import User
+from app.services.bigquery_service import bigquery_service
 
 router = APIRouter()
 
@@ -74,3 +75,17 @@ def get_wards_list(db: Session = Depends(deps.get_db)) -> Any:
     Retrieve all wards with demographic context and infrastructure indicators.
     """
     return db.query(Ward).all()
+
+
+@router.get("/bigquery")
+def get_bigquery_federated_analytics(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Execute analytics via Google BigQuery Federated Connection.
+    """
+    # Only administrative roles are allowed access
+    if current_user.role != "pmo":
+        return {"error": "Unauthorized Access"}
+    return bigquery_service.execute_federated_analytics(db)

@@ -1,7 +1,6 @@
-- `[x]` Create database models (`GridOfficer` and modify `Suggestion`)
-- `[x]` Implement backend endpoints for grid metadata, lookup, and dispatch actions
-- `[x]` Add frontend navigation link in TopBar and register the route in App.tsx
-- `[x]` Build the interactive Participate sub-app views (Map overlay, Officer Directory, Admin Dispatch Panel, Citizen location lookup)
-- `[x]` Seed mock Grid Officers at startup
-- `[x]` Write automated test cases for dispatching and verification
-- `[x]` Run test suite, linters, static type checks, and recompile build package
+- `[x]` Create `bigquery_service.py` service layer with mock external query fallbacks
+- `[x]` Add the `GET /api/v1/analytics/bigquery` endpoint in `analytics.py`
+- `[x]` Create the `PmoAnalytics.tsx` frontend page featuring KPI metrics and charts
+- `[x]` Add the sub-navigation tab bar to `Pmo.tsx` and `PmoAnalytics.tsx`
+- `[x]` Register the `/pmo/analytics` route inside `App.tsx`
+- `[x]` Verify the implementation via typecheck and pytest

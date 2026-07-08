@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { NavLink } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { MP, AnalyticsSummary } from '../types';
 import NationalStats from '../components/features/pmo/NationalStats';
@@ -75,6 +76,38 @@ const Pmo: React.FC = () => {
         <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '2px' }}>
           {t('pmo.subtitle', { count: mps.length })}
         </p>
+      </div>
+
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '22px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+        <NavLink 
+          to="/pmo" 
+          end
+          style={({ isActive }) => ({
+            color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+            borderBottom: isActive ? '2px solid var(--primary)' : '2px solid transparent',
+            paddingBottom: '8px',
+            fontWeight: 600,
+            textDecoration: 'none',
+            fontSize: '14px',
+            transition: 'all 0.2s ease'
+          })}
+        >
+          {t('pmo.title') || 'Representative Directory'}
+        </NavLink>
+        <NavLink 
+          to="/pmo/analytics" 
+          style={({ isActive }) => ({
+            color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+            borderBottom: isActive ? '2px solid var(--primary)' : '2px solid transparent',
+            paddingBottom: '8px',
+            fontWeight: 600,
+            textDecoration: 'none',
+            fontSize: '14px',
+            transition: 'all 0.2s ease'
+          })}
+        >
+          BigQuery OLAP Analytics
+        </NavLink>
       </div>
 
       <NationalStats mps={mps} summary={summary} />
