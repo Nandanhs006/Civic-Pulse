@@ -5,6 +5,8 @@ import apiClient from '../services/apiClient';
 import { MapContainer, TileLayer, Popup, Marker, CircleMarker } from 'react-leaflet';
 import { LatLngExpression } from 'leaflet';
 import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { useIsMobile } from '../hooks/useIsMobile';
 import 'leaflet/dist/leaflet.css';
 
 const CATEGORIES = [
@@ -227,6 +229,9 @@ interface ParticipateProps {
 const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const navigate = useNavigate();
   useAuth();
+  const isMobile = useIsMobile();
+  const { theme } = useTheme();
+  const tileUrl = `https://{s}.basemaps.cartocdn.com/${theme === 'light' ? 'light_all' : 'dark_all'}/{z}/{x}/{y}{r}.png`;
 
   const [officers, setOfficers] = useState<WardOfficer[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -843,14 +848,14 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '20px' }}>
             {/* Map selection */}
-            <div className="glass-panel" style={{ height: '480px', padding: 0, position: 'relative', overflow: 'hidden' }}>
+            <div className="glass-panel" style={{ height: isMobile ? '320px' : '480px', padding: 0, position: 'relative', overflow: 'hidden' }}>
               <MapContainer center={MAP_CENTER} zoom={14} style={{ width: '100%', height: '100%' }}>
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                <TileLayer key={theme} url={tileUrl} />
                 <Marker position={fmsCoords} />
               </MapContainer>
-              <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', zIndex: 100, border: '1px solid var(--border-color)' }}>
+              <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', zIndex: 100, border: '1px solid var(--border-card)' }}>
                 📍 Coordinates: {fmsCoords[0].toFixed(5)}, {fmsCoords[1].toFixed(5)}
               </div>
             </div>
@@ -869,7 +874,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     value={fmsContent}
                     onChange={(e) => setFmsContent(e.target.value)}
                     placeholder="E.g., Pothole near Central Market main gate..."
-                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '100px', fontSize: '13px' }}
+                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '100px', fontSize: '13px' }}
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -878,7 +883,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     value={fmsPhone}
                     onChange={(e) => setFmsPhone(e.target.value)}
                     placeholder="+91-98765-XXXXX"
-                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
+                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
                   />
                 </div>
 
@@ -906,7 +911,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               Support development projects proposed for your constituency. Upvotes affect the prioritization scoring metric directly.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
               {projects.map(project => (
                 <div key={project.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -950,7 +955,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
             <div className="glass-panel" style={{ padding: '24px' }}>
               <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Aegis AI Redress Engine</h3>
               <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -962,7 +967,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   value={cpgText}
                   onChange={(e) => setCpgText(e.target.value)}
                   placeholder="E.g., सड़कों पर बहुत पानी भरा हुआ है, जिससे लोगों का चलना मुश्किल हो गया है..."
-                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
+                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
                 />
                 <button type="submit" className="btn btn-primary" disabled={loading || !cpgText}>
                   Analyze Grievance
@@ -1061,7 +1066,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
           {/* Search, Sort and Filter Toolbar */}
           <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', justifyContent: 'space-between' }}>
             {/* Search Input */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 12px', flex: '1', minWidth: '240px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px 12px', flex: '1', minWidth: '240px' }}>
               <Search size={16} style={{ color: 'var(--text-muted)', opacity: 0.7 }} />
               <input
                 type="text"
@@ -1083,7 +1088,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 <select
                   value={timelineCategory}
                   onChange={(e) => setTimelineCategory(e.target.value)}
-                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
                 >
                   <option value="All">All Categories</option>
                   {CATEGORIES.map((cat: string) => (
@@ -1099,7 +1104,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 <select
                   value={timelineStatus}
                   onChange={(e) => setTimelineStatus(e.target.value)}
-                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
                 >
                   <option value="All">All Statuses</option>
                   <option value="Submitted">Submitted</option>
@@ -1114,7 +1119,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 <select
                   value={timelineSort}
                   onChange={(e) => setTimelineSort(e.target.value)}
-                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
                 >
                   <option value="newest">Newest First</option>
                   <option value="priority">Highest Priority</option>
@@ -1150,7 +1155,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       style={{
                         padding: '18px',
                         cursor: 'pointer',
-                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-card)',
                         background: isSelected ? 'rgba(59,130,246,0.03)' : 'rgba(255,255,255,0.02)'
                       }}
                     >
@@ -1225,7 +1230,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     </div>
 
                     {/* Stepper Timeline Visualizer */}
-                    <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px' }}>
+                    <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '16px' }}>
                       <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Ticket Workflow Timeline</h4>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', paddingLeft: '24px' }}>
@@ -1400,7 +1405,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                                 value={resolveCommentText}
                                 onChange={(e) => setResolveCommentText(e.target.value)}
                                 placeholder="Explain what was fixed to resolve this issue..."
-                                style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 8px', borderRadius: '6px', outline: 'none', height: '60px', fontSize: '12px' }}
+                                style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px 8px', borderRadius: '6px', outline: 'none', height: '60px', fontSize: '12px' }}
                                 required
                               />
                             </div>
@@ -1444,7 +1449,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     )}
 
                     {/* Comments / Activity Feed Section */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', flex: '1' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border-card)', paddingTop: '16px', flex: '1' }}>
                       <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Activity Feed</h4>
 
                       {/* Comments Feed List */}
@@ -1458,7 +1463,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                             <div key={c.id} style={{
                               padding: '10px', borderRadius: '6px',
                               background: c.isOfficer ? 'rgba(59,130,246,0.05)' : 'rgba(255,255,255,0.02)',
-                              border: c.isOfficer ? '1px solid rgba(59,130,246,0.2)' : '1px solid var(--border-color)'
+                              border: c.isOfficer ? '1px solid rgba(59,130,246,0.2)' : '1px solid var(--border-card)'
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>
                                 <span style={{ fontWeight: 600, color: c.isOfficer ? 'var(--primary)' : 'var(--text-main)' }}>{c.author}</span>
@@ -1471,7 +1476,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       </div>
 
                       {/* Add comment Form */}
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '4px 8px' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-card)', borderRadius: '6px', padding: '4px 8px' }}>
                         <input
                           type="text"
                           value={newCommentText}
@@ -1518,7 +1523,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       value={newReportText}
                       onChange={(e) => setNewReportText(e.target.value)}
                       placeholder="Explain what is broken or needed..."
-                      style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '100px', fontSize: '13px' }}
+                      style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '100px', fontSize: '13px' }}
                       required
                     />
                   </div>
@@ -1529,7 +1534,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       <select
                         value={newReportCategory}
                         onChange={(e) => setNewReportCategory(e.target.value)}
-                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
                       >
                         {CATEGORIES.map((cat: string) => (
                           <option key={cat} value={cat}>{cat}</option>
@@ -1542,7 +1547,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       <select
                         value={newReportWard}
                         onChange={(e) => setNewReportWard(Number(e.target.value))}
-                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
                       >
                         <option value={1}>Ward 1 (Saffron)</option>
                         <option value={2}>Ward 2 (Green)</option>
@@ -1559,7 +1564,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       type="file"
                       accept="image/*"
                       onChange={handleReportImageChange}
-                      style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 8px', borderRadius: '8px', fontSize: '12px' }}
+                      style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px 8px', borderRadius: '8px', fontSize: '12px' }}
                     />
                     {reportImagePreview && (
                       <div style={{ position: 'relative', width: '80px', height: '80px', marginTop: '6px', borderRadius: '4px', overflow: 'hidden' }}>
@@ -1608,9 +1613,9 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               </p>
             </div>
 
-            <div style={{ height: '480px', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ height: isMobile ? '320px' : '480px', borderRadius: '8px', overflow: 'hidden' }}>
               <MapContainer center={MAP_CENTER} zoom={14} style={{ width: '100%', height: '100%' }}>
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                <TileLayer key={theme} url={tileUrl} />
 
                 {suggestions.filter(s => s.latitude && s.longitude).map(s => {
                   const lat = Number(s.latitude);
@@ -1655,7 +1660,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {suggestions.filter(s => s.dispatch_status === 'Unassigned' || !s.dispatch_status).map(issue => (
-                <div key={issue.id} style={{ padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div key={issue.id} style={{ padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <p style={{ margin: 0, fontSize: '14px' }}>{issue.content}</p>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
@@ -1664,7 +1669,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       <select
                         value={selectedOfficer[issue.id] || ''}
                         onChange={(e) => setSelectedOfficer(prev => ({ ...prev, [issue.id]: Number(e.target.value) }))}
-                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px', borderRadius: '6px', fontSize: '12px' }}
+                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px', borderRadius: '6px', fontSize: '12px' }}
                       >
                         <option value="">-- Choose Officer --</option>
                         {officers.map(o => (
@@ -1743,7 +1748,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '20px' }}>
             <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
                 <h3 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>CityPulse IoT Event Monitor</h3>
@@ -1752,14 +1757,14 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 </p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '14px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-card)', textAlign: 'center' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Water Flow Rate</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, margin: '6px 0', color: '#22c55e' }}>92%</div>
                   <span style={{ fontSize: '10px', color: '#22c55e' }}>● Stable</span>
                 </div>
 
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-card)', textAlign: 'center' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Traffic Speed Avg</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, margin: '6px 0', color: 'var(--saffron)' }}>34 km/h</div>
                   <span style={{ fontSize: '10px', color: 'var(--saffron)' }}>● Delayed</span>
@@ -1783,7 +1788,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     padding: '10px 12px',
                     borderRadius: '6px',
                     fontSize: '12px',
-                    border: '1px solid var(--border-color)',
+                    border: '1px solid var(--border-card)',
                     background: alert.type === 'error' ? 'rgba(239,68,68,0.1)' :
                       alert.type === 'dispatch' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)',
                     color: alert.type === 'error' ? '#ef4444' :
@@ -1807,7 +1812,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
             <div className="glass-panel" style={{ padding: '24px' }}>
               <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Constituency Mailbox Manager</h3>
               <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -1819,7 +1824,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   value={mailContent}
                   onChange={(e) => setMailContent(e.target.value)}
                   placeholder="Type your development suggestion..."
-                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
+                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
                 />
                 <button type="submit" className="btn btn-primary" disabled={!mailContent}>
                   Deliver to MP Mailbox
@@ -1832,7 +1837,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', maxHeight: '340px' }}>
                 {mailBoxItems.map(item => (
-                  <div key={item.id} style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', fontSize: '13px' }}>
+                  <div key={item.id} style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', fontSize: '13px' }}>
                     <div style={{ color: 'var(--text-main)', fontWeight: 600 }}>{item.text}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Filed on {item.date}</div>
 

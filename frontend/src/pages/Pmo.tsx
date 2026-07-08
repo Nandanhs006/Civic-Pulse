@@ -1,21 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useNavigate, NavLink } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { MP, AnalyticsSummary } from '../types';
 import NationalStats from '../components/features/pmo/NationalStats';
 import MpDirectory from '../components/features/pmo/MpDirectory';
-import ConstituencyDashboard from '../components/features/dashboard/ConstituencyDashboard';
-import Avatar from '../components/common/Avatar';
-import { RefreshCw, ArrowLeft, MapPin } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { useLang } from '../context/LanguageContext';
 
-/** PMO super-admin command center: national overview + all-MP directory + drill-down. */
+/** PMO super-admin command center: national overview + all-MP directory. */
 const Pmo: React.FC = () => {
   const { t } = useLang();
+  const navigate = useNavigate();
   const [mps, setMps] = useState<MP[]>([]);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<MP | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -39,36 +37,6 @@ const Pmo: React.FC = () => {
     );
   }
 
-  // Drill-down view for a single constituency.
-  if (selected) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
-        <button
-          onClick={() => setSelected(null)}
-          className="btn-secondary"
-          style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 14px', fontSize: '13px' }}
-        >
-          <ArrowLeft size={15} /> {t('pmo.backToAll')}
-        </button>
-
-        <div className="glass-panel" style={{ padding: '22px', display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
-          <Avatar name={selected.name} photoUrl={selected.photo_url} size={64} />
-          <div style={{ flex: 1, minWidth: '200px' }}>
-            <h1 style={{ fontSize: '25px', color: 'var(--text-main)' }}>{selected.name}</h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', color: 'var(--text-muted)', fontSize: '14px', marginTop: '2px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <MapPin size={14} color="var(--saffron)" /> {selected.constituency_name}, {selected.state}
-              </span>
-              {selected.party && <span className="chip">{selected.party_abbr || selected.party}</span>}
-            </div>
-          </div>
-        </div>
-
-        <ConstituencyDashboard constituencyId={selected.constituency_id} />
-      </div>
-    );
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '26px' }} className="animate-fade-in">
       <div>
@@ -78,7 +46,7 @@ const Pmo: React.FC = () => {
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: '20px', marginBottom: '22px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '22px', borderBottom: '1px solid var(--border-card)', paddingBottom: '10px' }}>
         <NavLink 
           to="/pmo" 
           end
@@ -125,7 +93,7 @@ const Pmo: React.FC = () => {
       </div>
 
       <NationalStats mps={mps} summary={summary} />
-      <MpDirectory mps={mps} onSelect={setSelected} />
+      <MpDirectory mps={mps} onSelect={(mp) => navigate(`/pmo/mp/${mp.constituency_id}`)} />
     </div>
   );
 };

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../../../services/apiClient';
 import { MapIssue, Hierarchy } from '../../../types';
 import { useLang } from '../../../context/LanguageContext';
+import { useAuth } from '../../../context/AuthContext';
 import RoutingTree from '../../common/RoutingTree';
 import { severityOf, SEVERITY_COLOR } from './severity';
 import { X, Image as ImageIcon, CalendarDays } from 'lucide-react';
@@ -23,6 +25,8 @@ const chip = (color?: string): React.CSSProperties => ({
 
 const IssueDetailPanel: React.FC<IssueDetailPanelProps> = ({ issue, onClose }) => {
   const { t } = useLang();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [hierarchy, setHierarchy] = useState<Hierarchy | null>(null);
   const [imgBroken, setImgBroken] = useState(false);
 
@@ -87,7 +91,10 @@ const IssueDetailPanel: React.FC<IssueDetailPanelProps> = ({ issue, onClose }) =
         <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
           {t('map.representatives')}
         </div>
-        <RoutingTree hierarchy={hierarchy} />
+        <RoutingTree
+          hierarchy={hierarchy}
+          onMpClick={user?.role === 'pmo' ? (cid) => navigate(`/pmo/mp/${cid}`) : undefined}
+        />
       </div>
     </div>
   );

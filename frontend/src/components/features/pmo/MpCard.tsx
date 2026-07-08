@@ -45,7 +45,7 @@ const MpCard: React.FC<MpCardProps> = ({ mp, onClick }) => {
         <ChevronRight size={18} color="var(--text-muted)" />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-card)', paddingTop: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', borderTop: '1px solid var(--border-card)', paddingTop: '12px' }}>
         <Metric label={t('card.requests')} value={mp.total_suggestions} />
         <Metric label={t('card.resolved')} value={mp.resolved_suggestions} color="var(--india-green)" />
         <Metric label={t('card.pending')} value={mp.pending_suggestions} color={backlogColor} />
