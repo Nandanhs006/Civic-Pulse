@@ -315,6 +315,30 @@ async def startup_event():
         db.close()
 
 
-@app.get("/")
-def read_root():
-    return {"message": "Civic Pulse API is online and healthy", "docs": "/docs"}
+@app.get("/health", tags=["Debug"])
+def health_check():
+    return {"status": "healthy"}
+
+
+# Serve the built frontend (single-service deploys, e.g. Render/Cloud Run) when a
+# compiled bundle is present. Dev/CI have no bundle, so the JSON root is kept.
+_FRONTEND_DIST = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "frontend_dist"
+)
+
+if os.path.isdir(_FRONTEND_DIST):
+    from fastapi.responses import FileResponse
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_spa(full_path: str):
+        # Resolve within the dist dir; fall back to index.html for client routes.
+        candidate = os.path.normpath(os.path.join(_FRONTEND_DIST, full_path))
+        if candidate.startswith(_FRONTEND_DIST) and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(os.path.join(_FRONTEND_DIST, "index.html"))
+
+else:
+
+    @app.get("/")
+    def read_root():
+        return {"message": "Civic Pulse API is online and healthy", "docs": "/docs"}

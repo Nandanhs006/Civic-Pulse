@@ -1,0 +1,40 @@
+# Render Blueprint — free single-service demo (FastAPI serves the React SPA)
+# + a free managed Postgres. Deploy: push to GitHub, then in Render:
+# New + -> Blueprint -> pick this repo. No credit card, no API keys required
+# (this branch uses Leaflet/OpenStreetMap maps and the mock AI pipeline).
+
+databases:
+  - name: civic-pulse-db
+    plan: free
+    databaseName: civic_pulse
+    user: civic
+
+services:
+  - type: web
+    name: civic-pulse
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: POSTGRES_SERVER
+        fromDatabase:
+          name: civic-pulse-db
+          property: host
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: civic-pulse-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: civic-pulse-db
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: civic-pulse-db
+          property: database
+      # Signing key for JWT auth — generated once by Render.
+      - key: SECRET_KEY
+        generateValue: true
