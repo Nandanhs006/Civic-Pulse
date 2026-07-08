@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Pmo from './pages/Pmo';
 import PmoAnalytics from './pages/PmoAnalytics';
+import PmoLeaderboard from './pages/PmoLeaderboard';
 import LiveMap from './pages/LiveMap';
 import Participate from './pages/Participate';
 import RequireRole from './components/common/RequireRole';
@@ -61,6 +62,14 @@ const App: React.FC = () => (
       element={
         <RequireRole role="pmo">
           <Layout><PmoAnalytics /></Layout>
+        </RequireRole>
+      }
+    />
+    <Route
+      path="/pmo/leaderboard"
+      element={
+        <RequireRole role="pmo">
+          <Layout><PmoLeaderboard /></Layout>
         </RequireRole>
       }
     />

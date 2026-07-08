@@ -89,3 +89,86 @@ def get_bigquery_federated_analytics(
     if current_user.role != "pmo":
         return {"error": "Unauthorized Access"}
     return bigquery_service.execute_federated_analytics(db)
+
+
+from app.db.models.constituency import Constituency
+from app.db.models.mp import MP
+from app.db.models.mla import MLA
+
+
+@router.get("/performance")
+def get_performance_index(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Get governance and resolution performance index scores for all constituencies, MPs, and MLAs.
+    """
+    if current_user.role != "pmo":
+        return {"error": "Unauthorized Access"}
+
+    constituencies = db.query(Constituency).all()
+    results = []
+
+    for constituency in constituencies:
+        # Find MP
+        mp = db.query(MP).filter(MP.constituency_id == constituency.id).first()
+        mp_name = mp.name if mp else "Vacant"
+        mp_party = mp.party_abbr if mp else "N/A"
+
+        # Find MLA associated with this constituency (or select one representing assembly units)
+        mla = db.query(MLA).filter(MLA.state == constituency.state).first()
+        mla_name = mla.name if mla else "Local Councillor"
+
+        # Query metrics
+        total = (
+            db.query(Suggestion)
+            .filter(Suggestion.constituency_id == constituency.id)
+            .count()
+        )
+        resolved = (
+            db.query(Suggestion)
+            .filter(
+                Suggestion.constituency_id == constituency.id,
+                Suggestion.status == "Resolved",
+            )
+            .count()
+        )
+
+        # Calculate TAT and scores
+        open_cases = total - resolved
+        resolution_rate = (
+            round((resolved / total * 100), 1) if total > 0 else 85.0
+        )
+
+        # Governance Score Calculation
+        # Combines resolution rate, backlog penalty, and a baseline default
+        base_score = 60 + (resolution_rate * 0.3)
+        backlog_penalty = min(open_cases * 1.5, 15)
+        governance_score = round(
+            max(min(base_score - backlog_penalty, 98.0), 45.0), 1
+        )
+
+        # Average Turnaround Time (TAT) Mock
+        avg_tat_days = round(7.2 - (resolution_rate * 0.03), 1)
+
+        results.append(
+            {
+                "constituency_id": constituency.id,
+                "constituency_name": constituency.name,
+                "state": constituency.state,
+                "mp_name": mp_name,
+                "mp_party": mp_party,
+                "mla_name": mla_name,
+                "total_cases": total,
+                "resolved_cases": resolved,
+                "open_cases": open_cases,
+                "resolution_rate": resolution_rate,
+                "avg_tat_days": avg_tat_days,
+                "governance_score": governance_score,
+            }
+        )
+
+    # Sort results by governance_score descending (Rankings)
+    results.sort(key=lambda x: x["governance_score"], reverse=True)
+    return results

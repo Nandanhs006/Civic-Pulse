@@ -108,6 +108,20 @@ const Pmo: React.FC = () => {
         >
           Dashboard
         </NavLink>
+        <NavLink 
+          to="/pmo/leaderboard" 
+          style={({ isActive }) => ({
+            color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+            borderBottom: isActive ? '2px solid var(--primary)' : '2px solid transparent',
+            paddingBottom: '8px',
+            fontWeight: 600,
+            textDecoration: 'none',
+            fontSize: '14px',
+            transition: 'all 0.2s ease'
+          })}
+        >
+          Performance Index
+        </NavLink>
       </div>
 
       <NationalStats mps={mps} summary={summary} />

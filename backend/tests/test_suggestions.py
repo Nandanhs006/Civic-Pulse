@@ -124,3 +124,57 @@ def test_suggestion_uuid_prefix_and_rollback(client, db):
     assert not os.path.exists(full_path)
 
 
+def test_get_performance_index(client, db):
+    from app.db.models.constituency import Constituency
+    from app.db.models.mp import MP
+
+    # Seed mock records
+    con = Constituency(id=1, name="Bengaluru Central", state="Karnataka")
+    db.add(con)
+    db.commit()
+
+    mp = MP(
+        id=1,
+        name="Tejasvi Surya",
+        party="BJP",
+        party_abbr="BJP",
+        state="Karnataka",
+        constituency_id=1,
+    )
+    db.add(mp)
+    db.commit()
+
+    # Register first
+    reg_res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "perfadmin@civicpulse.gov",
+            "password": "perfpassword123",
+            "full_name": "Perf Admin",
+            "is_admin": True,
+        },
+    )
+    assert reg_res.status_code == 200
+
+    admin_login = client.post(
+        "/api/v1/auth/login",
+        data={"username": "perfadmin@civicpulse.gov", "password": "perfpassword123"},
+    )
+    assert admin_login.status_code == 200
+    token = admin_login.json()["access_token"]
+
+    res = client.get(
+        "/api/v1/analytics/performance",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data, list)
+    assert len(data) > 0
+    assert "constituency_name" in data[0]
+    assert "governance_score" in data[0]
+    assert "mp_name" in data[0]
+    assert "mla_name" in data[0]
+
+
+
