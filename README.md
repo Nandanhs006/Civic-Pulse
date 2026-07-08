@@ -20,58 +20,63 @@ Civic Pulse is an enterprise-ready, multilingual civic engagement and decision-s
 The following diagram illustrates how the system load balances incoming requests across multiple backend replicas, uses Google Cloud resources, queries BigQuery federated data sources, and serves dashboards:
 
 ```mermaid
-graph TB
-    subgraph Client Layer
+flowchart TD
+    subgraph "Clients & Gateways"
         Citizen["Citizen Portal"]
         Admin["MP & PMO Admin Dashboard"]
-    end
-
-    subgraph Gateway & Load Balancer
         Nginx["Nginx Reverse Proxy & Load Balancer"]
     end
 
-    subgraph FastAPI Backend Replica Pool
+    subgraph "FastAPI Backend Pool"
         FastAPI1["FastAPI Instance 1"]
         FastAPI2["FastAPI Instance 2"]
     end
 
-    subgraph Core Logic & Services
-        Limiter["Rate Limiter <br/> (Redis Token Bucket)"]
-        AIService["AI Service <br/> (Gemini 1.5 Flash API)"]
-        FileService["File Service <br/> (GCS Bucket Uploads)"]
+    subgraph "Caching & Rate Limiting (Redis)"
+        Cache[("Redis Cache Store")]
+        Limiter["Rate Limiter (Token Bucket)"]
     end
 
-    subgraph Persistence & Cache
-        CloudSQL[("Google Cloud SQL / Postgres")]
-        GCS[("Google Cloud Storage")]
-        Cache[("Redis Cache")]
-        BigQuery[("Google BigQuery Workspace <br/> (Federated Queries)")]
+    subgraph "Cloud Services & Media Storage"
+        AIService["Gemini 1.5 Flash AI API"]
+        FileService["File Upload Service"]
+        GCS[("Google Cloud Storage (GCS)")]
     end
 
-    subgraph Observability
+    subgraph "Databases & Analytics (OLTP/OLAP)"
+        CloudSQL[("Google Cloud SQL (PostgreSQL)")]
+        BigQuery[("Google BigQuery Workspace")]
+    end
+
+    subgraph "Observability"
         Prom["Prometheus Metrics"]
         Grafana["Grafana Dashboards"]
     end
 
-    %% Routing connections
+    %% Connections
     Citizen -->|Voice/Text/Photo Suggestions| Nginx
     Admin -->|Dashboard API & Analytics Calls| Nginx
-    
-    Nginx -->|Round-Robin load balance| FastAPI1
-    Nginx -->|Round-Robin load balance| FastAPI2
-    
-    FastAPI1 -->|1. Validate Rate Limits| Limiter
-    Limiter -->|Query bucket| Cache
-    
-    FastAPI1 -->|2. Ingest Suggestion| AIService
-    FastAPI1 -->|3. Save Attachments| FileService
-    
-    FileService -->|Store media| GCS
-    FastAPI1 -->|Read/Write Records| CloudSQL
-    
-    FastAPI1 -->|4. Query OLAP Analytics| BigQuery
-    BigQuery -->|EXTERNAL_QUERY Federated Bridge| CloudSQL
-    
+    Nginx -->|Round-Robin Balance| FastAPI1
+    Nginx -->|Round-Robin Balance| FastAPI2
+
+    %% Caching & Limiting
+    FastAPI1 -->|Validate Limits| Limiter
+    Limiter -->|Read/Write Token Bucket| Cache
+
+    %% AI & Files
+    FastAPI1 -->|Ingest Voice/Text| AIService
+    FastAPI1 -->|Upload Media Attachments| FileService
+    FileService -->|Store Assets| GCS
+
+    %% Core Data Writes
+    FastAPI1 -->|Read/Write Transactional Data| CloudSQL
+    CloudSQL <---|AI Categorization & Priority Mapping| AIService
+
+    %% OLAP Federated Bridge
+    FastAPI1 -->|Query Dashboard Analytics| BigQuery
+    CloudSQL <---|EXTERNAL_QUERY Live Sync Bridge| BigQuery
+
+    %% Observability
     FastAPI1 -->|Metrics Output| Prom
     Prom -->|Scrape / Query| Grafana
 ```
@@ -222,3 +227,65 @@ Run inside the `frontend/` directory:
 * **Run Unit Tests**: `npm run test` (Vitest engine)
 * **TypeScript compile validation**: `npm run typecheck` (tsc validation)
 * **Run ESLint checks**: `npm run lint`
+
+---
+
+## 🗄️ System Data Models (OLTP & OLAP)
+
+### 1. OLTP Database Schema (PostgreSQL Transactions)
+The transactional database contains fully normalized tables to enforce referential integrity and support concurrent writes:
+
+*   **`constituencies`**: Administrative regional units.
+    *   `id` (PK, INTEGER): Unique constituency index.
+    *   `name` (VARCHAR): Constituency region name.
+    *   `state` (VARCHAR): Associated Indian state.
+*   **`mps`**: Lok Sabha (Parliamentary) representatives.
+    *   `id` (PK, INTEGER): Unique MP record key.
+    *   `name` (VARCHAR): Representative's name.
+    *   `party` & `party_abbr` (VARCHAR): Political party affiliation.
+    *   `constituency_id` (FK ➔ `constituencies.id`): Associated constituency.
+*   **`mlas`**: Vidhan Sabha (Legislative Assembly) representatives.
+    *   `id` (PK, INTEGER): Unique MLA record key.
+    *   `name` (VARCHAR): Representative's name.
+    *   `party` (VARCHAR): Political party.
+    *   `constituency_id` (FK ➔ `constituencies.id`): Associated assembly constituency.
+*   **`wards`**: Local municipal sectors.
+    *   `id` (PK, INTEGER): Unique ward index.
+    *   `name` (VARCHAR): Ward/sector name.
+    *   `population` (INTEGER) & `area_sq_km` (FLOAT): Demographical attributes.
+    *   `demographics` & `infrastructure_gaps` (JSONB): Dynamic data (literacy rates, water supplies, pothole index).
+*   **`ward_officers`**: Municipal agents assigned to specific sectors.
+    *   `id` (PK, INTEGER): Officer key.
+    *   `name`, `email`, `phone` (VARCHAR): Officer details.
+    *   `ward_id` (FK ➔ `wards.id`): Monitored ward sector.
+*   **`suggestions`**: Citizen feedback, grievances, and active projects.
+    *   `id` (PK, UUID): Unique generated ticket code.
+    *   `title` (VARCHAR) & `description` (TEXT): Core content.
+    *   `category` (VARCHAR): Routed category (Roads, Water, Sanitation).
+    *   `priority` (INTEGER): AI-predicted severity rating (1-100).
+    *   `status` (VARCHAR): Resolution state (Open, Dispatched, Resolved).
+    *   `media_url` (VARCHAR): Link to audio/image file.
+    *   `created_at` (TIMESTAMP): Creation date.
+    *   `ward_id` (FK ➔ `wards.id`): Targeted sector.
+
+---
+
+### 2. OLAP Data Model (BigQuery Federated Query Schema)
+Because analytical queries run directly in-place over the PostgreSQL database utilizing BigQuery Federated Connections (`EXTERNAL_QUERY`), the analytical data model matches the transactional tables but exposes optimized virtual views:
+
+*   **`pmo_performance_metrics` (Aggregated Governance View)**:
+    *   `constituency_id` (INTEGER): Constituency reference key.
+    *   `constituency_name` (VARCHAR): Name of region.
+    *   `state` (VARCHAR): State name.
+    *   `mp_name` (VARCHAR): Lok Sabha MP representative.
+    *   `mla_name` (VARCHAR): Vidhan Sabha MLA representative.
+    *   `total_cases` (INTEGER): Cumulative suggestions/tickets count.
+    *   `resolved_cases` (INTEGER): Count of resolved tickets.
+    *   `open_cases` (INTEGER): Active unresolved backlog.
+    *   `resolution_rate` (DECIMAL): Percentage of cases closed successfully (`(resolved / total) * 100`).
+    *   `avg_tat_days` (DECIMAL): Average Turnaround Time (TAT) in days.
+    *   `governance_score` (DECIMAL): Weighted performance indicator (`0 - 100`) calculated as:
+        \[
+        \text{Score} = (\text{Resolution Rate} \times 0.6) + (\max(0, 100 - \text{Avg TAT}) \times 0.2) + (\max(0, 100 - \text{Open Cases}) \times 0.2)
+        \]
+

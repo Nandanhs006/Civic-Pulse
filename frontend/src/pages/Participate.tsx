@@ -228,7 +228,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const navigate = useNavigate();
   useAuth();
 
-  const [officers, setOfficers] = useState<GridOfficer[]>([]);
+  const [officers, setOfficers] = useState<WardOfficer[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [projects, setProjects] = useState<ProposedProject[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
