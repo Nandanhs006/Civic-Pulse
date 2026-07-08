@@ -9,6 +9,7 @@ const en = {
   'nav.pmoCommand': 'PMO Command',
   'nav.staffLogin': 'Staff Login',
   'nav.signOut': 'Sign out',
+  'nav.home': 'Home',
   'nav.openMenu': 'Open menu',
   'nav.closeMenu': 'Close menu',
   'nav.lightMode': 'Light mode',

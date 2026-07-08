@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -54,6 +54,19 @@ const TopBar: React.FC = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Publish the top bar's height so the sticky breadcrumb can offset below it.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const publish = () =>
+      document.documentElement.style.setProperty('--topbar-h', `${el.offsetHeight}px`);
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -77,7 +90,7 @@ const TopBar: React.FC = () => {
   ];
 
   return (
-    <header style={{ position: 'sticky', top: 0, zIndex: 500 }}>
+    <header ref={headerRef} style={{ position: 'sticky', top: 0, zIndex: 500 }}>
       <div
         className="glass-panel"
         style={{

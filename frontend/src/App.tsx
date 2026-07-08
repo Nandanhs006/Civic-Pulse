@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import TopBar from './components/layouts/TopBar';
+import Breadcrumbs from './components/layouts/Breadcrumbs';
 import Portal from './pages/Portal';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -18,6 +19,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div style={{ background: 'var(--bg-app)', minHeight: '100vh' }}>
       <TopBar />
+      <Breadcrumbs />
       <main style={{ maxWidth: '1440px', margin: '0 auto', padding: isMobile ? '18px 14px 48px' : '28px 24px 64px' }}>
         {children}
       </main>
@@ -29,6 +31,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const MapLayout: React.FC = () => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-app)' }}>
     <TopBar />
+    <Breadcrumbs />
     <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
       <LiveMap />
     </div>
