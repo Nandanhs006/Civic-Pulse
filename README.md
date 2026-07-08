@@ -21,34 +21,34 @@ The following diagram illustrates how the system load balances incoming requests
 
 ```mermaid
 flowchart TD
-    subgraph Clients & Gateways
+    subgraph "Clients & Gateways"
         Citizen["Citizen Portal"]
         Admin["MP & PMO Admin Dashboard"]
         Nginx["Nginx Reverse Proxy & Load Balancer"]
     end
 
-    subgraph FastAPI Backend Pool
+    subgraph "FastAPI Backend Pool"
         FastAPI1["FastAPI Instance 1"]
         FastAPI2["FastAPI Instance 2"]
     end
 
-    subgraph Caching & Rate Limiting (Redis)
+    subgraph "Caching & Rate Limiting (Redis)"
         Cache[("Redis Cache Store")]
         Limiter["Rate Limiter (Token Bucket)"]
     end
 
-    subgraph Cloud Services & Media Storage
+    subgraph "Cloud Services & Media Storage"
         AIService["Gemini 1.5 Flash AI API"]
         FileService["File Upload Service"]
         GCS[("Google Cloud Storage (GCS)")]
     end
 
-    subgraph Databases & Analytics (OLTP/OLAP)
+    subgraph "Databases & Analytics (OLTP/OLAP)"
         CloudSQL[("Google Cloud SQL (PostgreSQL)")]
         BigQuery[("Google BigQuery Workspace")]
     end
 
-    subgraph Observability
+    subgraph "Observability"
         Prom["Prometheus Metrics"]
         Grafana["Grafana Dashboards"]
     end

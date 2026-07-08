@@ -1,4 +1,4 @@
-# Walkthrough: Pagination, Rank Cards, simplified architecture diagram & Presentation Outline Complete
+# Walkthrough: Pagination, Rank Cards, Syntax Corrected Architecture Diagram, & Pitch Deck PPTX Complete
 
 We have successfully resolved the final set of requirements inside your VS Code workspace directory `/Volumes/DiskD/Civicpulse/Civic-Pulse/`:
 
@@ -17,14 +17,13 @@ We have successfully resolved the final set of requirements inside your VS Code 
     *   **Right**: Rank 3 (Green highlight)
     *   This ensures rank labels read sequentially as "1, 2, 3" rather than the previous podium layout.
 
-### 3. Simplified Architecture Diagram (README.md)
-*   Regrouped components in [README.md](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/README.md) to make it cleaner and more logical:
-    *   **Redis Caching & Limiting Block**: Groups Redis Cache Store and the Token Bucket Rate Limiter.
-    *   **Cloud Services & Media Storage Block**: Merges Gemini 1.5 Flash AI, File Upload Service, and GCS in one single high-cohesion block.
+### 3. Syntax Corrected Architecture Diagram (README.md)
+*   Regrouped components in [README.md](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/README.md) to make it cleaner and more logical.
+*   Wrapped all Mermaid subgraph labels in **double quotes** (e.g. `subgraph "Caching & Rate Limiting (Redis)"`) to prevent syntax parsing conflicts with parentheses and special characters on GitHub or markdown viewers.
 
-### 4. Root Slideshow Presentation & Pitch Deck
-*   Created a beautiful hackathon slide presentation outline **[CIVIC_PULSE_PRESENTATION.md](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/CIVIC_PULSE_PRESENTATION.md)** at your workspace root.
-*   Created a comprehensive 11-slide pitch deck **[CIVIC_PULSE_PITCH_DECK.md](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/CIVIC_PULSE_PITCH_DECK.md)** covering: the problem, the solution, technical and AI architecture, target audience, deployability, and scalability.
+### 4. Physical PowerPoint Pitch Deck (.pptx)
+*   Created **[make_pptx.py](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/make_pptx.py)** to programmatically build a widescreen 16:9 presentation slide deck matching your branding guidelines.
+*   Generated **[Civic_Pulse_Pitch_Deck.pptx](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/Civic_Pulse_Pitch_Deck.pptx)** inside the workspace root, containing exactly **11 slides** detailing the pitch, problem, solution, AI routing, database live-sync, deployability, and future scalability.
 
 ---
 
@@ -32,4 +31,4 @@ We have successfully resolved the final set of requirements inside your VS Code 
 
 *   **TypeScript Checks**: `npm run typecheck` returned **0 compilation errors**.
 *   **Backend Pytest Suite**: Run tests returned **11 passed test cases successfully**.
-*   **Production Release Bundle**: Assembled inside `/deploy-bundle`.
+*   **Production Release Bundle**: Assembled inside `/deploy-bundle`. Copies of `Civic_Pulse_Pitch_Deck.pptx` and `CIVIC_PULSE_PITCH_DECK.md` are included at the root of the distribution bundle folder.

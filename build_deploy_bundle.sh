@@ -40,6 +40,12 @@ cp backend/Dockerfile "$BUNDLE_DIR/backend/Dockerfile"
 
 echo "=== 4. Packaging Infrastructure configurations ==="
 cp docker-compose.yml "$BUNDLE_DIR/docker-compose.yml"
+if [ -f "Civic_Pulse_Pitch_Deck.pptx" ]; then
+    cp Civic_Pulse_Pitch_Deck.pptx "$BUNDLE_DIR/Civic_Pulse_Pitch_Deck.pptx"
+fi
+if [ -f "CIVIC_PULSE_PITCH_DECK.md" ]; then
+    cp CIVIC_PULSE_PITCH_DECK.md "$BUNDLE_DIR/CIVIC_PULSE_PITCH_DECK.md"
+fi
 if [ -d "charts" ]; then
     cp -r charts "$BUNDLE_DIR/charts"
 fi
