@@ -289,3 +289,11 @@ Because analytical queries run directly in-place over the PostgreSQL database ut
         \text{Score} = (\text{Resolution Rate} \times 0.6) + (\max(0, 100 - \text{Avg TAT}) \times 0.2) + (\max(0, 100 - \text{Open Cases}) \times 0.2)
         \]
 
+---
+
+## Future Phase & Technical Architecture
+
+### 1. Mobile & Offline Extensions
+* **Mobile Intake**: Native Flutter or Android apps for offline/field-based issue logging.
+* **SMS & Chat Flow**: WhatsApp Business API and SMS gateway integrations for low-connectivity users via Dialogflow.
+
