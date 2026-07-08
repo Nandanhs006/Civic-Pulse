@@ -192,3 +192,19 @@ Run inside the `frontend/` directory:
 * **Run Unit Tests**: `npm run test` (Vitest engine)
 * **TypeScript compile validation**: `npm run typecheck` (tsc validation)
 * **Run ESLint checks**: `npm run lint`
+
+---
+
+## Future Phase & Technical Architecture
+
+### 1. Mobile & Offline Extensions
+* **Mobile Intake**: Native Flutter or Android apps for offline/field-based issue logging.
+* **SMS & Chat Flow**: WhatsApp Business API and SMS gateway integrations for low-connectivity users via Dialogflow.
+
+### 2. Recommended Stack & Tools
+* **AI/ML & Generative AI**: Gemini API, Vertex AI agents, and Google AI Studio.
+* **Language & Voice**: Cloud Speech-to-Text & Text-to-Speech (multilingual intake), Translation API.
+* **Vision & Verification**: Vertex AI Vision & Gemini Multimodal models for validating user photos (e.g. infrastructure faults).
+* **Geospatial**: Google Maps Platform (hotspots), Google Earth Engine (satellite imagery).
+* **Backend & Storage**: BigQuery (large-scale public data analysis), Firebase (auth/hosting), Cloud Run.
+* **Public Datasets**: data.gov.in, Census/NFHS, CPCB air quality, IMD weather datasets.
