@@ -1502,8 +1502,8 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
           {/* New Issue Report Modal Dialog */}
           {showReportModal && (
-            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-              <div className="glass-panel" style={{ width: '450px', padding: '24px', position: 'relative', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', zIndex: 1000 }}>
+              <div className="glass-panel" style={{ width: isMobile ? '100%' : '450px', maxHeight: isMobile ? '90dvh' : '95dvh', overflowY: 'auto', padding: '24px', position: 'relative', display: 'flex', flexDirection: 'column', gap: '16px', borderRadius: isMobile ? '20px 20px 0 0' : undefined }}>
                 <button
                   onClick={() => setShowReportModal(false)}
                   style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
@@ -1528,7 +1528,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '12px', fontWeight: 600 }}>Category</label>
                       <select
