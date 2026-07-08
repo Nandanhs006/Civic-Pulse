@@ -4,8 +4,19 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/apiClient';
 import { MapContainer, TileLayer, Popup, Marker, CircleMarker } from 'react-leaflet';
 import { LatLngExpression } from 'leaflet';
-import { ArrowLeft, Brain, ThumbsUp, Sliders } from 'lucide-react';
+import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
+
+const CATEGORIES = [
+  "Water",
+  "Roads",
+  "Education",
+  "Health",
+  "Sanitation",
+  "Public Spaces",
+  "Electricity",
+  "Safety"
+];
 
 // Pydantic Schema interfaces
 interface GridOfficer {
@@ -30,6 +41,12 @@ interface Suggestion {
   latitude?: number;
   longitude?: number;
   sentiment?: string;
+  ward_id?: number;
+  assigned_officer_id?: number;
+  image_url?: string;
+  audio_url?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface ProposedProject {
@@ -183,22 +200,255 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
     { id: 1, text: "We need a local solar charging hub in Ward 3's community park.", date: "2026-07-06" }
   ]);
 
+  // 4. CivicTimeline SeeClickFix State
+  const [timelineCategory, setTimelineCategory] = useState('All');
+  const [timelineStatus, setTimelineStatus] = useState('All');
+  const [timelineSearch, setTimelineSearch] = useState('');
+  const [timelineSort, setTimelineSort] = useState('newest');
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [localUpvotes, setLocalUpvotes] = useState<Record<string, number>>({});
+  const [upvotedIssues, setUpvotedIssues] = useState<Record<string, boolean>>({});
+  
+  const [issueComments, setIssueComments] = useState<Record<string, Array<{ id: number; author: string; text: string; date: string; isOfficer?: boolean }>>>({
+    's1': [
+      { id: 1, author: 'Arjun Mehta', text: 'I have dispatched the road repair crew to inspect the potholes near the market corner.', date: '2026-07-06', isOfficer: true },
+      { id: 2, author: 'Citizen', text: 'Thank you! The potholes are extremely deep and dangerous during rainy evenings.', date: '2026-07-07' }
+    ],
+    's2': [
+      { id: 1, author: 'System Dispatch', text: 'Ticket registered. Waiting for assignment to local ward electricity unit.', date: '2026-07-07' }
+    ]
+  });
+  const [newCommentText, setNewCommentText] = useState('');
+  
+  // Ticket reporting modal
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [newReportText, setNewReportText] = useState('');
+  const [newReportCategory, setNewReportCategory] = useState('Water');
+  const [newReportWard, setNewReportWard] = useState(1);
+
+  // Before/After evidence states
+  const [resolvedImages, setResolvedImages] = useState<Record<string, string>>({});
+  const [isResolving, setIsResolving] = useState(false);
+  const [resolveImagePreview, setResolveImagePreview] = useState<string | null>(null);
+  const [resolveCommentText, setResolveCommentText] = useState('');
+  
+  // Image states for the new report modal
+  const [reportImageFile, setReportImageFile] = useState<File | null>(null);
+  const [reportImagePreview, setReportImagePreview] = useState<string | null>(null);
+
+  const handleReportImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setReportImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReportImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleResolveImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setResolveImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleResolveSubmit = (issueId: string, assignedOfficerName: string) => {
+    // Update local suggestion
+    setSuggestions(prev => prev.map(s => {
+      if (s.id === issueId) {
+        return { ...s, status: 'Resolved', dispatch_status: 'Resolved' };
+      }
+      return s;
+    }));
+
+    // Save image if uploaded
+    if (resolveImagePreview) {
+      setResolvedImages(prev => ({ ...prev, [issueId]: resolveImagePreview }));
+    }
+
+    // Append resolution note to activity feed
+    const noteText = resolveCommentText.trim() || 'Work completed and verified.';
+    const newComment = {
+      id: Date.now(),
+      author: assignedOfficerName || 'Grid Representative',
+      text: `✅ RESOLUTION: ${noteText}`,
+      date: new Date().toISOString().split('T')[0],
+      isOfficer: true
+    };
+    setIssueComments(prev => ({
+      ...prev,
+      [issueId]: [...(prev[issueId] || []), newComment]
+    }));
+
+    // Reset state
+    setResolveImagePreview(null);
+    setResolveCommentText('');
+    setIsResolving(false);
+    setSyncMsg('Issue resolved successfully! Timeline updated.');
+    setTimeout(() => setSyncMsg(''), 3000);
+  };
+
+  const handleTimelineReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReportText) return;
+    setLoading(true);
+
+    const formData = new FormData();
+    formData.append('content', newReportText);
+    formData.append('citizen_phone', '+919999999999');
+    formData.append('latitude', String(MAP_CENTER[0] + (Math.random() - 0.5) * 0.02));
+    formData.append('longitude', String(MAP_CENTER[1] + (Math.random() - 0.5) * 0.02));
+    formData.append('language_code', 'en');
+    formData.append('constituency_id', '1');
+    formData.append('category', newReportCategory);
+    if (reportImageFile) {
+      formData.append('image', reportImageFile, reportImageFile.name);
+    }
+
+    try {
+      await apiClient.post<Suggestion>('/api/v1/suggestions/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setSyncMsg('Issue successfully reported and added to CivicTimeline!');
+      setNewReportText('');
+      setReportImageFile(null);
+      setReportImagePreview(null);
+      setShowReportModal(false);
+      fetchData();
+      setTimeout(() => setSyncMsg(''), 4000);
+    } catch (err) {
+      console.error(err);
+      const mockNew: Suggestion = {
+        id: 's_' + Date.now(),
+        content: newReportText,
+        category: newReportCategory,
+        priority_score: 55,
+        status: 'Submitted',
+        dispatch_status: 'Unassigned',
+        latitude: MAP_CENTER[0] + (Math.random() - 0.5) * 0.01,
+        longitude: MAP_CENTER[1] + (Math.random() - 0.5) * 0.01,
+        image_url: reportImagePreview || undefined
+      };
+      setSuggestions(prev => [mockNew, ...prev]);
+      setSyncMsg('Issue added locally (Server offline fallback).');
+      setNewReportText('');
+      setReportImageFile(null);
+      setReportImagePreview(null);
+      setShowReportModal(false);
+      setTimeout(() => setSyncMsg(''), 4000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddComment = (suggestionId: string) => {
+    if (!newCommentText.trim()) return;
+    const newComment = {
+      id: Date.now(),
+      author: 'Citizen',
+      text: newCommentText,
+      date: new Date().toISOString().split('T')[0]
+    };
+    setIssueComments(prev => ({
+      ...prev,
+      [suggestionId]: [...(prev[suggestionId] || []), newComment]
+    }));
+    setNewCommentText('');
+  };
+
+  const handleTimelineUpvote = (suggestionId: string) => {
+    if (upvotedIssues[suggestionId]) return;
+    setUpvotedIssues(prev => ({ ...prev, [suggestionId]: true }));
+    setLocalUpvotes(prev => ({ ...prev, [suggestionId]: (prev[suggestionId] || 0) + 1 }));
+    setSyncMsg('Upvote registered! This boosts the priority of this issue.');
+    setTimeout(() => setSyncMsg(''), 3000);
+  };
+
+  const getFilteredSuggestions = () => {
+    return suggestions
+      .filter(s => {
+        const matchesCategory = timelineCategory === 'All' || s.category === timelineCategory;
+        const matchesStatus = timelineStatus === 'All' || s.status === timelineStatus;
+        const matchesSearch = s.content.toLowerCase().includes(timelineSearch.toLowerCase()) || 
+          (s.english_translation && s.english_translation.toLowerCase().includes(timelineSearch.toLowerCase()));
+        return matchesCategory && matchesStatus && matchesSearch;
+      })
+      .sort((a, b) => {
+        if (timelineSort === 'priority') {
+          return b.priority_score - a.priority_score;
+        } else if (timelineSort === 'upvotes') {
+          const upA = localUpvotes[a.id] || 0;
+          const upB = localUpvotes[b.id] || 0;
+          return upB - upA;
+        } else {
+          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          if (dateA && dateB) return dateB - dateA;
+          return b.id.localeCompare(a.id);
+        }
+      });
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const officersRes = await apiClient.get<GridOfficer[]>('/api/v1/grid/officers');
-      setOfficers(officersRes.data.length > 0 ? officersRes.data : MOCK_OFFICERS);
+      // 1. Fetch grid officers (public/auth)
+      try {
+        const officersRes = await apiClient.get<GridOfficer[]>('/api/v1/grid/officers');
+        setOfficers(officersRes.data.length > 0 ? officersRes.data : MOCK_OFFICERS);
+      } catch (e) {
+        console.warn("Failed to fetch officers, using mock:", e);
+        setOfficers(MOCK_OFFICERS);
+      }
 
-      const suggestionsRes = await apiClient.get<Suggestion[]>('/api/v1/suggestions/');
-      setSuggestions(suggestionsRes.data.length > 0 ? suggestionsRes.data : MOCK_SUGGESTIONS);
+      // 2. Fetch suggestions (try authenticated suggestions first, fall back to public map suggestions)
+      let loadedSuggestions: Suggestion[] = [];
+      try {
+        const suggestionsRes = await apiClient.get<Suggestion[]>('/api/v1/suggestions/');
+        if (suggestionsRes.data && suggestionsRes.data.length > 0) {
+          loadedSuggestions = suggestionsRes.data;
+        }
+      } catch (e) {
+        console.warn("Auth suggestions failed, trying public map suggestions:", e);
+      }
 
-      const projectsRes = await apiClient.get<ProposedProject[]>('/api/v1/projects/');
-      setProjects(projectsRes.data.length > 0 ? projectsRes.data : MOCK_PROJECTS);
+      // If auth suggestions was empty or failed, load the 300 public map suggestions
+      if (loadedSuggestions.length === 0) {
+        try {
+          const mapIssuesRes = await apiClient.get<any[]>('/api/v1/suggestions/map');
+          if (mapIssuesRes.data && mapIssuesRes.data.length > 0) {
+            loadedSuggestions = mapIssuesRes.data.map(item => ({
+              ...item,
+              dispatch_status: item.status === 'Resolved' ? 'Resolved' : 
+                               item.status === 'Reviewed' || item.status === 'Processing' ? 'Dispatched' : 'Unassigned'
+            }));
+          }
+        } catch (e) {
+          console.error("Failed to fetch public map suggestions:", e);
+        }
+      }
+
+      setSuggestions(loadedSuggestions.length > 0 ? loadedSuggestions : MOCK_SUGGESTIONS);
+
+      // 3. Fetch proposed projects
+      try {
+        const projectsRes = await apiClient.get<ProposedProject[]>('/api/v1/projects/');
+        setProjects(projectsRes.data.length > 0 ? projectsRes.data : MOCK_PROJECTS);
+      } catch (e) {
+        console.warn("Failed to fetch projects, using mock:", e);
+        setProjects(MOCK_PROJECTS);
+      }
+
     } catch (err) {
-      console.error("Error synchronizing command data:", err);
-      setOfficers(MOCK_OFFICERS);
-      setSuggestions(MOCK_SUGGESTIONS);
-      setProjects(MOCK_PROJECTS);
+      console.error("Error in synchronizing command data:", err);
     } finally {
       setLoading(false);
     }
@@ -677,38 +927,600 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
       )}
 
       {/* ========================================================= */}
-      {/* 4. CIVICTIMELINE VIEW */}
+      {/* 4. CIVICTIMELINE VIEW (SEECLICKFIX) */}
       {/* ========================================================= */}
       {activeApp === 'seeclickfix' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <ArrowLeft size={16} /> Back to Hub
-          </button>
+          
+          {/* Header Action Bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ArrowLeft size={16} /> Back to Hub
+            </button>
+            <button 
+              onClick={() => setShowReportModal(true)} 
+              className="btn btn-primary" 
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <PlusCircle size={16} /> Report an Issue
+            </button>
+          </div>
 
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>CivicTimeline Community Issue Board</h3>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {suggestions.map(s => (
-                <div key={s.id} style={{ padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', color: 'var(--text-main)' }}>{s.content}</h4>
-                    <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                      <span>Category: {s.category || 'General'}</span>
-                      <span>•</span>
-                      <span>Priority: {s.priority_score}/100</span>
-                    </div>
-                  </div>
-                  <span className="badge" style={{ 
-                    background: s.status === 'Resolved' ? 'rgba(34,197,94,0.1)' : 'rgba(59,130,246,0.1)',
-                    color: s.status === 'Resolved' ? '#22c55e' : 'var(--primary)'
-                  }}>
-                    {s.status}
-                  </span>
-                </div>
-              ))}
+          {/* Metric Overview Panels */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+            <div className="glass-panel" style={{ padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Issues</div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)' }}>{suggestions.length}</div>
+            </div>
+            <div className="glass-panel" style={{ padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Submitted (Under Review)</div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: '#3b82f6' }}>
+                {suggestions.filter(s => s.status === 'Submitted' || s.status === 'Processing').length}
+              </div>
+            </div>
+            <div className="glass-panel" style={{ padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Dispatched (In Progress)</div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--saffron)' }}>
+                {suggestions.filter(s => s.dispatch_status === 'Dispatched' || s.assigned_officer_id).length}
+              </div>
+            </div>
+            <div className="glass-panel" style={{ padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Resolved</div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: '#22c55e' }}>
+                {suggestions.filter(s => s.status === 'Resolved').length}
+              </div>
             </div>
           </div>
+
+          {/* Search, Sort and Filter Toolbar */}
+          <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', justifyContent: 'space-between' }}>
+            {/* Search Input */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 12px', flex: '1', minWidth: '240px' }}>
+              <Search size={16} style={{ color: 'var(--text-muted)', opacity: 0.7 }} />
+              <input 
+                type="text" 
+                value={timelineSearch}
+                onChange={(e) => setTimelineSearch(e.target.value)}
+                placeholder="Search issues or English translations..."
+                style={{ background: 'none', border: 'none', color: 'var(--text-main)', width: '100%', outline: 'none', fontSize: '13px' }}
+              />
+              {timelineSearch && (
+                <X size={14} style={{ cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setTimelineSearch('')} />
+              )}
+            </div>
+
+            {/* Filter selectors */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+              {/* Category Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Filter size={14} style={{ color: 'var(--text-muted)' }} />
+                <select 
+                  value={timelineCategory}
+                  onChange={(e) => setTimelineCategory(e.target.value)}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                >
+                  <option value="All">All Categories</option>
+                  {CATEGORIES.map((cat: string) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                  <option value="General">General</option>
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Activity size={14} style={{ color: 'var(--text-muted)' }} />
+                <select 
+                  value={timelineStatus}
+                  onChange={(e) => setTimelineStatus(e.target.value)}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Submitted">Submitted</option>
+                  <option value="Processing">Processing</option>
+                  <option value="Resolved">Resolved</option>
+                </select>
+              </div>
+
+              {/* Sort selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ArrowUpDown size={14} style={{ color: 'var(--text-muted)' }} />
+                <select 
+                  value={timelineSort}
+                  onChange={(e) => setTimelineSort(e.target.value)}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="priority">Highest Priority</option>
+                  <option value="upvotes">Most Supported</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Board Layout (Split Panel) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '20px', alignItems: 'start' }}>
+            
+            {/* Left Column: Tickets List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '680px', overflowY: 'auto', paddingRight: '4px' }}>
+              {getFilteredSuggestions().length === 0 ? (
+                <div className="glass-panel" style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <Search size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                  <p style={{ fontWeight: 600, margin: 0 }}>No Matching Issues Found</p>
+                  <p style={{ fontSize: '12px', marginTop: '4px' }}>Try adjusting your search criteria or filters.</p>
+                </div>
+              ) : (
+                getFilteredSuggestions().map(s => {
+                  const supports = (localUpvotes[s.id] || 0);
+                  const isUpvoted = upvotedIssues[s.id];
+                  const hasComments = issueComments[s.id]?.length || 0;
+                  const isSelected = selectedIssueId === s.id;
+                  
+                  return (
+                    <div 
+                      key={s.id} 
+                      onClick={() => setSelectedIssueId(s.id)}
+                      className={`glass-panel transition-all hover-glow`}
+                      style={{ 
+                        padding: '18px', 
+                        cursor: 'pointer', 
+                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                        background: isSelected ? 'rgba(59,130,246,0.03)' : 'rgba(255,255,255,0.02)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                        <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--primary)', fontSize: '11px' }}>
+                          {s.category || 'General'}
+                        </span>
+                        
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          {/* Priority Pill */}
+                          <span style={{ 
+                            fontSize: '11px', 
+                            fontWeight: 600, 
+                            color: s.priority_score > 75 ? '#ef4444' : s.priority_score > 40 ? 'var(--saffron)' : '#22c55e',
+                            background: s.priority_score > 75 ? 'rgba(239,68,68,0.1)' : s.priority_score > 40 ? 'rgba(249,115,22,0.1)' : 'rgba(34,197,94,0.1)',
+                            padding: '2px 8px',
+                            borderRadius: '12px'
+                          }}>
+                            Priority: {s.priority_score}
+                          </span>
+                          
+                          {/* Status Badge */}
+                          <span className="badge" style={{ 
+                            background: s.status === 'Resolved' ? 'rgba(34,197,94,0.1)' : 'rgba(59,130,246,0.1)',
+                            color: s.status === 'Resolved' ? '#22c55e' : 'var(--primary)',
+                            fontSize: '11px'
+                          }}>
+                            {s.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 600, lineHeight: 1.4, color: 'var(--text-main)' }}>
+                        {s.content}
+                      </h4>
+                      {s.english_translation && s.english_translation !== s.content && (
+                        <p style={{ margin: '-6px 0 10px 0', fontSize: '12px', fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                          📝 {s.english_translation}
+                        </p>
+                      )}
+
+                      {/* Card Footer Info */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '10px' }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <ThumbsUp size={12} color={isUpvoted ? 'var(--primary)' : 'currentColor'} /> {supports} supports
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <MessageSquare size={12} /> {hasComments} comments
+                          </span>
+                        </div>
+                        {s.ward_id && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <MapPin size={12} /> Ward {s.ward_id}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Right Column: Ticket Timeline & Details */}
+            <div className="glass-panel" style={{ padding: '24px', position: 'sticky', top: '20px', minHeight: '480px', display: 'flex', flexDirection: 'column' }}>
+              {(() => {
+                const issue = suggestions.find(s => s.id === selectedIssueId);
+                if (!issue) {
+                  return (
+                    <div style={{ flex: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
+                      <Activity size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+                      <h4 style={{ margin: 0, fontWeight: 600, fontSize: '16px' }}>Select an Issue</h4>
+                      <p style={{ fontSize: '12px', marginTop: '6px', maxWidth: '280px' }}>
+                        Select any reported ticket from the list to view its real-time workflow status, dispatch updates, and comments.
+                      </p>
+                    </div>
+                  );
+                }
+
+                // Match assigned representative
+                const assignedOfficer = officers.find(o => o.id === issue.assigned_officer_id) || 
+                  (issue.ward_id ? officers.find(o => o.ward_id === issue.ward_id) : null);
+                
+                const comments = issueComments[issue.id] || [];
+                const isUpvoted = upvotedIssues[issue.id];
+                const upvoteCount = (localUpvotes[issue.id] || 0);
+
+                // Define step states
+                const stepDispatched = !!issue.assigned_officer_id || issue.dispatch_status === 'Dispatched';
+                const stepResolved = issue.status === 'Resolved';
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: '1' }}>
+                    <div>
+                      <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--primary)', marginBottom: '8px' }}>
+                        {issue.category || 'General'}
+                      </span>
+                      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, lineHeight: 1.4 }}>{issue.content}</h3>
+                    </div>
+
+                    {/* Stepper Timeline Visualizer */}
+                    <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Ticket Workflow Timeline</h4>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', paddingLeft: '24px' }}>
+                        {/* Line connector */}
+                        <div style={{ position: 'absolute', top: '8px', left: '7px', bottom: '8px', width: '2px', background: 'rgba(255,255,255,0.05)' }}></div>
+                        
+                        {/* Step 1: Submitted */}
+                        <div style={{ position: 'relative' }}>
+                          <span style={{ 
+                            position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
+                            background: '#22c55e', border: '2px solid var(--bg-card)'
+                          }} />
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>Submitted & Prioritized</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Report registered at priority score **{issue.priority_score}/100**.
+                          </div>
+                        </div>
+
+                        {/* Step 2: Dispatched */}
+                        <div style={{ position: 'relative' }}>
+                          <span style={{ 
+                            position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
+                            background: stepDispatched ? 'var(--saffron)' : 'rgba(255,255,255,0.1)',
+                            border: '2px solid var(--bg-card)'
+                          }} />
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: stepDispatched ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                            Dispatched to Ward Representative
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {stepDispatched ? (
+                              <span>Assigned to Grid Officer **{assignedOfficer?.name}** for inspection.</span>
+                            ) : (
+                              <span>Awaiting dispatch queue allocation.</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Step 3: Resolved */}
+                        <div style={{ position: 'relative' }}>
+                          <span style={{ 
+                            position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
+                            background: stepResolved ? '#22c55e' : 'rgba(255,255,255,0.1)',
+                            border: '2px solid var(--bg-card)'
+                          }} />
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: stepResolved ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                            Resolution Verified
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {stepResolved ? (
+                              <span style={{ color: '#22c55e', fontWeight: 600 }}>Resolved: Issue verified closed.</span>
+                            ) : (
+                              <span>Awaiting field execution and community sign-off.</span>
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+
+                    {/* Before & After evidence block */}
+                    {(() => {
+                      const beforeImage = issue.image_url || 
+                        (issue.id === 's1' ? 'https://images.unsplash.com/photo-1584467541268-b040f83be3fd?w=400' : 
+                         issue.id === 's2' ? 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400' : null);
+                         
+                      const categoryMockAfters: Record<string, string> = {
+                        'Water': 'https://images.unsplash.com/photo-1542013936693-8848e574047a?w=400',
+                        'Roads': 'https://images.unsplash.com/photo-1515162305285-0293e4767cc2?w=400',
+                        'Education': 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400',
+                        'Health': 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400',
+                        'Sanitation': 'https://images.unsplash.com/photo-1616963172089-a038f8cfc8d3?w=400',
+                        'Safety': 'https://images.unsplash.com/photo-1508849789987-4e5333c12b78?w=400',
+                        'Electricity': 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=400',
+                        'General': 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=400'
+                      };
+                      
+                      const afterImage = resolvedImages[issue.id] || categoryMockAfters[issue.category || 'General'];
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Resolution Evidence (Before / After)</h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            {/* Before Image */}
+                            <div className="glass-panel" style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(255,255,255,0.01)' }}>
+                              <div style={{ height: '90px', borderRadius: '4px', overflow: 'hidden', background: 'rgba(0,0,0,0.2)', position: 'relative' }}>
+                                {beforeImage ? (
+                                  <img src={beforeImage} alt="Before" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>No Photo Attached</div>
+                                )}
+                                <span className="badge" style={{ position: 'absolute', top: '4px', left: '4px', background: 'rgba(239,68,68,0.8)', color: 'white', fontSize: '9px', padding: '2px 4px' }}>BEFORE</span>
+                              </div>
+                            </div>
+                            {/* After Image */}
+                            <div className="glass-panel" style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(255,255,255,0.01)' }}>
+                              <div style={{ height: '90px', borderRadius: '4px', overflow: 'hidden', background: 'rgba(0,0,0,0.2)', position: 'relative' }}>
+                                {stepResolved ? (
+                                  <img src={afterImage} alt="After" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--text-muted)', padding: '4px', textAlign: 'center' }}>
+                                    <span>Resolution Pending</span>
+                                  </div>
+                                )}
+                                <span className="badge" style={{ position: 'absolute', top: '4px', left: '4px', background: stepResolved ? 'rgba(34,197,94,0.8)' : 'rgba(255,255,255,0.2)', color: 'white', fontSize: '9px', padding: '2px 4px' }}>AFTER</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Officer info */}
+                    <div>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assigned Grid Representative</h4>
+                      {assignedOfficer ? (
+                        <div className="glass-panel" style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.01)' }}>
+                          <img src={assignedOfficer.avatar_url} alt={assignedOfficer.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                          <div style={{ display: 'flex', flexDirection: 'column', flex: '1' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600 }}>{assignedOfficer.name}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Ward {assignedOfficer.ward_id} Grid Manager</span>
+                          </div>
+                          <a href={`tel:${assignedOfficer.phone}`} className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--primary)', fontSize: '10px', cursor: 'pointer', textDecoration: 'none' }}>
+                            Contact
+                          </a>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          Awaiting representative allocation...
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Support and Upvote Action */}
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button 
+                        onClick={() => handleTimelineUpvote(issue.id)}
+                        className={`btn ${isUpvoted ? 'btn-secondary' : 'btn-primary'}`}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1', justifyContent: 'center', padding: '10px', fontSize: '13px' }}
+                        disabled={isUpvoted}
+                      >
+                        <ThumbsUp size={16} />
+                        {isUpvoted ? 'Supported' : `Support Issue (${upvoteCount})`}
+                      </button>
+                    </div>
+
+                    {/* Resolve Form trigger and panel */}
+                    {!stepResolved && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {!isResolving ? (
+                          <button 
+                            onClick={() => setIsResolving(true)}
+                            className="btn btn-secondary"
+                            style={{ width: '100%', padding: '10px', fontSize: '13px', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', background: 'rgba(34,197,94,0.05)' }}
+                          >
+                            Verify & Resolve Ticket
+                          </button>
+                        ) : (
+                          <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(34,197,94,0.02)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                            <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#22c55e' }}>Complete Ticket Resolution</h4>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <label style={{ fontSize: '11px', fontWeight: 600 }}>Resolution Report / Note</label>
+                              <textarea 
+                                value={resolveCommentText}
+                                onChange={(e) => setResolveCommentText(e.target.value)}
+                                placeholder="Explain what was fixed to resolve this issue..."
+                                style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 8px', borderRadius: '6px', outline: 'none', height: '60px', fontSize: '12px' }}
+                                required
+                              />
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <label style={{ fontSize: '11px', fontWeight: 600 }}>Upload Evidence (After Photo)</label>
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                onChange={handleResolveImageChange}
+                                style={{ fontSize: '11px', color: 'var(--text-muted)' }}
+                              />
+                              {resolveImagePreview && (
+                                <img src={resolveImagePreview} alt="Preview" style={{ height: '60px', width: '60px', objectFit: 'cover', borderRadius: '4px', marginTop: '4px' }} />
+                              )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                              <button 
+                                onClick={() => {
+                                  setIsResolving(false);
+                                  setResolveImagePreview(null);
+                                  setResolveCommentText('');
+                                }} 
+                                className="btn btn-secondary" 
+                                style={{ padding: '4px 10px', fontSize: '12px' }}
+                              >
+                                Cancel
+                              </button>
+                              <button 
+                                onClick={() => handleResolveSubmit(issue.id, assignedOfficer?.name || 'Grid Representative')}
+                                className="btn btn-primary" 
+                                style={{ padding: '4px 10px', fontSize: '12px', background: '#22c55e', borderColor: '#22c55e' }}
+                              >
+                                Complete Resolution
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Comments / Activity Feed Section */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', flex: '1' }}>
+                      <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Activity Feed</h4>
+                      
+                      {/* Comments Feed List */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '160px', flex: '1' }}>
+                        {comments.length === 0 ? (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '10px' }}>
+                            No citizen comments posted yet.
+                          </div>
+                        ) : (
+                          comments.map(c => (
+                            <div key={c.id} style={{ 
+                              padding: '10px', borderRadius: '6px', 
+                              background: c.isOfficer ? 'rgba(59,130,246,0.05)' : 'rgba(255,255,255,0.02)',
+                              border: c.isOfficer ? '1px solid rgba(59,130,246,0.2)' : '1px solid var(--border-color)'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                <span style={{ fontWeight: 600, color: c.isOfficer ? 'var(--primary)' : 'var(--text-main)' }}>{c.author}</span>
+                                <span>{c.date}</span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.3 }}>{c.text}</p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Add comment Form */}
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '4px 8px' }}>
+                        <input 
+                          type="text" 
+                          value={newCommentText}
+                          onChange={(e) => setNewCommentText(e.target.value)}
+                          placeholder="Write a comment or status update..."
+                          style={{ background: 'none', border: 'none', color: 'var(--text-main)', width: '100%', outline: 'none', fontSize: '12px' }}
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddComment(issue.id)}
+                        />
+                        <button 
+                          onClick={() => handleAddComment(issue.id)}
+                          style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '2px' }}
+                          disabled={!newCommentText}
+                        >
+                          <Send size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* New Issue Report Modal Dialog */}
+          {showReportModal && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+              <div className="glass-panel" style={{ width: '450px', padding: '24px', position: 'relative', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <button 
+                  onClick={() => setShowReportModal(false)}
+                  style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                >
+                  <X size={18} />
+                </button>
+                
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>File a SeeClickFix Report</h3>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Submit a localized developmental ticket. It will automatically load on the community board and alert local ward managers.
+                </p>
+
+                <form onSubmit={handleTimelineReportSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Describe the issue</label>
+                    <textarea 
+                      value={newReportText}
+                      onChange={(e) => setNewReportText(e.target.value)}
+                      placeholder="Explain what is broken or needed..."
+                      style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '100px', fontSize: '13px' }}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 600 }}>Category</label>
+                      <select 
+                        value={newReportCategory}
+                        onChange={(e) => setNewReportCategory(e.target.value)}
+                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+                      >
+                        {CATEGORIES.map((cat: string) => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 600 }}>Target Ward</label>
+                      <select 
+                        value={newReportWard}
+                        onChange={(e) => setNewReportWard(Number(e.target.value))}
+                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+                      >
+                        <option value={1}>Ward 1 (Saffron)</option>
+                        <option value={2}>Ward 2 (Green)</option>
+                        <option value={3}>Ward 3 (Blue)</option>
+                        <option value={4}>Ward 4 (Amethyst)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Photo upload input for Before evidence */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Attach Photo (Before Evidence)</label>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleReportImageChange}
+                      style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 8px', borderRadius: '8px', fontSize: '12px' }}
+                    />
+                    {reportImagePreview && (
+                      <div style={{ position: 'relative', width: '80px', height: '80px', marginTop: '6px', borderRadius: '4px', overflow: 'hidden' }}>
+                        <img src={reportImagePreview} alt="Before preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button 
+                          type="button"
+                          onClick={() => { setReportImageFile(null); setReportImagePreview(null); }}
+                          style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', border: 'none', color: 'white', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px' }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                    <button type="button" onClick={() => setShowReportModal(false)} className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }} disabled={loading}>
+                      {loading ? 'Filing...' : 'Submit Report'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 

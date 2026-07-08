@@ -5,7 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useLang } from '../../context/LanguageContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import LanguageSwitcher from '../common/LanguageSwitcher';
-import { Landmark, Sun, Moon, LogOut, LogIn, LayoutDashboard, Radio, Command, MapPinned, Users } from 'lucide-react';
+import { Sun, Moon, LogOut, LogIn, LayoutDashboard, Radio, Command, MapPinned, Users } from 'lucide-react';
 
 const navLinkStyle = ({ isActive }: { isActive: boolean }): React.CSSProperties => ({
   display: 'flex',
@@ -51,19 +51,12 @@ const TopBar: React.FC = () => {
       >
         {/* Brand */}
         <NavLink to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-          <div
-            style={{
-              width: isMobile ? 36 : 42,
-              height: isMobile ? 36 : 42,
-              borderRadius: 10,
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'linear-gradient(135deg, var(--saffron), var(--india-green))',
-            }}
-          >
-            <Landmark size={isMobile ? 20 : 24} color="white" />
+          <div style={{ width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: 10, flexShrink: 0, overflow: 'hidden' }}>
+            <img
+              src={theme === 'light' ? '/logo/logo.png' : '/logo/logo_dark.png'}
+              alt="Civic Pulse logo"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: isMobile ? '16px' : '18px', color: 'var(--text-main)' }}>
