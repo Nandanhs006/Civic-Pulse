@@ -297,3 +297,69 @@ Because analytical queries run directly in-place over the PostgreSQL database ut
 * **Mobile Intake**: Native Flutter or Android apps for offline/field-based issue logging.
 * **SMS & Chat Flow**: WhatsApp Business API and SMS gateway integrations for low-connectivity users via Dialogflow.
 
+### 2. Recommended Stack & Tools
+* **AI/ML & Generative AI**: Gemini API, Vertex AI agents, and Google AI Studio.
+* **Language & Voice**: Cloud Speech-to-Text & Text-to-Speech (multilingual intake), Translation API.
+* **Vision & Verification**: Vertex AI Vision & Gemini Multimodal models for validating user photos (e.g. infrastructure faults).
+* **Geospatial**: Google Maps Platform (hotspots), Google Earth Engine (satellite imagery).
+* **Backend & Storage**: BigQuery (large-scale public data analysis), Firebase (auth/hosting), Cloud Run.
+* **Public Datasets**: data.gov.in, Census/NFHS, CPCB air quality, IMD weather datasets.
+
+---
+
+## 📸 Platform Screenshots & Walkthrough
+
+![Light Mode](frontend/public/images/web_ss/light.png)
+Light Mode availability: A clean, high-contrast, modern layout optimized for daytime viewing and administrative work.
+
+![Dark Mode](frontend/public/images/web_ss/dark.png)
+Dark Mode availability: A premium dark-mode interface leveraging deep slate tones, reducing eye strain for late-night reviews.
+
+![MP Login](frontend/public/images/web_ss/mp_L.png)
+MP Login: Secure credentials-based authentication gateway ensuring data privacy and role-based access control.
+
+![MP Dashboard Overview](frontend/public/images/web_ss/mp1.png)
+MP Dashboard: Interactive summary view for Lok Sabha MPs displaying active cases, constituency analytics, and task distributions.
+
+![MP Ward Performance](frontend/public/images/web_ss/mp2.png)
+MP Performance & Ward Analysis: Drill-down metrics per ward, showing active caseload and performance ratings of different ward officers.
+
+![PMO Dashboard Overview](frontend/public/images/web_ss/pmo1.jpeg)
+PMO Dashboard: High-level aggregates and KPIs, exposing nationwide constituency performance indices, resolution rates, and ticket turnaround times.
+
+![PMO Leaderboard](frontend/public/images/web_ss/pmo2.jpeg)
+PMO Leaderboard: Ranked sorting of constituencies based on project execution speed, citizen feedback sentiment, and resource utilization.
+
+![PMO Regional Detail](frontend/public/images/web_ss/pmo3.jpeg)
+PMO Analytics: Drill-down heatmaps and analytical breakdowns for specific states and districts.
+
+![Citizen Proposals](frontend/public/images/web_ss/participatory.png)
+Participatory Budgeting: Interface showing local ward participatory project proposals (e.g. water systems, road restoration) and active community upvoting.
+
+![Grid Officer Tasks](frontend/public/images/web_ss/gr1.png)
+Grid Representative Portal: Action dashboard for field officers to view dispatch assignments, route maps, and task priorities.
+
+![Grid Task Action](frontend/public/images/web_ss/gr2.png)
+Grievance Inspection & Update: Task detail view where officers can upload resolution evidence, comments, and change status.
+
+![StreetMapper](frontend/public/images/web_ss/streetmap_p.png)
+StreetMapper Portal: An interface for citizens to submit geolocated infrastructure issues with voice notes, descriptions, and before photos.
+
+![Civic Fund](frontend/public/images/web_ss/funds_p.png)
+Civic Fund: A detailed overview of budgeted projects, estimated costs in ₹ Rupees, and active feasibility scoring.
+
+![Hotspot Tracker](frontend/public/images/web_ss/hotspots_p.png)
+Hotspot Tracker: Leaflet-based geospatial heatmap visualizing grievance density and clustering to guide resource allocation.
+
+![Sector Directory](frontend/public/images/web_ss/ward_p.png)
+Sector Directory: Direct mapping of municipal ward officers and administrative performance indexes.
+
+![Live Map 1](frontend/public/images/web_ss/map1.jpeg)
+Live Map View 1: Detailed geospatial visualizations of civic nodes, assembly constituencies, and Lok Sabha boundary polygons.
+
+![Live Map 2](frontend/public/images/web_ss/map2.jpeg)
+Live Map View 2: Detailed assembly-constituency level mappings and civic node marker listings.
+
+![Civic Timeline](frontend/public/images/web_ss/civic_P.png)
+Civic Timeline: Chronological resolution feed displaying detailed activity history and before/after evidence side-by-side.
+
