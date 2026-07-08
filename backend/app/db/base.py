@@ -8,4 +8,4 @@ from app.db.models.user import User  # noqa
 from app.db.models.ward import Ward  # noqa
 from app.db.models.suggestion import Suggestion  # noqa
 from app.db.models.project import ProposedProject  # noqa
-from app.db.models.grid_officer import GridOfficer  # noqa
+from app.db.models.ward_officer import WardOfficer  # noqa

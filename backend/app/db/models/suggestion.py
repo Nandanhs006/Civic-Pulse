@@ -32,9 +32,9 @@ class Suggestion(Base):
         Integer, ForeignKey("assembly_constituencies.id"), nullable=True, index=True
     )
 
-    # Grid dispatch assignments
+    # Ward dispatch assignments
     assigned_officer_id: Any = Column(
-        Integer, ForeignKey("grid_officers.id"), nullable=True, index=True
+        Integer, ForeignKey("ward_officers.id"), nullable=True, index=True
     )
     dispatch_status: Any = Column(String(50), default="Unassigned")
 

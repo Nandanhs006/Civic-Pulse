@@ -13,7 +13,7 @@ from app.api.v1 import (
     constituencies,
     mps,
     hierarchy,
-    grid,
+    ward,
 )
 from app.db.session import engine, SessionLocal
 from app.db.base import Base
@@ -21,7 +21,7 @@ from app.db.models.ward import Ward
 from app.db.models.user import User
 from app.db.models.suggestion import Suggestion
 from app.db.models.project import ProposedProject
-from app.db.models.grid_officer import GridOfficer
+from app.db.models.ward_officer import WardOfficer
 from app.core.security import get_password_hash
 from app.middleware.rate_limit import check_rate_limit
 from app.middleware.timeout import TimeoutMiddleware
@@ -80,9 +80,9 @@ app.include_router(
     tags=["Hierarchy"],
 )
 app.include_router(
-    grid.router,
-    prefix=f"{settings.API_V1_STR}/grid",
-    tags=["Grid"],
+    ward.router,
+    prefix=f"{settings.API_V1_STR}/ward",
+    tags=["Ward"],
 )
 
 import asyncio
@@ -175,10 +175,10 @@ async def startup_event():
             db.commit()
             print("[Seed] Successfully populated default Wards dataset.")
 
-        # Seed Grid Officers
-        if db.query(GridOfficer).count() == 0:
+        # Seed Ward Officers
+        if db.query(WardOfficer).count() == 0:
             mock_officers = [
-                GridOfficer(
+                WardOfficer(
                     id=1,
                     name="Arjun Mehta",
                     email="arjun.mehta@civicpulse.gov",
@@ -187,7 +187,7 @@ async def startup_event():
                     is_active=True,
                     ward_id=1,
                 ),
-                GridOfficer(
+                WardOfficer(
                     id=2,
                     name="Priya Sharma",
                     email="priya.sharma@civicpulse.gov",
@@ -196,7 +196,7 @@ async def startup_event():
                     is_active=True,
                     ward_id=2,
                 ),
-                GridOfficer(
+                WardOfficer(
                     id=3,
                     name="Rohan Das",
                     email="rohan.das@civicpulse.gov",
@@ -205,7 +205,7 @@ async def startup_event():
                     is_active=True,
                     ward_id=3,
                 ),
-                GridOfficer(
+                WardOfficer(
                     id=4,
                     name="Anjali Nair",
                     email="anjali.nair@civicpulse.gov",
@@ -217,7 +217,7 @@ async def startup_event():
             ]
             db.add_all(mock_officers)
             db.commit()
-            print("[Seed] Successfully populated default Grid Officers dataset.")
+            print("[Seed] Successfully populated default Ward Officers dataset.")
 
         # 3. Seed Suggestions
         if db.query(Suggestion).count() == 0:

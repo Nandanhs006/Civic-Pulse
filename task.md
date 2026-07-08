@@ -1,7 +1,3 @@
-- `[x]` Create database models (`GridOfficer` and modify `Suggestion`)
-- `[x]` Implement backend endpoints for grid metadata, lookup, and dispatch actions
-- `[x]` Add frontend navigation link in TopBar and register the route in App.tsx
-- `[x]` Build the interactive Participate sub-app views (Map overlay, Officer Directory, Admin Dispatch Panel, Citizen location lookup)
-- `[x]` Seed mock Grid Officers at startup
-- `[x]` Write automated test cases for dispatching and verification
-- `[x]` Run test suite, linters, static type checks, and recompile build package
+- `[x]` Update `FileService` inside `file_service.py` to support `custom_name` parameter and file deletion
+- `[x]` Update `create_suggestion` inside `suggestion_service.py` to use UUID prefixing and transactional rollback
+- `[x]` Verify with pytest unit tests and type checks
