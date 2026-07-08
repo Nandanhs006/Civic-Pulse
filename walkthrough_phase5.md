@@ -1,4 +1,4 @@
-# Walkthrough: Pagination, Rank Cards, & Presentation Outline Complete
+# Walkthrough: Pagination, Rank Cards, simplified architecture diagram & Presentation Outline Complete
 
 We have successfully resolved the final set of requirements inside your VS Code workspace directory `/Volumes/DiskD/Civicpulse/Civic-Pulse/`:
 
@@ -17,9 +17,14 @@ We have successfully resolved the final set of requirements inside your VS Code 
     *   **Right**: Rank 3 (Green highlight)
     *   This ensures rank labels read sequentially as "1, 2, 3" rather than the previous podium layout.
 
-### 3. Root Slideshow Presentation (PPT Outline)
-*   Created a beautiful hackathon slide presentation markdown file **[CIVIC_PULSE_PRESENTATION.md](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/CIVIC_PULSE_PRESENTATION.md)** at your workspace root.
-*   It covers: Pitch, Problem Statement, System Architecture, Gemini AI pipelines, and PMO oversight controls.
+### 3. Simplified Architecture Diagram (README.md)
+*   Regrouped components in [README.md](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/README.md) to make it cleaner and more logical:
+    *   **Redis Caching & Limiting Block**: Groups Redis Cache Store and the Token Bucket Rate Limiter.
+    *   **Cloud Services & Media Storage Block**: Merges Gemini 1.5 Flash AI, File Upload Service, and GCS in one single high-cohesion block.
+
+### 4. Root Slideshow Presentation & Pitch Deck
+*   Created a beautiful hackathon slide presentation outline **[CIVIC_PULSE_PRESENTATION.md](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/CIVIC_PULSE_PRESENTATION.md)** at your workspace root.
+*   Created a comprehensive 11-slide pitch deck **[CIVIC_PULSE_PITCH_DECK.md](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/CIVIC_PULSE_PITCH_DECK.md)** covering: the problem, the solution, technical and AI architecture, target audience, deployability, and scalability.
 
 ---
 

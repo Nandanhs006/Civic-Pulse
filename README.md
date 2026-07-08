@@ -20,32 +20,32 @@ Civic Pulse is an enterprise-ready, multilingual civic engagement and decision-s
 The following diagram illustrates how the system load balances incoming requests across multiple backend replicas, uses Google Cloud resources, queries BigQuery federated data sources, and serves dashboards:
 
 ```mermaid
-graph TB
-    subgraph Client Layer
+flowchart TD
+    subgraph Clients & Gateways
         Citizen["Citizen Portal"]
         Admin["MP & PMO Admin Dashboard"]
-    end
-
-    subgraph Gateway & Load Balancer
         Nginx["Nginx Reverse Proxy & Load Balancer"]
     end
 
-    subgraph FastAPI Backend Replica Pool
+    subgraph FastAPI Backend Pool
         FastAPI1["FastAPI Instance 1"]
         FastAPI2["FastAPI Instance 2"]
     end
 
-    subgraph Core Logic & Services
-        Limiter["Rate Limiter <br/> (Redis Token Bucket)"]
-        AIService["AI Service <br/> (Gemini 1.5 Flash API)"]
-        FileService["File Service <br/> (GCS Bucket Uploads)"]
+    subgraph Caching & Rate Limiting (Redis)
+        Cache[("Redis Cache Store")]
+        Limiter["Rate Limiter (Token Bucket)"]
     end
 
-    subgraph Persistence & Cache
-        CloudSQL[("Google Cloud SQL / Postgres")]
-        GCS[("Google Cloud Storage")]
-        Cache[("Redis Cache")]
-        BigQuery[("Google BigQuery Workspace <br/> (Federated Queries)")]
+    subgraph Cloud Services & Media Storage
+        AIService["Gemini 1.5 Flash AI API"]
+        FileService["File Upload Service"]
+        GCS[("Google Cloud Storage (GCS)")]
+    end
+
+    subgraph Databases & Analytics (OLTP/OLAP)
+        CloudSQL[("Google Cloud SQL (PostgreSQL)")]
+        BigQuery[("Google BigQuery Workspace")]
     end
 
     subgraph Observability
@@ -53,26 +53,30 @@ graph TB
         Grafana["Grafana Dashboards"]
     end
 
-    %% Routing connections
+    %% Connections
     Citizen -->|Voice/Text/Photo Suggestions| Nginx
     Admin -->|Dashboard API & Analytics Calls| Nginx
-    
-    Nginx -->|Round-Robin load balance| FastAPI1
-    Nginx -->|Round-Robin load balance| FastAPI2
-    
-    FastAPI1 -->|1. Validate Rate Limits| Limiter
-    Limiter -->|Query bucket| Cache
-    
-    FastAPI1 -->|2. Ingest Suggestion| AIService
-    FastAPI1 -->|3. Save Attachments| FileService
-    
-    FileService -->|Store media| GCS
-    FastAPI1 -->|Read/Write Records| CloudSQL
-    
-    FastAPI1 -->|4. Query OLAP Analytics| BigQuery
-    CloudSQL <---|EXTERNAL_QUERY Federated Bridge| BigQuery
+    Nginx -->|Round-Robin Balance| FastAPI1
+    Nginx -->|Round-Robin Balance| FastAPI2
+
+    %% Caching & Limiting
+    FastAPI1 -->|Validate Limits| Limiter
+    Limiter -->|Read/Write Token Bucket| Cache
+
+    %% AI & Files
+    FastAPI1 -->|Ingest Voice/Text| AIService
+    FastAPI1 -->|Upload Media Attachments| FileService
+    FileService -->|Store Assets| GCS
+
+    %% Core Data Writes
+    FastAPI1 -->|Read/Write Transactional Data| CloudSQL
     CloudSQL <---|AI Categorization & Priority Mapping| AIService
-    
+
+    %% OLAP Federated Bridge
+    FastAPI1 -->|Query Dashboard Analytics| BigQuery
+    CloudSQL <---|EXTERNAL_QUERY Live Sync Bridge| BigQuery
+
+    %% Observability
     FastAPI1 -->|Metrics Output| Prom
     Prom -->|Scrape / Query| Grafana
 ```
