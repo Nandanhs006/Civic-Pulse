@@ -2,20 +2,20 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.api import deps
-from app.schemas import GridOfficerOut, GridDispatchInput, SuggestionOut
-from app.db.models.grid_officer import GridOfficer
+from app.schemas import WardOfficerOut, WardDispatchInput, SuggestionOut
+from app.db.models.ward_officer import WardOfficer
 from app.db.models.suggestion import Suggestion
 from app.db.models.ward import Ward
 
 router = APIRouter()
 
 
-@router.get("/officers", response_model=List[GridOfficerOut])
-def get_grid_officers(db: Session = Depends(deps.get_db)):
+@router.get("/officers", response_model=List[WardOfficerOut])
+def get_ward_officers(db: Session = Depends(deps.get_db)):
     """
-    Get all grid officers and compute their active workloads dynamically.
+    Get all ward officers and compute their active workloads dynamically.
     """
-    officers = db.query(GridOfficer).filter(GridOfficer.is_active.is_(True)).all()
+    officers = db.query(WardOfficer).filter(WardOfficer.is_active.is_(True)).all()
 
     results = []
     for officer in officers:
@@ -30,7 +30,7 @@ def get_grid_officers(db: Session = Depends(deps.get_db)):
         )
 
         results.append(
-            GridOfficerOut(
+            WardOfficerOut(
                 id=officer.id,
                 name=officer.name,
                 email=officer.email,
@@ -46,9 +46,9 @@ def get_grid_officers(db: Session = Depends(deps.get_db)):
 
 
 @router.post("/dispatch", response_model=SuggestionOut)
-def dispatch_suggestion(payload: GridDispatchInput, db: Session = Depends(deps.get_db)):
+def dispatch_suggestion(payload: WardDispatchInput, db: Session = Depends(deps.get_db)):
     """
-    Assign a suggestion to a Grid Officer and update status.
+    Assign a suggestion to a Ward Officer and update status.
     """
     suggestion = (
         db.query(Suggestion).filter(Suggestion.id == payload.suggestion_id).first()
@@ -59,11 +59,11 @@ def dispatch_suggestion(payload: GridDispatchInput, db: Session = Depends(deps.g
             detail="Suggestion not found.",
         )
 
-    officer = db.query(GridOfficer).filter(GridOfficer.id == payload.officer_id).first()
+    officer = db.query(WardOfficer).filter(WardOfficer.id == payload.officer_id).first()
     if not officer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Grid Officer not found.",
+            detail="Ward Officer not found.",
         )
 
     suggestion.assigned_officer_id = officer.id
@@ -75,12 +75,12 @@ def dispatch_suggestion(payload: GridDispatchInput, db: Session = Depends(deps.g
     return suggestion
 
 
-@router.get("/my-officer", response_model=Optional[GridOfficerOut])
+@router.get("/my-officer", response_model=Optional[WardOfficerOut])
 def get_my_officer(
     latitude: float, longitude: float, db: Session = Depends(deps.get_db)
 ):
     """
-    Determine the matching ward for the given coordinates and return its assigned Grid Officer.
+    Determine the matching ward for the given coordinates and return its assigned Ward Officer.
     """
     wards = db.query(Ward).all()
     if not wards:
@@ -95,10 +95,10 @@ def get_my_officer(
 
     # Find the officer assigned to this ward
     officer = (
-        db.query(GridOfficer)
+        db.query(WardOfficer)
         .filter(
-            GridOfficer.ward_id == target_ward.id,
-            GridOfficer.is_active.is_(True),
+            WardOfficer.ward_id == target_ward.id,
+            WardOfficer.is_active.is_(True),
         )
         .first()
     )
@@ -114,7 +114,7 @@ def get_my_officer(
         .count()
     )
 
-    return GridOfficerOut(
+    return WardOfficerOut(
         id=officer.id,
         name=officer.name,
         email=officer.email,

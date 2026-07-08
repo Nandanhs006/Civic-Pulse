@@ -1,5 +1,5 @@
-def test_get_grid_officers(client):
-    response = client.get("/api/v1/grid/officers")
+def test_get_ward_officers(client):
+    response = client.get("/api/v1/ward/officers")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
@@ -23,13 +23,13 @@ def test_dispatch_suggestion(client):
     suggestion_id = response.json()["id"]
 
     # 2. Fetch active officers
-    officers_response = client.get("/api/v1/grid/officers")
+    officers_response = client.get("/api/v1/ward/officers")
     assert officers_response.status_code == 200
     officer_id = officers_response.json()[0]["id"]
 
     # 3. Dispatch the suggestion to this officer
     dispatch_response = client.post(
-        "/api/v1/grid/dispatch",
+        "/api/v1/ward/dispatch",
         json={"suggestion_id": suggestion_id, "officer_id": officer_id},
     )
     assert dispatch_response.status_code == 200
@@ -40,7 +40,9 @@ def test_dispatch_suggestion(client):
 
 
 def test_get_my_officer(client):
-    response = client.get("/api/v1/grid/my-officer?latitude=12.9716&longitude=77.5946")
+    response = client.get(
+        "/api/v1/ward/my-officer?latitude=12.9716&longitude=77.5946"
+    )
     assert response.status_code == 200
     data = response.json()
     if data is not None:

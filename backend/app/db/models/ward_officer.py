@@ -4,8 +4,8 @@ from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 
 
-class GridOfficer(Base):
-    __tablename__ = "grid_officers"
+class WardOfficer(Base):
+    __tablename__ = "ward_officers"
 
     id: Any = Column(Integer, primary_key=True, index=True)
     name: Any = Column(String(100), nullable=False)
