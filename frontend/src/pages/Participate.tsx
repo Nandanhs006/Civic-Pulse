@@ -138,28 +138,87 @@ const MOCK_PROJECTS: ProposedProject[] = [
   }
 ];
 
-const MOCK_SUGGESTIONS: Suggestion[] = [
+const DUMMY_SUGGESTIONS: Suggestion[] = [
   {
-    id: "s1",
-    content: "Potholes are very deep near the market corner, causing constant traffic jams.",
+    id: "s_mock_1",
+    content: "Major drainage overflow causing contamination near primary school sector.",
+    category: "Sanitation",
+    priority_score: 92,
+    status: "Resolved",
+    dispatch_status: "Resolved",
+    latitude: 12.973,
+    longitude: 77.593,
+    image_url: "/images/bfr_aft/bfr6.webp"
+  },
+  {
+    id: "s_mock_2",
+    content: "Dumped garbage and broken park benches in community footpath.",
+    category: "Public Spaces",
+    priority_score: 45,
+    status: "Resolved",
+    dispatch_status: "Resolved",
+    latitude: 12.970,
+    longitude: 77.596,
+    image_url: "/images/bfr_aft/bfr2.jpg"
+  },
+  {
+    id: "s_mock_3",
+    content: "Hanging loose electrical wires posing hazard near apartment entrance.",
+    category: "Electricity",
+    priority_score: 88,
+    status: "Resolved",
+    dispatch_status: "Resolved",
+    latitude: 12.974,
+    longitude: 77.592,
+    image_url: "/images/bfr_aft/bfr8.webp"
+  },
+  {
+    id: "s_mock_4",
+    content: "Deep potholes on the main junction leading to major traffic congestion.",
     category: "Roads",
-    priority_score: 78,
-    status: "Submitted",
-    dispatch_status: "Unassigned",
-    latitude: 12.972,
-    longitude: 77.595
+    priority_score: 79,
+    status: "Resolved",
+    dispatch_status: "Resolved",
+    latitude: 12.976,
+    longitude: 77.597,
+    image_url: "/images/bfr_aft/bfr9.webp"
+  },
+  {
+    id: "s_mock_5",
+    content: "Garbage pile-up near commercial market blocking public walkway.",
+    category: "Sanitation",
+    priority_score: 65,
+    status: "Resolved",
+    dispatch_status: "Resolved",
+    latitude: 12.971,
+    longitude: 77.594,
+    image_url: "/images/bfr_aft/bfr5.jpg"
   },
   {
     id: "s2",
     content: "Street lights are completely off on 4th cross road, unsafe for women walking home.",
     category: "Safety",
     priority_score: 85,
-    status: "Submitted",
-    dispatch_status: "Unassigned",
+    status: "Resolved",
+    dispatch_status: "Resolved",
     latitude: 12.975,
-    longitude: 77.591
+    longitude: 77.591,
+    image_url: "/images/bfr_aft/bfr7.webp"
+  },
+  {
+    id: "s_mock_6",
+    content: "Piled up garbage since one week, causing sanitation issue",
+    category: "Sanitation",
+    priority_score: 80,
+    status: "Resolved",
+    dispatch_status: "Resolved",
+    latitude: 12.9725,
+    longitude: 77.6015,
+    image_url: "/images/bfr_aft/bfr1.jpg"
   }
 ];
+
+const MOCK_SUGGESTIONS: Suggestion[] = [];
 
 interface ParticipateProps {
   activeApp?: 'hub' | 'fixmystreet' | 'decidim' | 'cpgrams' | 'seeclickfix' | 'ushahidi' | 'hotline' | 'grid' | 'citybrain' | 'mailbox';
@@ -168,7 +227,7 @@ interface ParticipateProps {
 const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const navigate = useNavigate();
   useAuth();
-  
+
   const [officers, setOfficers] = useState<GridOfficer[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [projects, setProjects] = useState<ProposedProject[]>([]);
@@ -208,18 +267,41 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [localUpvotes, setLocalUpvotes] = useState<Record<string, number>>({});
   const [upvotedIssues, setUpvotedIssues] = useState<Record<string, boolean>>({});
-  
+
   const [issueComments, setIssueComments] = useState<Record<string, Array<{ id: number; author: string; text: string; date: string; isOfficer?: boolean }>>>({
-    's1': [
-      { id: 1, author: 'Arjun Mehta', text: 'I have dispatched the road repair crew to inspect the potholes near the market corner.', date: '2026-07-06', isOfficer: true },
-      { id: 2, author: 'Citizen', text: 'Thank you! The potholes are extremely deep and dangerous during rainy evenings.', date: '2026-07-07' }
-    ],
+
     's2': [
-      { id: 1, author: 'System Dispatch', text: 'Ticket registered. Waiting for assignment to local ward electricity unit.', date: '2026-07-07' }
+      { id: 1, author: 'System Dispatch', text: 'Ticket registered. Waiting for assignment to local ward electricity unit.', date: '2026-07-07' },
+      { id: 2, author: 'System', text: '✅ RESOLUTION: Street lights repaired and power supply restored.', date: '2026-07-08', isOfficer: true }
+    ],
+    's_mock_1': [
+      { id: 1, author: 'Citizen', text: 'Water is leaking out of the drain and flooding the primary school entrance.', date: '2026-07-05' },
+      { id: 2, author: 'Arjun Mehta', text: 'Sewerage department cleaning crew has cleared the blockage and repaired the cracked duct.', date: '2026-07-06', isOfficer: true },
+      { id: 3, author: 'System', text: '✅ RESOLUTION: Issue resolved and verified by representative.', date: '2026-07-07', isOfficer: true }
+    ],
+    's_mock_2': [
+      { id: 1, author: 'Citizen', text: 'The playground benches are completely broken and unusable.', date: '2026-07-05' },
+      { id: 2, author: 'Priya Sharma', text: 'Carpenter team has replaced the damaged wooden planks and painted the benches.', date: '2026-07-07', isOfficer: true }
+    ],
+    's_mock_3': [
+      { id: 1, author: 'Citizen', text: 'Electrical wire is hanging dangerously low after the storm.', date: '2026-07-06' },
+      { id: 2, author: 'Rohan Das', text: 'Electricity board technician has safely re-tensioned the cable and cleared the hazard.', date: '2026-07-07', isOfficer: true }
+    ],
+    's_mock_4': [
+      { id: 1, author: 'Citizen', text: 'Potholes are causing severe traffic delays here.', date: '2026-07-05' },
+      { id: 2, author: 'Anjali Nair', text: 'Road tarring crew has leveled the potholes and applied fresh asphalt patch.', date: '2026-07-07', isOfficer: true }
+    ],
+    's_mock_5': [
+      { id: 1, author: 'Citizen', text: 'Massive pile of trash accumulated, blocking the entire pedestrian path.', date: '2026-07-05' },
+      { id: 2, author: 'Priya Sharma', text: 'Sanitation department waste collection vehicle has cleared the trash pile and sanitized the area.', date: '2026-07-06', isOfficer: true }
+    ],
+    's_mock_6': [
+      { id: 1, author: 'Citizen', text: 'Drain is clogged with plastic bags and silt near school gates.', date: '2026-07-05' },
+      { id: 2, author: 'Arjun Mehta', text: 'Drainage clearing team has removed the garbage blockages and flushed the pipe.', date: '2026-07-07', isOfficer: true }
     ]
   });
   const [newCommentText, setNewCommentText] = useState('');
-  
+
   // Ticket reporting modal
   const [showReportModal, setShowReportModal] = useState(false);
   const [newReportText, setNewReportText] = useState('');
@@ -231,7 +313,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const [isResolving, setIsResolving] = useState(false);
   const [resolveImagePreview, setResolveImagePreview] = useState<string | null>(null);
   const [resolveCommentText, setResolveCommentText] = useState('');
-  
+
   // Image states for the new report modal
   const [reportImageFile, setReportImageFile] = useState<File | null>(null);
   const [reportImagePreview, setReportImagePreview] = useState<string | null>(null);
@@ -316,7 +398,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
       await apiClient.post<Suggestion>('/api/v1/suggestions/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+
       setSyncMsg('Issue successfully reported and added to CivicTimeline!');
       setNewReportText('');
       setReportImageFile(null);
@@ -377,7 +459,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
       .filter(s => {
         const matchesCategory = timelineCategory === 'All' || s.category === timelineCategory;
         const matchesStatus = timelineStatus === 'All' || s.status === timelineStatus;
-        const matchesSearch = s.content.toLowerCase().includes(timelineSearch.toLowerCase()) || 
+        const matchesSearch = s.content.toLowerCase().includes(timelineSearch.toLowerCase()) ||
           (s.english_translation && s.english_translation.toLowerCase().includes(timelineSearch.toLowerCase()));
         return matchesCategory && matchesStatus && matchesSearch;
       })
@@ -412,7 +494,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
       // 2. Fetch suggestions (try authenticated suggestions first, fall back to public map suggestions)
       let loadedSuggestions: Suggestion[] = [];
       try {
-        const suggestionsRes = await apiClient.get<Suggestion[]>('/api/v1/suggestions/');
+        const suggestionsRes = await apiClient.get<Suggestion[]>('/api/v1/suggestions/?limit=500');
         if (suggestionsRes.data && suggestionsRes.data.length > 0) {
           loadedSuggestions = suggestionsRes.data;
         }
@@ -427,8 +509,8 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
           if (mapIssuesRes.data && mapIssuesRes.data.length > 0) {
             loadedSuggestions = mapIssuesRes.data.map(item => ({
               ...item,
-              dispatch_status: item.status === 'Resolved' ? 'Resolved' : 
-                               item.status === 'Reviewed' || item.status === 'Processing' ? 'Dispatched' : 'Unassigned'
+              dispatch_status: item.status === 'Resolved' ? 'Resolved' :
+                item.status === 'Reviewed' || item.status === 'Processing' ? 'Dispatched' : 'Unassigned'
             }));
           }
         } catch (e) {
@@ -436,7 +518,11 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
         }
       }
 
-      setSuggestions(loadedSuggestions.length > 0 ? loadedSuggestions : MOCK_SUGGESTIONS);
+      const baseSuggestions = loadedSuggestions.length > 0 ? loadedSuggestions : MOCK_SUGGESTIONS;
+      const filteredBase = baseSuggestions.filter(
+        baseItem => !DUMMY_SUGGESTIONS.some(dummyItem => dummyItem.id === baseItem.id)
+      );
+      setSuggestions([...DUMMY_SUGGESTIONS, ...filteredBase]);
 
       // 3. Fetch proposed projects
       try {
@@ -552,7 +638,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
       { id: Date.now(), msg: 'CRITICAL: Water pressure dropped in Grid 2 (Pipeline leak)', type: 'error', grid: 2 },
       ...prev
     ]);
-    
+
     setTimeout(() => {
       setCityBrainAlerts(prev => [
         { id: Date.now() + 1, msg: 'City Brain Dispatch: Plumber team dispatched to Grid 2', type: 'dispatch', grid: 2 },
@@ -579,7 +665,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      
+
       {/* Dynamic Sync Banner */}
       {syncMsg && (
         <div style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', padding: '12px 18px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, zIndex: 1000, position: 'sticky', top: '10px' }}>
@@ -592,7 +678,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
       {/* ========================================================= */}
       {activeApp === 'hub' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
+
           <div className="glass-panel" style={{ padding: '24px', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '30%', background: 'linear-gradient(90deg, transparent, rgba(59,130,246,0.05))', pointerEvents: 'none' }}></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
@@ -608,7 +694,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
           {/* 3x3 Grid of Platforms */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-            
+
             {/* Card 1: StreetMapper */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -779,7 +865,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               <form onSubmit={handleFmsSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ fontSize: '12px', fontWeight: 600 }}>Describe the issue</label>
-                  <textarea 
+                  <textarea
                     value={fmsContent}
                     onChange={(e) => setFmsContent(e.target.value)}
                     placeholder="E.g., Pothole near Central Market main gate..."
@@ -788,14 +874,14 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ fontSize: '12px', fontWeight: 600 }}>Your phone number</label>
-                  <input 
+                  <input
                     value={fmsPhone}
                     onChange={(e) => setFmsPhone(e.target.value)}
                     placeholder="+91-98765-XXXXX"
                     style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
                   />
                 </div>
-                
+
                 <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
                   File StreetMapper Report
                 </button>
@@ -839,7 +925,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <ThumbsUp size={14} /> {project.supporting_suggestions_count} Supporters
                     </span>
-                    <button 
+                    <button
                       onClick={() => handleDecidimUpvote(project.id)}
                       className={`btn ${votedProjects[project.id] ? 'btn-secondary' : 'btn-primary'}`}
                       style={{ padding: '6px 16px', fontSize: '12px' }}
@@ -872,7 +958,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               </p>
 
               <form onSubmit={handleCpgAnalyze} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <textarea 
+                <textarea
                   value={cpgText}
                   onChange={(e) => setCpgText(e.target.value)}
                   placeholder="E.g., सड़कों पर बहुत पानी भरा हुआ है, जिससे लोगों का चलना मुश्किल हो गया है..."
@@ -895,13 +981,13 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>AI Classification Output</h3>
-                  
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '6px' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>English Translation:</span>
                       <p style={{ margin: '4px 0 0 0', fontSize: '13px' }}>{cpgResult.english}</p>
                     </div>
-                    
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Predicted Category:</span>
                       <span style={{ fontWeight: 600 }}>{cpgResult.category}</span>
@@ -931,15 +1017,15 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
       {/* ========================================================= */}
       {activeApp === 'seeclickfix' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
+
           {/* Header Action Bar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <ArrowLeft size={16} /> Back to Hub
             </button>
-            <button 
-              onClick={() => setShowReportModal(true)} 
-              className="btn btn-primary" 
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="btn btn-primary"
               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               <PlusCircle size={16} /> Report an Issue
@@ -977,8 +1063,8 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             {/* Search Input */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 12px', flex: '1', minWidth: '240px' }}>
               <Search size={16} style={{ color: 'var(--text-muted)', opacity: 0.7 }} />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={timelineSearch}
                 onChange={(e) => setTimelineSearch(e.target.value)}
                 placeholder="Search issues or English translations..."
@@ -994,7 +1080,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               {/* Category Filter */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Filter size={14} style={{ color: 'var(--text-muted)' }} />
-                <select 
+                <select
                   value={timelineCategory}
                   onChange={(e) => setTimelineCategory(e.target.value)}
                   style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
@@ -1010,7 +1096,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               {/* Status Filter */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Activity size={14} style={{ color: 'var(--text-muted)' }} />
-                <select 
+                <select
                   value={timelineStatus}
                   onChange={(e) => setTimelineStatus(e.target.value)}
                   style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
@@ -1025,7 +1111,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               {/* Sort selector */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <ArrowUpDown size={14} style={{ color: 'var(--text-muted)' }} />
-                <select 
+                <select
                   value={timelineSort}
                   onChange={(e) => setTimelineSort(e.target.value)}
                   style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
@@ -1040,7 +1126,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
           {/* Main Board Layout (Split Panel) */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '20px', alignItems: 'start' }}>
-            
+
             {/* Left Column: Tickets List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '680px', overflowY: 'auto', paddingRight: '4px' }}>
               {getFilteredSuggestions().length === 0 ? (
@@ -1055,47 +1141,20 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   const isUpvoted = upvotedIssues[s.id];
                   const hasComments = issueComments[s.id]?.length || 0;
                   const isSelected = selectedIssueId === s.id;
-                  
+
                   return (
-                    <div 
-                      key={s.id} 
+                    <div
+                      key={s.id}
                       onClick={() => setSelectedIssueId(s.id)}
                       className={`glass-panel transition-all hover-glow`}
-                      style={{ 
-                        padding: '18px', 
-                        cursor: 'pointer', 
+                      style={{
+                        padding: '18px',
+                        cursor: 'pointer',
                         border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
                         background: isSelected ? 'rgba(59,130,246,0.03)' : 'rgba(255,255,255,0.02)'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
-                        <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--primary)', fontSize: '11px' }}>
-                          {s.category || 'General'}
-                        </span>
-                        
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          {/* Priority Pill */}
-                          <span style={{ 
-                            fontSize: '11px', 
-                            fontWeight: 600, 
-                            color: s.priority_score > 75 ? '#ef4444' : s.priority_score > 40 ? 'var(--saffron)' : '#22c55e',
-                            background: s.priority_score > 75 ? 'rgba(239,68,68,0.1)' : s.priority_score > 40 ? 'rgba(249,115,22,0.1)' : 'rgba(34,197,94,0.1)',
-                            padding: '2px 8px',
-                            borderRadius: '12px'
-                          }}>
-                            Priority: {s.priority_score}
-                          </span>
-                          
-                          {/* Status Badge */}
-                          <span className="badge" style={{ 
-                            background: s.status === 'Resolved' ? 'rgba(34,197,94,0.1)' : 'rgba(59,130,246,0.1)',
-                            color: s.status === 'Resolved' ? '#22c55e' : 'var(--primary)',
-                            fontSize: '11px'
-                          }}>
-                            {s.status}
-                          </span>
-                        </div>
-                      </div>
+
 
                       <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 600, lineHeight: 1.4, color: 'var(--text-main)' }}>
                         {s.content}
@@ -1145,9 +1204,9 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 }
 
                 // Match assigned representative
-                const assignedOfficer = officers.find(o => o.id === issue.assigned_officer_id) || 
+                const assignedOfficer = officers.find(o => o.id === issue.assigned_officer_id) ||
                   (issue.ward_id ? officers.find(o => o.ward_id === issue.ward_id) : null);
-                
+
                 const comments = issueComments[issue.id] || [];
                 const isUpvoted = upvotedIssues[issue.id];
                 const upvoteCount = (localUpvotes[issue.id] || 0);
@@ -1168,14 +1227,14 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     {/* Stepper Timeline Visualizer */}
                     <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px' }}>
                       <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Ticket Workflow Timeline</h4>
-                      
+
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', paddingLeft: '24px' }}>
                         {/* Line connector */}
                         <div style={{ position: 'absolute', top: '8px', left: '7px', bottom: '8px', width: '2px', background: 'rgba(255,255,255,0.05)' }}></div>
-                        
+
                         {/* Step 1: Submitted */}
                         <div style={{ position: 'relative' }}>
-                          <span style={{ 
+                          <span style={{
                             position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
                             background: '#22c55e', border: '2px solid var(--bg-card)'
                           }} />
@@ -1187,7 +1246,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
                         {/* Step 2: Dispatched */}
                         <div style={{ position: 'relative' }}>
-                          <span style={{ 
+                          <span style={{
                             position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
                             background: stepDispatched ? 'var(--saffron)' : 'rgba(255,255,255,0.1)',
                             border: '2px solid var(--bg-card)'
@@ -1206,7 +1265,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
                         {/* Step 3: Resolved */}
                         <div style={{ position: 'relative' }}>
-                          <span style={{ 
+                          <span style={{
                             position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
                             background: stepResolved ? '#22c55e' : 'rgba(255,255,255,0.1)',
                             border: '2px solid var(--bg-card)'
@@ -1228,10 +1287,8 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
                     {/* Before & After evidence block */}
                     {(() => {
-                      const beforeImage = issue.image_url || 
-                        (issue.id === 's1' ? 'https://images.unsplash.com/photo-1584467541268-b040f83be3fd?w=400' : 
-                         issue.id === 's2' ? 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400' : null);
-                         
+                      const beforeImage = issue.image_url;
+
                       const categoryMockAfters: Record<string, string> = {
                         'Water': 'https://images.unsplash.com/photo-1542013936693-8848e574047a?w=400',
                         'Roads': 'https://images.unsplash.com/photo-1515162305285-0293e4767cc2?w=400',
@@ -1242,8 +1299,18 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                         'Electricity': 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=400',
                         'General': 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=400'
                       };
-                      
-                      const afterImage = resolvedImages[issue.id] || categoryMockAfters[issue.category || 'General'];
+
+                      const dummyAfters: Record<string, string> = {
+                        's_mock_1': '/images/bfr_aft/aft6.png',
+                        's_mock_2': '/images/bfr_aft/aft2.jpg',
+                        's_mock_3': '/images/bfr_aft/aft8.png',
+                        's_mock_4': '/images/bfr_aft/aft9.png',
+                        's_mock_5': '/images/bfr_aft/aft5.jpg',
+                        's2': '/images/bfr_aft/aft7.png',
+                        's_mock_6': '/images/bfr_aft/aft1.jpg',
+                      };
+
+                      const afterImage = resolvedImages[issue.id] || dummyAfters[issue.id] || categoryMockAfters[issue.category || 'General'];
 
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1301,7 +1368,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
                     {/* Support and Upvote Action */}
                     <div style={{ display: 'flex', gap: '10px' }}>
-                      <button 
+                      <button
                         onClick={() => handleTimelineUpvote(issue.id)}
                         className={`btn ${isUpvoted ? 'btn-secondary' : 'btn-primary'}`}
                         style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1', justifyContent: 'center', padding: '10px', fontSize: '13px' }}
@@ -1316,7 +1383,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     {!stepResolved && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {!isResolving ? (
-                          <button 
+                          <button
                             onClick={() => setIsResolving(true)}
                             className="btn btn-secondary"
                             style={{ width: '100%', padding: '10px', fontSize: '13px', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', background: 'rgba(34,197,94,0.05)' }}
@@ -1326,10 +1393,10 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                         ) : (
                           <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(34,197,94,0.02)', border: '1px solid rgba(34,197,94,0.2)' }}>
                             <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#22c55e' }}>Complete Ticket Resolution</h4>
-                            
+
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                               <label style={{ fontSize: '11px', fontWeight: 600 }}>Resolution Report / Note</label>
-                              <textarea 
+                              <textarea
                                 value={resolveCommentText}
                                 onChange={(e) => setResolveCommentText(e.target.value)}
                                 placeholder="Explain what was fixed to resolve this issue..."
@@ -1340,9 +1407,9 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                               <label style={{ fontSize: '11px', fontWeight: 600 }}>Upload Evidence (After Photo)</label>
-                              <input 
-                                type="file" 
-                                accept="image/*" 
+                              <input
+                                type="file"
+                                accept="image/*"
                                 onChange={handleResolveImageChange}
                                 style={{ fontSize: '11px', color: 'var(--text-muted)' }}
                               />
@@ -1352,20 +1419,20 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                             </div>
 
                             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
-                              <button 
+                              <button
                                 onClick={() => {
                                   setIsResolving(false);
                                   setResolveImagePreview(null);
                                   setResolveCommentText('');
-                                }} 
-                                className="btn btn-secondary" 
+                                }}
+                                className="btn btn-secondary"
                                 style={{ padding: '4px 10px', fontSize: '12px' }}
                               >
                                 Cancel
                               </button>
-                              <button 
+                              <button
                                 onClick={() => handleResolveSubmit(issue.id, assignedOfficer?.name || 'Grid Representative')}
-                                className="btn btn-primary" 
+                                className="btn btn-primary"
                                 style={{ padding: '4px 10px', fontSize: '12px', background: '#22c55e', borderColor: '#22c55e' }}
                               >
                                 Complete Resolution
@@ -1379,7 +1446,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     {/* Comments / Activity Feed Section */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', flex: '1' }}>
                       <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Activity Feed</h4>
-                      
+
                       {/* Comments Feed List */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '160px', flex: '1' }}>
                         {comments.length === 0 ? (
@@ -1388,8 +1455,8 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                           </div>
                         ) : (
                           comments.map(c => (
-                            <div key={c.id} style={{ 
-                              padding: '10px', borderRadius: '6px', 
+                            <div key={c.id} style={{
+                              padding: '10px', borderRadius: '6px',
                               background: c.isOfficer ? 'rgba(59,130,246,0.05)' : 'rgba(255,255,255,0.02)',
                               border: c.isOfficer ? '1px solid rgba(59,130,246,0.2)' : '1px solid var(--border-color)'
                             }}>
@@ -1405,15 +1472,15 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
                       {/* Add comment Form */}
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '4px 8px' }}>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           value={newCommentText}
                           onChange={(e) => setNewCommentText(e.target.value)}
                           placeholder="Write a comment or status update..."
                           style={{ background: 'none', border: 'none', color: 'var(--text-main)', width: '100%', outline: 'none', fontSize: '12px' }}
                           onKeyDown={(e) => e.key === 'Enter' && handleAddComment(issue.id)}
                         />
-                        <button 
+                        <button
                           onClick={() => handleAddComment(issue.id)}
                           style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '2px' }}
                           disabled={!newCommentText}
@@ -1432,13 +1499,13 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
           {showReportModal && (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
               <div className="glass-panel" style={{ width: '450px', padding: '24px', position: 'relative', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <button 
+                <button
                   onClick={() => setShowReportModal(false)}
                   style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
                 >
                   <X size={18} />
                 </button>
-                
+
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>File a SeeClickFix Report</h3>
                 <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
                   Submit a localized developmental ticket. It will automatically load on the community board and alert local ward managers.
@@ -1447,7 +1514,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 <form onSubmit={handleTimelineReportSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '12px', fontWeight: 600 }}>Describe the issue</label>
-                    <textarea 
+                    <textarea
                       value={newReportText}
                       onChange={(e) => setNewReportText(e.target.value)}
                       placeholder="Explain what is broken or needed..."
@@ -1459,7 +1526,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '12px', fontWeight: 600 }}>Category</label>
-                      <select 
+                      <select
                         value={newReportCategory}
                         onChange={(e) => setNewReportCategory(e.target.value)}
                         style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
@@ -1472,7 +1539,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '12px', fontWeight: 600 }}>Target Ward</label>
-                      <select 
+                      <select
                         value={newReportWard}
                         onChange={(e) => setNewReportWard(Number(e.target.value))}
                         style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
@@ -1488,16 +1555,16 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   {/* Photo upload input for Before evidence */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '12px', fontWeight: 600 }}>Attach Photo (Before Evidence)</label>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
+                    <input
+                      type="file"
+                      accept="image/*"
                       onChange={handleReportImageChange}
                       style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 8px', borderRadius: '8px', fontSize: '12px' }}
                     />
                     {reportImagePreview && (
                       <div style={{ position: 'relative', width: '80px', height: '80px', marginTop: '6px', borderRadius: '4px', overflow: 'hidden' }}>
                         <img src={reportImagePreview} alt="Before preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        <button 
+                        <button
                           type="button"
                           onClick={() => { setReportImageFile(null); setReportImagePreview(null); }}
                           style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', border: 'none', color: 'white', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px' }}
@@ -1544,13 +1611,13 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <div style={{ height: '480px', borderRadius: '8px', overflow: 'hidden' }}>
               <MapContainer center={MAP_CENTER} zoom={14} style={{ width: '100%', height: '100%' }}>
                 <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-                
+
                 {suggestions.filter(s => s.latitude && s.longitude).map(s => {
                   const lat = Number(s.latitude);
                   const lng = Number(s.longitude);
                   const radius = s.priority_score > 70 ? 25 : 12;
                   return (
-                    <CircleMarker 
+                    <CircleMarker
                       key={s.id}
                       center={[lat, lng]}
                       radius={radius}
@@ -1558,7 +1625,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     >
                       <Popup>
                         <div style={{ color: 'black' }}>
-                          <strong>Complaint:</strong> {s.content}<br/>
+                          <strong>Complaint:</strong> {s.content}<br />
                           <strong>Priority:</strong> {s.priority_score}/100
                         </div>
                       </Popup>
@@ -1590,11 +1657,11 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               {suggestions.filter(s => s.dispatch_status === 'Unassigned' || !s.dispatch_status).map(issue => (
                 <div key={issue.id} style={{ padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <p style={{ margin: 0, fontSize: '14px' }}>{issue.content}</p>
-                  
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Route to Officer:</span>
-                      <select 
+                      <select
                         value={selectedOfficer[issue.id] || ''}
                         onChange={(e) => setSelectedOfficer(prev => ({ ...prev, [issue.id]: Number(e.target.value) }))}
                         style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px', borderRadius: '6px', fontSize: '12px' }}
@@ -1606,7 +1673,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       </select>
                     </div>
 
-                    <button 
+                    <button
                       onClick={() => handleHotlineDispatch(issue.id)}
                       className="btn btn-primary"
                       style={{ padding: '6px 14px', fontSize: '12px' }}
@@ -1637,7 +1704,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               return (
                 <div key={officer.id} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: color }}></div>
-                  
+
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <img src={officer.avatar_url} alt={officer.name} style={{ width: '50px', height: '50px', borderRadius: '50%', border: `2px solid ${color}`, objectFit: 'cover' }} />
                     <div>
@@ -1699,8 +1766,8 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 </div>
               </div>
 
-              <button 
-                onClick={triggerCityBrainSim} 
+              <button
+                onClick={triggerCityBrainSim}
                 className="btn btn-primary"
                 disabled={brainProcessing}
               >
@@ -1712,15 +1779,15 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               <h3 style={{ margin: 0, fontSize: '16px' }}>Dispatch Logs</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '340px' }}>
                 {cityBrainAlerts.map(alert => (
-                  <div key={alert.id} style={{ 
-                    padding: '10px 12px', 
-                    borderRadius: '6px', 
+                  <div key={alert.id} style={{
+                    padding: '10px 12px',
+                    borderRadius: '6px',
                     fontSize: '12px',
                     border: '1px solid var(--border-color)',
-                    background: alert.type === 'error' ? 'rgba(239,68,68,0.1)' : 
-                               alert.type === 'dispatch' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)',
-                    color: alert.type === 'error' ? '#ef4444' : 
-                           alert.type === 'dispatch' ? 'var(--primary)' : 'var(--text-muted)'
+                    background: alert.type === 'error' ? 'rgba(239,68,68,0.1)' :
+                      alert.type === 'dispatch' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)',
+                    color: alert.type === 'error' ? '#ef4444' :
+                      alert.type === 'dispatch' ? 'var(--primary)' : 'var(--text-muted)'
                   }}>
                     {alert.msg}
                   </div>
@@ -1748,7 +1815,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               </p>
 
               <form onSubmit={handleMailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <textarea 
+                <textarea
                   value={mailContent}
                   onChange={(e) => setMailContent(e.target.value)}
                   placeholder="Type your development suggestion..."
@@ -1762,13 +1829,13 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
             <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <h3 style={{ margin: 0, fontSize: '16px' }}>Mailbox History & Answers</h3>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', maxHeight: '340px' }}>
                 {mailBoxItems.map(item => (
                   <div key={item.id} style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', fontSize: '13px' }}>
                     <div style={{ color: 'var(--text-main)', fontWeight: 600 }}>{item.text}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Filed on {item.date}</div>
-                    
+
                     <div style={{ marginTop: '10px', background: 'rgba(59,130,246,0.05)', padding: '8px', borderRadius: '4px', borderLeft: '3px solid var(--primary)', fontSize: '12px', color: 'var(--text-main)' }}>
                       <strong>MP Reply:</strong> Under consideration for next financial year sanction list.
                     </div>
