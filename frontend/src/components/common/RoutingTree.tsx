@@ -28,6 +28,8 @@ const emblemBox = (src: string, alt: string) => (
 interface RoutingTreeProps {
   hierarchy: Hierarchy | null;
   note?: string; // optional hint shown when tiers are missing
+  /** When set, the MP tier becomes a button that opens that constituency. */
+  onMpClick?: (constituencyId: number) => void;
 }
 
 const tierIconBox = (color: string, children: React.ReactNode) => (
@@ -60,10 +62,15 @@ const Node: React.FC<{
   primary: React.ReactNode;
   secondary?: React.ReactNode;
   right?: React.ReactNode;
-}> = ({ icon, tier, primary, secondary, right }) => (
+  onClick?: () => void;
+}> = ({ icon, tier, primary, secondary, right, onClick }) => (
   <div
-    className="glass-panel"
-    style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}
+    className={onClick ? 'glass-panel glass-panel-hover' : 'glass-panel'}
+    onClick={onClick}
+    role={onClick ? 'button' : undefined}
+    tabIndex={onClick ? 0 : undefined}
+    onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
+    style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', cursor: onClick ? 'pointer' : undefined }}
   >
     {icon}
     <div style={{ flex: 1, minWidth: 0 }}>
@@ -78,7 +85,7 @@ const Node: React.FC<{
 );
 
 /** Vertical tree of who receives a request: MP → MLA → local civic body. */
-const RoutingTree: React.FC<RoutingTreeProps> = ({ hierarchy, note }) => {
+const RoutingTree: React.FC<RoutingTreeProps> = ({ hierarchy, note, onMpClick }) => {
   const { t } = useLang();
   const parl = hierarchy?.parliamentary;
   const asm = hierarchy?.assembly;
@@ -105,6 +112,7 @@ const RoutingTree: React.FC<RoutingTreeProps> = ({ hierarchy, note }) => {
               : t('tree.mpFallback')
           }
           right={parl.mp ? <Avatar name={parl.mp.name} photoUrl={parl.mp.photo_url} size={38} /> : undefined}
+          onClick={onMpClick && parl.mp ? () => onMpClick(parl.constituency.id) : undefined}
         />
       )}
 
