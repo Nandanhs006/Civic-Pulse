@@ -55,6 +55,20 @@ const PmoNav: React.FC = () => {
       >
         Dashboard
       </NavLink>
+      <NavLink 
+        to="/pmo/leaderboard" 
+        style={({ isActive }) => ({
+          color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+          borderBottom: isActive ? '2px solid var(--primary)' : '2px solid transparent',
+          paddingBottom: '8px',
+          fontWeight: 600,
+          textDecoration: 'none',
+          fontSize: '14px',
+          transition: 'all 0.2s ease'
+        })}
+      >
+        Performance Index
+      </NavLink>
     </div>
   );
 };
@@ -150,7 +164,7 @@ const PmoAnalytics: React.FC = () => {
         <div className="glass-panel" style={{ padding: '20px' }}>
           <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>DISPATCH SATURATION</span>
           <h2 style={{ fontSize: '28px', margin: '8px 0 4px', fontWeight: 700 }}>{data.dispatch_saturation}%</h2>
-          <span style={{ fontSize: '11px', color: 'var(--saffron)' }}>✔ Allocated to local Grid Representatives</span>
+          <span style={{ fontSize: '11px', color: 'var(--saffron)' }}>✔ Allocated to local Ward Representatives</span>
         </div>
 
         <div className="glass-panel" style={{ padding: '20px' }}>
@@ -215,11 +229,11 @@ const PmoAnalytics: React.FC = () => {
           </div>
         </div>
 
-        {/* Sector Workload Audit */}
+        {/* Ward Workload Audit */}
         <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px' }}>
             <Shield size={16} color="var(--primary)" />
-            <h3 style={{ margin: 0, fontSize: '16px' }}>Grid Officer Case Saturation</h3>
+            <h3 style={{ margin: 0, fontSize: '16px' }}>Ward Officer Case Saturation</h3>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>

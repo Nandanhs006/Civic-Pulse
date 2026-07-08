@@ -221,7 +221,7 @@ class HierarchyOut(BaseModel):
     civic: Optional[HierCivic] = None
 
 
-class GridOfficerOut(BaseModel):
+class WardOfficerOut(BaseModel):
     id: int
     name: str
     email: str
@@ -233,6 +233,6 @@ class GridOfficerOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class GridDispatchInput(BaseModel):
+class WardDispatchInput(BaseModel):
     suggestion_id: str
     officer_id: int

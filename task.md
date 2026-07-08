@@ -1,6 +1,3 @@
-- `[x]` Create `bigquery_service.py` service layer with mock external query fallbacks
-- `[x]` Add the `GET /api/v1/analytics/bigquery` endpoint in `analytics.py`
-- `[x]` Create the `PmoAnalytics.tsx` frontend page featuring KPI metrics and charts
-- `[x]` Add the sub-navigation tab bar to `Pmo.tsx` and `PmoAnalytics.tsx`
-- `[x]` Register the `/pmo/analytics` route inside `App.tsx`
-- `[x]` Verify the implementation via typecheck and pytest
+- `[x]` Update `FileService` inside `file_service.py` to support `custom_name` parameter and file deletion
+- `[x]` Update `create_suggestion` inside `suggestion_service.py` to use UUID prefixing and transactional rollback
+- `[x]` Verify with pytest unit tests and type checks

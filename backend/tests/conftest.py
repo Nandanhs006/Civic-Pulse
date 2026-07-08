@@ -8,7 +8,7 @@ from app.main import app
 from app.db.base import Base
 from app.api.deps import get_db
 from app.db.models.ward import Ward
-from app.db.models.grid_officer import GridOfficer
+from app.db.models.ward_officer import WardOfficer
 
 # Use an in-memory SQLite database for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
@@ -79,9 +79,9 @@ def setup_database():
         ]
         db.add_all(mock_wards)
 
-        # Seed Grid Officers
+        # Seed Ward Officers
         mock_officers = [
-            GridOfficer(
+            WardOfficer(
                 id=1,
                 name="Arjun Mehta",
                 email="arjun.mehta@civicpulse.gov",
@@ -90,7 +90,7 @@ def setup_database():
                 is_active=True,
                 ward_id=1,
             ),
-            GridOfficer(
+            WardOfficer(
                 id=2,
                 name="Priya Sharma",
                 email="priya.sharma@civicpulse.gov",
@@ -99,7 +99,7 @@ def setup_database():
                 is_active=True,
                 ward_id=2,
             ),
-            GridOfficer(
+            WardOfficer(
                 id=3,
                 name="Rohan Das",
                 email="rohan.das@civicpulse.gov",
@@ -108,7 +108,7 @@ def setup_database():
                 is_active=True,
                 ward_id=3,
             ),
-            GridOfficer(
+            WardOfficer(
                 id=4,
                 name="Anjali Nair",
                 email="anjali.nair@civicpulse.gov",

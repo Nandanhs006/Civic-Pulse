@@ -78,6 +78,32 @@ graph TB
 
 ---
 
+## System Data Model (OLTP vs. OLAP)
+
+Civic Pulse decouples transactional writes from analytics using a CQRS-lite pattern powered by Google Cloud SQL (OLTP PostgreSQL) and Google BigQuery (OLAP Federated Connection):
+
+### 1. OLTP Database Schema (Cloud SQL - PostgreSQL)
+Maintains transactional consistency, normalization, and relational constraints:
+*   **`users`**: Email, hashed passwords, roles (`pmo` super-admin, `mp` representative), and constituency references.
+*   **`constituencies`**: Parliamentary district borders and coordinates.
+*   **`mps`**: Representative metadata (name, party, email, wikipedia links).
+*   **`suggestions`**: Citizen grievances including raw text, audio voice transcriptions, image attachments, coordinates, AI predicted category, AI priority score, and ward officer assignment.
+*   **`proposed_projects`**: Participatory budgeting projects, estimates (in ₹ Rupees), upvotes support, and AI feasibility justification.
+*   **`ward_officers`**: Local ward representatives.
+*   **`wards`**: Demographic aggregates and infrastructure gaps.
+
+### 2. OLAP Data Model Views (Google BigQuery)
+Computes long-term aggregates and metrics using BigQuery Federated Queries (`EXTERNAL_QUERY`) directly over Cloud SQL tables in real-time:
+*   **`grievance_tat_analytics`**: Aggregated Turnaround Time (TAT) metrics grouped by constituency/category:
+    ```sql
+    SELECT constituency_id, category, AVG(TIMESTAMP_DIFF(updated_at, created_at, DAY)) as avg_tat_days
+    ```
+*   **`regional_sentiment_distribution`**: Positive vs. negative sentiment distribution ratios per constituency.
+*   **`ward_load_index`**: Active open caseload load metrics per Ward Officer to monitor staff bottlenecks.
+*   **`participatory_budget_efficiency`**: Weighs cost-to-citizen-satisfaction metrics (budget value in ₹ Rupees vs. support votes density).
+
+---
+
 ## Phase 1: Architecture & Directory Structure
 
 ```

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.db.models.suggestion import Suggestion
 from app.db.models.project import ProposedProject
-from app.db.models.grid_officer import GridOfficer
+from app.db.models.ward_officer import WardOfficer
 
 
 class BigQueryService:
@@ -66,7 +66,7 @@ class BigQueryService:
         )
 
         # Roster Officer Load
-        officers = db.query(GridOfficer).all()
+        officers = db.query(WardOfficer).all()
         officer_load = []
         for o in officers:
             active_cases = (
