@@ -7,10 +7,12 @@ import ConstituencyDashboard from '../components/features/dashboard/Constituency
 import Avatar from '../components/common/Avatar';
 import { RefreshCw, ArrowLeft, MapPin } from 'lucide-react';
 import { useLang } from '../context/LanguageContext';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 /** PMO super-admin command center: national overview + all-MP directory + drill-down. */
 const Pmo: React.FC = () => {
   const { t } = useLang();
+  const isMobile = useIsMobile();
   const [mps, setMps] = useState<MP[]>([]);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,11 +52,32 @@ const Pmo: React.FC = () => {
           <ArrowLeft size={15} /> {t('pmo.backToAll')}
         </button>
 
-        <div className="glass-panel" style={{ padding: '22px', display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
-          <Avatar name={selected.name} photoUrl={selected.photo_url} size={64} />
-          <div style={{ flex: 1, minWidth: '200px' }}>
-            <h1 style={{ fontSize: '25px', color: 'var(--text-main)' }}>{selected.name}</h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', color: 'var(--text-muted)', fontSize: '14px', marginTop: '2px' }}>
+        <div
+          className="glass-panel"
+          style={{
+            padding: isMobile ? '18px' : '22px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: isMobile ? '14px' : '18px',
+            flexDirection: isMobile ? 'column' : 'row',
+            textAlign: isMobile ? 'center' : 'left',
+          }}
+        >
+          <Avatar name={selected.name} photoUrl={selected.photo_url} size={isMobile ? 72 : 64} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ fontSize: isMobile ? '21px' : '25px', color: 'var(--text-main)', lineHeight: 1.2 }}>{selected.name}</h1>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                flexWrap: 'wrap',
+                justifyContent: isMobile ? 'center' : 'flex-start',
+                color: 'var(--text-muted)',
+                fontSize: '14px',
+                marginTop: '6px',
+              }}
+            >
               <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <MapPin size={14} color="var(--saffron)" /> {selected.constituency_name}, {selected.state}
               </span>

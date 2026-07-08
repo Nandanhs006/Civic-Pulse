@@ -15,6 +15,8 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }): React.CSSProperties 
   borderRadius: '8px',
   fontSize: '14px',
   fontWeight: 600,
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
   textDecoration: 'none',
   color: isActive ? 'white' : 'var(--text-muted)',
   background: isActive ? 'var(--primary)' : 'transparent',
@@ -78,7 +80,18 @@ const TopBar: React.FC = () => {
         </NavLink>
 
         {/* Nav + actions */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px' }}>
+        <nav
+          className={isMobile ? 'hide-scrollbar' : undefined}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: isMobile ? '5px' : '8px',
+            // On mobile, scroll horizontally instead of letting items overlap.
+            overflowX: isMobile ? 'auto' : 'visible',
+            minWidth: 0,
+            paddingBottom: isMobile ? '2px' : 0,
+          }}
+        >
           <NavLink to="/" style={navLinkStyle} end title={t('nav.portal')}>
             <Radio size={16} /> {!isMobile && t('nav.portal')}
           </NavLink>
@@ -109,13 +122,13 @@ const TopBar: React.FC = () => {
             className="btn-secondary"
             aria-label="Toggle theme"
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            style={{ padding: '9px', display: 'flex', border: '1px solid var(--border-card)' }}
+            style={{ padding: '9px', display: 'flex', flexShrink: 0, border: '1px solid var(--border-card)' }}
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
           {token && user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '4px', flexShrink: 0 }}>
               {!isMobile && (
                 <div style={{ textAlign: 'right', lineHeight: 1.2 }}>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
@@ -129,7 +142,7 @@ const TopBar: React.FC = () => {
               <button
                 onClick={handleLogout}
                 className="btn-secondary"
-                style={{ padding: '9px', display: 'flex', borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                style={{ padding: '9px', display: 'flex', flexShrink: 0, borderColor: 'var(--danger)', color: 'var(--danger)' }}
                 title={t('nav.signOut')}
               >
                 <LogOut size={16} />
