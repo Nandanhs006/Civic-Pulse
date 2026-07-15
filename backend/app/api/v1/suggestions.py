@@ -58,10 +58,14 @@ def get_suggestions_list(
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
-    Retrieve citizen suggestions. MPs are auto-scoped to their own constituency;
-    the PMO may pass an optional constituency_id or see all.
+    Retrieve citizen suggestions.
+    - MPs auto-scoped to own constituency; duplicates excluded (unique issues only).
+    - PMO may pass constituency_id or see all; duplicates excluded by default.
+    - Citizens see their own submissions including duplicates.
     """
     scoped = deps.resolve_scope(current_user, constituency_id)
+    # MPs and PMO only see unique issues — duplicates filtered out
+    exclude_duplicates = current_user.role in ("mp", "pmo", "mla")
     return service.get_suggestions(
         category=category,
         status=status,
@@ -69,7 +73,9 @@ def get_suggestions_list(
         constituency_id=scoped,
         skip=skip,
         limit=limit,
+        exclude_duplicates=exclude_duplicates,
     )
+
 
 
 @router.get("/map", response_model=List[MapIssueOut])
@@ -99,3 +105,36 @@ def read_suggestion(
             status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found"
         )
     return suggestion
+
+
+@router.get("/duplicates/clusters")
+def get_duplicate_clusters(
+    constituency_id: Optional[int] = None,
+    service: SuggestionService = Depends(deps.get_suggestion_service),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    PMO/MP: Return clusters of duplicate complaints grouped by original issue.
+    Useful for understanding true complaint volume vs noise.
+    """
+    if current_user.role not in ("pmo", "mp", "mla"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to representatives.",
+        )
+    scoped = deps.resolve_scope(current_user, constituency_id)
+    return service.get_duplicate_clusters(constituency_id=scoped)
+
+
+@router.post("/transcribe")
+def transcribe_audio_endpoint(
+    audio: UploadFile = File(...),
+    service: SuggestionService = Depends(deps.get_suggestion_service),
+) -> Any:
+    """
+    Transcribe raw audio on-the-fly and return the transcription preview + detected language.
+    Useful for displaying live translation previews before submission.
+    """
+    return service.transcribe_audio_preview(audio)
+
+

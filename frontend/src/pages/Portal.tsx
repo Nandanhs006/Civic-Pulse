@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import apiClient from '../services/apiClient';
-import { Mic, MicOff, Send, CheckCircle2, Image, MapPin, Loader2, UserCheck, Trash2 } from 'lucide-react';
+import { Mic, MicOff, Send, CheckCircle2, Image, MapPin, Loader2, UserCheck, Trash2, Brain } from 'lucide-react';
 import { Suggestion, Constituency, MP, Hierarchy } from '../types';
 import ConstituencyPicker, { Autofill } from '../components/common/ConstituencyPicker';
 import Avatar from '../components/common/Avatar';
@@ -28,6 +28,8 @@ const Portal: React.FC = () => {
   const [sentToMp, setSentToMp] = useState<MP | null>(null);
 
   const { isRecording, audioBlob, duration, startRecording, stopRecording, deleteRecording } = useAudioRecorder();
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcriptionPreview, setTranscriptionPreview] = useState<string | null>(null);
 
   // Object URL for reviewing the captured clip; revoked when the blob changes.
   const audioUrl = useMemo(() => (audioBlob ? URL.createObjectURL(audioBlob) : null), [audioBlob]);
@@ -36,6 +38,35 @@ const Portal: React.FC = () => {
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
   }, [audioUrl]);
+
+  // Automatic audio transcription on completion
+  useEffect(() => {
+    if (!audioBlob) {
+      setTranscriptionPreview(null);
+      return;
+    }
+
+    const autoTranscribe = async () => {
+      setTranscribing(true);
+      const formData = new FormData();
+      // Use webm container to match native browser recordings
+      formData.append('audio', audioBlob, 'temp_audio.webm');
+      try {
+        const response = await apiClient.post<{ transcript: string }>('/api/v1/suggestions/transcribe', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setTranscriptionPreview(response.data.transcript);
+        setContent(response.data.transcript);
+      } catch (err) {
+        console.warn('Audio transcription preview failed:', err);
+      } finally {
+        setTranscribing(false);
+      }
+    };
+
+    autoTranscribe();
+  }, [audioBlob]);
+
   const { t } = useLang();
 
   // Tree follows the SELECTED constituency. The GPS-derived MLA/civic tiers are
@@ -307,40 +338,69 @@ const Portal: React.FC = () => {
             </div>
 
             {audioBlob && !isRecording && audioUrl && (
-              <div
-                style={{
-                  ...softPanel,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
-                  {t('portal.reviewRecording')}
-                </span>
-                <audio controls src={audioUrl} style={{ flex: 1, minWidth: '180px', height: '36px' }} />
-                <button
-                  type="button"
-                  onClick={deleteRecording}
-                  title={t('portal.deleteRecording')}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div
                   style={{
+                    ...softPanel,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 12px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--danger)',
-                    background: 'transparent',
-                    color: 'var(--danger)',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
+                    gap: '12px',
+                    flexWrap: 'wrap',
                   }}
                 >
-                  <Trash2 size={16} />
-                  {t('portal.deleteRecording')}
-                </button>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                    {t('portal.reviewRecording')}
+                  </span>
+                  <audio controls src={audioUrl} style={{ flex: 1, minWidth: '180px', height: '36px' }} />
+                  <button
+                    type="button"
+                    onClick={deleteRecording}
+                    title={t('portal.deleteRecording')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid var(--danger)',
+                      background: 'transparent',
+                      color: 'var(--danger)',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Trash2 size={16} />
+                    {t('portal.deleteRecording')}
+                  </button>
+                </div>
+
+                {/* Transcription Preview Box */}
+                {(transcribing || transcriptionPreview) && (
+                  <div
+                    style={{
+                      ...softPanel,
+                      border: '1px dashed var(--secondary)',
+                      background: 'rgba(34, 197, 94, 0.04)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <Brain size={16} className={transcribing ? 'animate-pulse text-secondary' : 'text-secondary'} style={{ color: 'var(--secondary)' }} />
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--secondary)' }}>
+                        {transcribing ? 'Transcribing audio via AI...' : 'Speech-to-Text Preview (AI Transcribed)'}
+                      </span>
+                    </div>
+                    {transcribing ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        <Loader2 size={14} className="animate-spin" /> Processing voice intake...
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: '13px', fontStyle: 'italic', margin: 0, color: 'var(--text-main)' }}>
+                        "{transcriptionPreview}"
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

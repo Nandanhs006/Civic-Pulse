@@ -38,7 +38,7 @@ flowchart TD
     end
 
     subgraph "Cloud Services & Media Storage"
-        AIService["Gemini 1.5 Flash AI API"]
+        AIService["Gemini Flash AI API"]
         FileService["File Upload Service"]
         GCS[("Google Cloud Storage (GCS)")]
     end
@@ -178,12 +178,17 @@ source venv/bin/activate
 # 2. Install all required dependencies
 pip install -r backend/requirements.txt
 
-# 3. Start the FastAPI development server
-POSTGRES_PASSWORD="" PYTHONPATH=backend uvicorn app.main:app --reload --port 8001
+# 3. Run SQLite / PostgreSQL migrations to prepare AI database columns
+POSTGRES_PASSWORD="" PYTHONPATH=backend ./venv/bin/python3 backend/app/scripts/migrate_ai_fields.py
+
+# 4. Start the FastAPI development server
+POSTGRES_PASSWORD="" PYTHONPATH=backend ./venv/bin/uvicorn app.main:app --reload --port 8001
 ```
-*Note: Automatically falls back to local SQLite (`sqlite:///./civic_pulse.db`) if no PostgreSQL password/host is defined. Set environment variables to enable Google Cloud integrations:*
-* `GEMINI_API_KEY`: Set this to your Google AI Studio or Vertex AI Gemini API key to enable active LLM issue translation, classification, and scoring.
+*Note: Automatically falls back to local SQLite (`sqlite:///./civic_pulse.db`) if no PostgreSQL password/host is defined. Env vars can be saved in a `.env` file at the project root to enable Google Cloud integrations:*
+* `GEMINI_API_KEY`: Set this to your Google AI Studio or Vertex AI Gemini API key to enable active LLM issue translation, classification, scoring, and voice transcription.
+* `MOCK_AI_PIPELINE`: Set to `false` to enable live Gemini API calls instead of simulated responses.
 * `GCS_BUCKET_NAME`: Set this to your Google Cloud Storage bucket name to upload citizen images and voice clips directly to the cloud.
+
 
 #### 2. Frontend React Setup
 ```bash
@@ -355,3 +360,32 @@ Live Map View 2: Detailed assembly-constituency level mappings and civic node ma
 ![Civic Timeline](frontend/public/images/web_ss/civic_P.png)
 Civic Timeline: Chronological resolution feed displaying detailed activity history and before/after evidence side-by-side.
 
+---
+
+## 🔭 Future Phase Roadmap
+
+### 📱 Mobile & Offline Support
+* **Flutter / Android App** — Native citizen app for offline issue logging and sync.
+* **SMS Gateway** — Basic SMS intake for no-internet rural areas.
+* **WhatsApp Business API** — Conversational complaint submission via Dialogflow.
+* **Offline Queue** — Local-first reporting with background sync on connectivity restore.
+
+### 🤖 AI & ML Expansion
+* **Gemini API / Vertex AI** — Fine-tuned grievance classification and priority scoring agents.
+* **Voice & Dialect** — Cloud Speech-to-Text + Translation API for 20+ Indian regional languages.
+* **Multimodal Vision** — Gemini Vision / Vertex AI Vision to auto-classify citizen-uploaded photos (potholes, smoke, flood damage).
+* **Duplicate Detection** — Vector similarity search to group redundant reports into single resolved actions.
+
+### 🗺️ Geospatial & Public Data
+* **Google Maps Platform** — Live hotspot heatmaps for infrastructure issue clustering.
+* **Google Earth Engine** — Satellite imagery overlays for flood/crop damage in rural tracks.
+* **Public Datasets** — Integrate `data.gov.in`, Census/NFHS, CPCB air quality, and IMD weather data for smarter governance scores.
+
+### 🔥 Backend & Real-Time
+* **Firebase** — Real-time push notifications for citizens on issue status changes.
+* **Cloud Functions** — Event-driven automation for officer dispatch on new critical tickets.
+* **MediaPipe** — On-device photo classification for low-bandwidth environments.
+
+### 🔒 Scale & Security
+* **Sovereign Cloud** — Deployable on NIC or state government private cloud for data compliance.
+* **Federated Identity** — DigiLocker / Aadhaar-linked citizen authentication.
