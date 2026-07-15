@@ -24,6 +24,7 @@ flowchart TD
     subgraph "Clients & Gateways"
         Citizen["Citizen Portal"]
         Admin["MP & PMO Admin Dashboard"]
+        Offline["Apps / Offline Channels"]
         Nginx["Nginx Reverse Proxy & Load Balancer"]
     end
 
@@ -56,6 +57,7 @@ flowchart TD
     %% Connections
     Citizen -->|Voice/Text/Photo Suggestions| Nginx
     Admin -->|Dashboard API & Analytics Calls| Nginx
+    Offline -->|Sync suggestions & Webhooks| Nginx
     Nginx -->|Round-Robin Balance| FastAPI1
     Nginx -->|Round-Robin Balance| FastAPI2
 
@@ -81,7 +83,126 @@ flowchart TD
     Prom -->|Scrape / Query| Grafana
 ```
 
+### 📱 Mobile & Offline Intake Architecture
+
+For low-connectivity, cellular-only, and remote rural citizens:
+
+```
+┌───────────────────────────────── Citizen Channels ──────────────────────────────────┐
+│                                                                                     │
+│    [Mobile App (Flutter)]               [WhatsApp]                     [Basic SMS]  │
+│              │                               │                              │       │
+│       (Offline Queue)                 (Dialogflow CX)               (SMS Gateway API)│
+│              │                               │                              │       │
+│              ▼                               ▼                              ▼       │
+└──────────────┬───────────────────────────────┬──────────────────────────────┬───────┘
+               │                               │                              │
+               ▼                               ▼                              ▼
+    ┌──────────────────────────────────────────────────────────────────────────────────┐
+    │                         Civic Pulse HTTPS API Gateway                            │
+    └──────────────────────────────────────────────────────────────────────────────────┘
+```
+
 ---
+
+## 🧠 AI / ML Module Architecture
+
+`suggestion_service.py` is the main central engine (The Orchestrator) of the backend. It coordinates intake from all client sources and forwards payloads to the dedicated AI/ML services:
+
+```
+                  ┌──────────────────────────────────────────┐
+                  │   Intake (Web / Mobile App / WhatsApp)   │
+                  └────────────────────┬─────────────────────┘
+                                       │
+                                       ▼
+                  ┌──────────────────────────────────────────┐
+                  │          suggestion_service.py           │
+                  └──────┬─────────────┬──────────────┬──────┘
+                         │             │              │
+        ┌────────────────┴┐    ┌───────┴────────┐    ┌┴────────────────┐
+        │   Transcription │    │   AI Engine    │    │  Deduplication  │
+        │  (stt_service)  │    │  (ai_service)  │    │ (embedding_svc) │
+        └─────────────────┘    └────────────────┘    └─────────────────┘
+```
+
+The following spider diagram visualizes how the 8 core AI & Machine Learning modules interact, coordinate, and fall back during a citizen request lifespan:
+
+```mermaid
+flowchart TD
+    subgraph "On-Device Client (Browser/Mobile)"
+        ClientVision["mediapipeClassifier.ts<br>(On-Device EfficientNet Lite Hint)"]
+    end
+
+    subgraph "Intake Webhook Gateway"
+        DFWebhook["dialogflow.py<br>(Conversational Webhook Callback)"]
+    end
+
+    subgraph "Core Orchestration"
+        Orchestrator["suggestion_service.py<br>(Pipeline Coordinator)"]
+    end
+
+    subgraph "AI/ML Dedicated Services"
+        STT["stt_service.py<br>(Cloud Speech-to-Text v2)"]
+        Translation["translation_service.py<br>(Cloud Translation v3)"]
+        GeminiCore["ai_service.py<br>(Gemini Flash & Vertex AI)"]
+        Embeddings["embedding_service.py<br>(Gemini Embeddings-004)"]
+        TTS["tts_service.py<br>(Cloud Text-to-Speech WaveNet)"]
+    end
+
+    %% Flow connections
+    ClientVision -->|1. Pre-classified image category hint| Orchestrator
+    DFWebhook -->|1. User chat intake / text / GPS| Orchestrator
+    
+    Orchestrator -->|2. Multilingual Audio Intake| STT
+    STT -->|Fallback| GeminiCore
+    
+    Orchestrator -->|3. Regional Text Translation| Translation
+    Translation -->|Fallback| GeminiCore
+    
+    Orchestrator -->|4. Structured Classification & Scoring| GeminiCore
+    Orchestrator -->|5. Cosine Similarity Duplicate Check| Embeddings
+    Orchestrator -->|6. Multilingual Confirmation Audio| TTS
+    
+    TTS -.->|Audio URL returned to| DFWebhook
+    Orchestrator -.->|Live reference ID returned to| DFWebhook
+```
+
+### Module Breakdown & Pitch Breakdown
+
+#### 1. `ai_service.py` (Gemini & Vertex AI Core)
+* **What it is**: The primary intelligence engine.
+* **Pitch explanation**: "This module connects directly to Google Gemini and Vertex AI. It takes raw, unstructured text from a citizen and instantly processes it: translating it from 20+ regional Indian languages, categorizing it (e.g. Roads, Water, Safety), performing sentiment analysis to detect frustration levels, and calculating a priority score. If GCP credentials are present, it dynamically loads Vertex AI to generate structured reasoning explaining *why* it scored the grievance that way."
+
+#### 2. `stt_service.py` (Cloud Speech-to-Text v2)
+* **What it is**: High-fidelity Indian dialect transcriber.
+* **Pitch explanation**: "This module handles multilingual voice intake. It is built on Google's next-generation Cloud Speech-to-Text v2 API, optimized with the `latest_long` audio model. It supports auto-detecting and transcribing 20+ Indian languages (Hindi, Tamil, Telugu, Kannada, etc.) dynamically. If the cloud API is offline, the pipeline gracefully falls back to Gemini's inline audio ingestion without disrupting the citizen."
+
+#### 3. `translation_service.py` (Translation API v3)
+* **What it is**: Dedicated real-time translation bridge.
+* **Pitch explanation**: "To ensure maximum classification accuracy, this module handles translating incoming regional complaints into clean English before they hit the core NLP classifier. It utilizes Google Cloud Translation v3, which supports custom glossaries. This means local civic terms like *'Gram Panchayat'*, *'Tehsil'*, or *'Patwari'* are translated correctly, preserving context that standard translation tools lose."
+
+#### 4. `tts_service.py` (Text-to-Speech WaveNet Confirmations)
+* **What it is**: Multilingual audio acknowledgment generator.
+* **Pitch explanation**: "A key feature for low-literacy or rural citizens. When a citizen submits a complaint, this module uses Google Wavenet voices (configured for 11 regional Indian languages) to generate an on-the-fly MP3 audio confirmation (e.g., *'Your complaint has been registered under ID ABC123'*) spoken back to them in their own native tongue. It plays instantly in the citizen's browser upon submission."
+
+#### 5. `embedding_service.py` (Gemini Embeddings & Duplicate Detection)
+* **What it is**: AI-driven deduplication engine.
+* **Pitch explanation**: "MPs are flooded with duplicate complaints about the same pothole or broken pipe. This module uses Gemini's `text-embedding-004` model to convert every complaint into a high-dimensional vector. It runs real-time cosine similarity checks against the last 500 complaints in that constituency. If a new report is a duplicate (similarity > 92%), it is flagged, saved for the citizen, but filtered out of the MP's dashboard—cutting through the noise. **It also leverages GPS coordinates: it auto-scopes the lookup to candidates within the same physical constituency boundary resolved by the citizen's GPS coordinates, ensuring spatial accuracy.**"
+
+#### 6. `dialogflow.py` (Conversational AI Webhook)
+* **What it is**: Multi-channel intake router (WhatsApp, SMS, IVR).
+* **Pitch explanation**: "This endpoint acts as the backend fulfillment webhook for Google Dialogflow CX. It allows citizens to file grievances or check complaint status via WhatsApp, SMS, or interactive voice calls (IVR). The conversational agent collects details, auto-classifies them, and saves them directly into the main database, creating a friction-free intake channel. **A webhook is critical here because Dialogflow itself is only a conversational parser with no database or backend logic access. Dialogflow acts as the front desk receptionist (collecting user information politely) while the Webhook acts as the office database administrator (taking that info, saving it to PostgreSQL/SQLite, running duplication checks, and returning a real tracking ID).**"
+
+#### 7. `suggestion_service.py` (Pipeline Orchestrator)
+* **What it is**: The transaction coordinator.
+* **Pitch explanation**: "The brain of the backend. It coordinates the transactional workflow. When a submission arrives, it saves files, triggers audio transcription, enriches the request with Gemini Vision photo analysis, runs the deduplication engine, auto-detects administrative boundaries via GPS, routes it to the correct local ward officer, and triggers the audio playback confirmation."
+
+#### 8. `mediapipeClassifier.ts` (On-Device Vision Classifier)
+* **What it is**: Browser-side client-side machine learning.
+* **Pitch explanation**: "For rural areas with poor internet connectivity, we don't want to waste bandwidth sending large images to the server. This module uses Google MediaPipe (running EfficientNet Lite 4 WASM) on-device inside the citizen's browser. It classifies uploaded photos (e.g. detecting garbage vs potholes) locally in ~200ms before upload, sending a category hint to help the server process it faster."
+
+---
+
 
 ## System Data Model (OLTP vs. OLAP)
 

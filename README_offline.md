@@ -58,6 +58,19 @@ Enables conversational complaint submission directly from India's most popular m
 
 Provides basic text-only complaint intake for citizens using feature phones (non-smartphones) or areas with zero internet connectivity.
 
+```
+[Citizen Phone] 
+      │ 
+      ▼ (SS7 Cellular Network)
+[SMS Gateway (e.g. Twilio)]
+      │ 
+      ▼ (HTTP POST Web Request)  ◄── This is the WEBHOOK!
+[Civic Pulse FastAPI Web Server]
+      │ 
+      ▼ (SQL Database Write)
+[PostgreSQL Database]
+```
+
 ### Key UX Features:
 * **Keyword Intake Protocol**: Citizens text simple formatted messages to a dedicated toll-free shortcode:
   `REPORT [Category] [Description]` (e.g., `REPORT Water Pipe broken near market`)
