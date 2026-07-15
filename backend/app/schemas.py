@@ -243,3 +243,22 @@ class WardOfficerOut(BaseModel):
 class WardDispatchInput(BaseModel):
     suggestion_id: str
     officer_id: int
+
+
+# Sync Schemas
+class SuggestionSyncIn(BaseModel):
+    offline_uuid: str
+    content: Optional[str] = None
+    citizen_phone: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    constituency_id: Optional[int] = None
+    language_code: Optional[str] = "en"
+    created_at_offline: Optional[str] = None
+
+
+class SuggestionSyncOut(BaseModel):
+    offline_uuid: str
+    live_id: Optional[str] = None
+    status: str  # "synced", "duplicate", "error"
+

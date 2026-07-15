@@ -313,7 +313,9 @@ Citizens get a live preview of what the AI transcribed from their audio *before*
 
 ### 6. `dialogflow.py` (Conversational AI Webhook)
 * **What it is**: Multi-channel intake router (WhatsApp, SMS, IVR).
-* **Pitch explanation**: "This endpoint acts as the backend fulfillment webhook for Google Dialogflow CX. It allows citizens to file grievances or check complaint status via WhatsApp, SMS, or interactive voice calls (IVR). The conversational agent collects details, auto-classifies them, and saves them directly into the main database, creating a friction-free intake channel."
+* **Pitch explanation**: "This endpoint acts as the backend fulfillment webhook for Google Dialogflow CX. It allows citizens to file grievances or check complaint status via WhatsApp, SMS, or interactive voice calls (IVR). The conversational agent collects details, auto-classifies them, and saves them directly into the main database, creating a friction-free intake channel. **A webhook is critical here because Dialogflow itself is only a conversational parser with no database or backend logic access. Dialogflow acts as the front desk receptionist (collecting user information politely) while the Webhook acts as the office database administrator (taking that info, saving it to PostgreSQL/SQLite, running duplication checks, and returning a real tracking ID).**"
+
+
 
 ### 7. `suggestion_service.py` (Pipeline Orchestrator)
 * **What it is**: The transaction coordinator.

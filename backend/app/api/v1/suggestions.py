@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile, status
 from sqlalchemy.orm import Session
 from app.api import deps
-from app.schemas import SuggestionOut, MapIssueOut
+from app.schemas import SuggestionOut, MapIssueOut, SuggestionSyncIn, SuggestionSyncOut
 from app.services.suggestion_service import SuggestionService
 from app.db.models.suggestion import Suggestion
 from app.db.models.user import User
@@ -136,5 +136,66 @@ def transcribe_audio_endpoint(
     Useful for displaying live translation previews before submission.
     """
     return service.transcribe_audio_preview(audio)
+
+
+@router.post("/sync", response_model=List[SuggestionSyncOut])
+def sync_suggestions_endpoint(
+    payload: List[SuggestionSyncIn],
+    service: SuggestionService = Depends(deps.get_suggestion_service),
+) -> Any:
+    """
+    Bulk import offline suggestion entries from mobile app cache queue.
+    Idempotent logic prevents duplicate logs on connection retries.
+    """
+    payload_dicts = [item.model_dump() for item in payload]
+    return service.sync_suggestions(payload_dicts)
+
+
+@router.post("/sms/intake")
+def sms_intake_webhook(
+    From: str = Form(...),
+    Body: str = Form(...),
+    service: SuggestionService = Depends(deps.get_suggestion_service),
+) -> Any:
+    """
+    Intake SMS reports from telecom gateways.
+    Parses format: REPORT [Category] [Description] or raw text content.
+    Returns lightweight confirmation text back to the gateway.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    text = Body.strip()
+    category = "General"
+    content = text
+
+    # Parse potential keyword prefix: 'REPORT <category> <description>'
+    if text.upper().startswith("REPORT"):
+        parts = text.split(None, 2)
+        if len(parts) >= 3:
+            # e.g. REPORT Water Pipe broken -> parts = ['REPORT', 'Water', 'Pipe broken']
+            category_candidate = parts[1].strip()
+            known_categories = {"Water", "Roads", "Education", "Health", "Sanitation", "Public Spaces", "Electricity", "Safety"}
+            matching_cat = next((c for c in known_categories if c.lower() == category_candidate.lower()), None)
+            if matching_cat:
+                category = matching_cat
+                content = parts[2].strip()
+            else:
+                content = text[7:].strip()
+        elif len(parts) == 2:
+            content = parts[1].strip()
+
+    try:
+        suggestion = service.create_suggestion(
+            content=content,
+            citizen_phone=From,
+            language_code="en",
+        )
+        short_id = suggestion.id[:8].upper()
+        return f"Civic Pulse: Thank you! Report registered. ID: {short_id}. Category: {suggestion.category}."
+    except Exception as e:
+        logger.error(f"[SMS Webhook] Failed to register suggestion: {e}")
+        return "Civic Pulse: Error registering complaint. Please try again later."
+
 
 
