@@ -103,6 +103,9 @@ class MapIssueOut(BaseModel):
     image_url: Optional[str] = None
     constituency_id: Optional[int] = None
     created_at: datetime
+    state: Optional[str] = None
+    city: Optional[str] = None
+    mp: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 

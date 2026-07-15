@@ -41,6 +41,9 @@ const LiveMap: React.FC = () => {
   );
   const [category, setCategory] = useState('');
   const [statusF, setStatusF] = useState('');
+  const [stateF, setStateF] = useState('');
+  const [cityF, setCityF] = useState('');
+  const [mpF, setMpF] = useState('');
 
   useEffect(() => {
     apiClient
@@ -58,6 +61,18 @@ const LiveMap: React.FC = () => {
     () => Array.from(new Set(issues.map((i) => i.status).filter(Boolean))).sort() as string[],
     [issues]
   );
+  const states = useMemo(
+    () => Array.from(new Set(issues.map((i) => (i as any).state).filter(Boolean))).sort() as string[],
+    [issues]
+  );
+  const cities = useMemo(
+    () => Array.from(new Set(issues.map((i) => (i as any).city).filter(Boolean))).sort() as string[],
+    [issues]
+  );
+  const mps = useMemo(
+    () => Array.from(new Set(issues.map((i) => (i as any).mp).filter(Boolean))).sort() as string[],
+    [issues]
+  );
 
   const filtered = useMemo(
     () =>
@@ -65,9 +80,12 @@ const LiveMap: React.FC = () => {
         if (!selectedSeverities.has(severityOf(i))) return false;
         if (category && i.category !== category) return false;
         if (statusF && i.status !== statusF) return false;
+        if (stateF && (i as any).state !== stateF) return false;
+        if (cityF && (i as any).city !== cityF) return false;
+        if (mpF && (i as any).mp !== mpF) return false;
         return true;
       }),
-    [issues, selectedSeverities, category, statusF]
+    [issues, selectedSeverities, category, statusF, stateF, cityF, mpF]
   );
 
   const counts = useMemo(() => {
@@ -87,6 +105,9 @@ const LiveMap: React.FC = () => {
     setSelectedSeverities(new Set(['critical', 'moderate', 'low', 'resolved']));
     setCategory('');
     setStatusF('');
+    setStateF('');
+    setCityF('');
+    setMpF('');
   };
 
   const tileVariant = theme === 'light' ? 'light_all' : 'dark_all';
@@ -130,12 +151,21 @@ const LiveMap: React.FC = () => {
         <MapFilters
           categories={categories}
           statuses={statuses}
+          states={states}
+          cities={cities}
+          mps={mps}
           selectedSeverities={selectedSeverities}
           toggleSeverity={toggleSeverity}
           category={category}
           setCategory={setCategory}
           status={statusF}
           setStatus={setStatusF}
+          stateF={stateF}
+          setStateF={setStateF}
+          cityF={cityF}
+          setCityF={setCityF}
+          mpF={mpF}
+          setMpF={setMpF}
           onReset={resetFilters}
         />
       </div>

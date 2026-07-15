@@ -173,6 +173,31 @@ flowchart TD
 * **What it is**: The primary intelligence engine.
 * **Pitch explanation**: "This module connects directly to Google Gemini and Vertex AI. It takes raw, unstructured text from a citizen and instantly processes it: translating it from 20+ regional Indian languages, categorizing it (e.g. Roads, Water, Safety), performing sentiment analysis to detect frustration levels, and calculating a priority score. If GCP credentials are present, it dynamically loads Vertex AI to generate structured reasoning explaining *why* it scored the grievance that way."
 
+```mermaid
+flowchart TD
+    subgraph "AI Severity Classification Pipeline"
+        Input["Citizen Grievance Ingestion"] --> NLP["ai_service.py <br>(Gemini Core NLP Analysis)"]
+        NLP -->|Extracts Urgency Score| BaseScore["Base Priority Score <br>(Scale 1-100)"]
+        
+        Photo{"Photo Attached?"}
+        Photo -->|Yes| Vision["ai_service.py <br>(Gemini Vision Photo Severity Analyzer)"]
+        Photo -->|No| FinalScore
+        
+        Vision -->|Visual Gravity Check| Boost["Priority Boost <br>(Up to +20 Score)"]
+        BaseScore --> FinalScore["Final Consolidated Score"]
+        Boost --> FinalScore
+        
+        FinalScore --> Decision{"Score Threshold Check"}
+        
+        Decision -->|Score >= 70| Critical["🔴 Critical Severity"]
+        Decision -->|Score 40 to 69| Moderate["🟡 Moderate Severity"]
+        Decision -->|Score < 40| Low["🟢 Low Severity"]
+        
+        Admin["Admin Dashboard Status"] -->|Completed| Resolved["🔵 Resolved Status"]
+    end
+```
+
+
 #### 2. `stt_service.py` (Cloud Speech-to-Text v2)
 * **What it is**: High-fidelity Indian dialect transcriber.
 * **Pitch explanation**: "This module handles multilingual voice intake. It is built on Google's next-generation Cloud Speech-to-Text v2 API, optimized with the `latest_long` audio model. It supports auto-detecting and transcribing 20+ Indian languages (Hindi, Tamil, Telugu, Kannada, etc.) dynamically. If the cloud API is offline, the pipeline gracefully falls back to Gemini's inline audio ingestion without disrupting the citizen."
