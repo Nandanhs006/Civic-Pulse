@@ -49,6 +49,17 @@ const AppSimulator: React.FC = () => {
   const { isRecording, audioBlob, duration, startRecording, stopRecording, deleteRecording } = useAudioRecorder();
   const [transcribing, setTranscribing] = useState<boolean>(false);
   const [transcriptionPreview, setTranscriptionPreview] = useState<string | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (!audioBlob) {
+      setAudioUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(audioBlob);
+    setAudioUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [audioBlob]);
 
   // Offline queue
   const [offlineQueue, setOfflineQueue] = useState<OfflineReport[]>([]);
@@ -94,6 +105,17 @@ const AppSimulator: React.FC = () => {
   const saveQueue = (queue: OfflineReport[]) => {
     setOfflineQueue(queue);
     localStorage.setItem('civic_pulse_offline_queue', JSON.stringify(queue));
+  };
+
+  const handleResetMobileApp = () => {
+    setContent('');
+    setPhone('9988776655');
+    setImageFile(null);
+    setImagePreview(null);
+    deleteRecording();
+    setTranscriptionPreview(null);
+    setSyncSuccessMsg(null);
+    saveQueue([]);
   };
 
   // Handle local voice recording transcription
@@ -250,7 +272,7 @@ const AppSimulator: React.FC = () => {
   // Submit Simulated SMS
   const handleSendSms = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!smsBody.strip()) return;
+    if (!smsBody.trim()) return;
 
     setSendingSms(true);
     setSmsReply(null);
@@ -260,7 +282,9 @@ const AppSimulator: React.FC = () => {
     formData.append('Body', smsBody);
 
     try {
-      const response = await apiClient.post('/api/v1/suggestions/sms/intake', formData);
+      const response = await apiClient.post('/api/v1/suggestions/sms/intake', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       setSmsReply(response.data);
     } catch (err) {
       console.error(err);
@@ -295,11 +319,13 @@ const AppSimulator: React.FC = () => {
       intentName = "civic.complaint.start";
     } else if (clean === 'yes' || clean === 'confirm') {
       intentName = "civic.complaint.submit";
-    } else if (clean.startsWith('status')) {
+    } else if (clean.startsWith('status') || /^[a-f0-9]{8}$/i.test(clean)) {
       intentName = "civic.status.check";
       const parts = clean.split(/\s+/);
-      if (parts.length > 1) {
+      if (parts.length > 1 && parts[0] === 'status') {
         currentParams.complaint_id = parts[1].toUpperCase();
+      } else if (clean !== 'status') {
+        currentParams.complaint_id = clean.toUpperCase();
       }
     } else {
       intentName = "civic.complaint.detail";
@@ -414,7 +440,17 @@ const AppSimulator: React.FC = () => {
                   <Smartphone size={16} color="var(--secondary)" />
                   <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-main)' }}>CivicPulse Native</span>
                 </div>
-                <div style={{ display: 'flex', gap: '4px' }}>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handleResetMobileApp}
+                    style={{
+                      border: 'none', background: 'rgba(239, 68, 68, 0.15)',
+                      color: 'var(--danger)', padding: '3px 8px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: 600, marginRight: '4px'
+                    }}
+                  >
+                    Reset
+                  </button>
                   <button
                     onClick={() => toggleNetwork(true)}
                     style={{
@@ -463,12 +499,12 @@ const AppSimulator: React.FC = () => {
                       style={{
                         width: '38px', height: '38px', borderRadius: '50%', border: 'none',
                         background: isRecording ? 'var(--danger)' : 'var(--primary)',
-                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0
                       }}
                     >
                       {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
                     </button>
-                    <div style={{ fontSize: '11px' }}>
+                    <div style={{ fontSize: '11px', flex: 1 }}>
                       <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>
                         {isRecording ? 'Recording Audio...' : audioBlob ? 'Audio Recorded' : 'Tap to Record'}
                       </div>
@@ -476,6 +512,9 @@ const AppSimulator: React.FC = () => {
                         {isRecording ? `${duration} seconds` : audioBlob ? 'Ready to sync' : 'Speak in your language'}
                       </div>
                     </div>
+                    {audioUrl && (
+                      <audio controls src={audioUrl} style={{ height: '24px', maxWidth: '140px' }} />
+                    )}
                   </div>
                 </div>
 
@@ -764,7 +803,7 @@ const AppSimulator: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>SMS BODY (KEYWORD PROTOCOL)</label>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>SMS BODY</label>
                   <textarea
                     rows={2}
                     value={smsBody}
@@ -775,9 +814,6 @@ const AppSimulator: React.FC = () => {
                     }}
                     placeholder="e.g. REPORT Roads Pothole on main lane"
                   />
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                    Use keyword: `REPORT [Category] [Message]` to specify category, or send raw text for auto-classification.
-                  </span>
                 </div>
 
                 <button
@@ -792,7 +828,7 @@ const AppSimulator: React.FC = () => {
                   {sendingSms ? (
                     <><Loader2 size={16} className="animate-spin" /> Transmitting...</>
                   ) : (
-                    <><Send size={16} /> Send SMS to Gateway Webhook</>
+                    <><Send size={16} /> Send SMS</>
                   )}
                 </button>
               </form>

@@ -197,8 +197,15 @@ class AIService:
             },
         ]
 
-        # Pick one randomly or construct a basic fallback
-        return random.choice(mock_transcripts)
+        # Return a consistent water supply complaint to align with the presentation scenario
+        return {
+            "raw_text": "There is no water supply in our street for 3 days.",
+            "language_code": "en",
+            "english_translation": "There is no water supply in our street for 3 days.",
+            "category": "Water",
+            "sentiment": "Negative",
+            "priority_score": 85,
+        }
 
     # ─────────────────────────────────────────────────────────────────────────
     # MODULE 3: Gemini Vision — Photo Analysis
