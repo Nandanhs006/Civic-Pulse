@@ -285,3 +285,45 @@ Citizens get a live preview of what the AI transcribed from their audio *before*
 | `backend/app/services/suggestion_service.py` | Full pipeline orchestration | ✅ Live |
 | `frontend/src/services/mediapipeClassifier.ts` | MediaPipe on-device | ⏸ Pitch-Ready |
 | `backend/app/scripts/migrate_ai_fields.py` | DB migration for AI columns | Run once |
+
+---
+
+## 📢 Pitch Deck Guide: Module Breakdown
+
+### 1. `ai_service.py` (Gemini & Vertex AI Core)
+* **What it is**: The primary intelligence engine.
+* **Pitch explanation**: "This module connects directly to Google Gemini and Vertex AI. It takes raw, unstructured text from a citizen and instantly processes it: translating it from 20+ regional Indian languages, categorizing it (e.g. Roads, Water, Safety), performing sentiment analysis to detect frustration levels, and calculating a priority score. If GCP credentials are present, it dynamically loads Vertex AI to generate structured reasoning explaining *why* it scored the grievance that way."
+
+### 2. `stt_service.py` (Cloud Speech-to-Text v2)
+* **What it is**: High-fidelity Indian dialect transcriber.
+* **Pitch explanation**: "This module handles multilingual voice intake. It is built on Google's next-generation Cloud Speech-to-Text v2 API, optimized with the `latest_long` audio model. It supports auto-detecting and transcribing 20+ Indian languages (Hindi, Tamil, Telugu, Kannada, etc.) dynamically. If the cloud API is offline, the pipeline gracefully falls back to Gemini's inline audio ingestion without disrupting the citizen."
+
+### 3. `translation_service.py` (Translation API v3)
+* **What it is**: Dedicated real-time translation bridge.
+* **Pitch explanation**: "To ensure maximum classification accuracy, this module handles translating incoming regional complaints into clean English before they hit the core NLP classifier. It utilizes Google Cloud Translation v3, which supports custom glossaries. This means local civic terms like *'Gram Panchayat'*, *'Tehsil'*, or *'Patwari'* are translated correctly, preserving context that standard translation tools lose."
+
+### 4. `tts_service.py` (Text-to-Speech WaveNet Confirmations)
+* **What it is**: Multilingual audio acknowledgment generator.
+* **Pitch explanation**: "A key feature for low-literacy or rural citizens. When a citizen submits a complaint, this module uses Google Wavenet voices (configured for 11 regional Indian languages) to generate an on-the-fly MP3 audio confirmation (e.g., *'Your complaint has been registered under ID ABC123'*) spoken back to them in their own native tongue. It plays instantly in the citizen's browser upon submission."
+
+### 5. `embedding_service.py` (Gemini Embeddings & Duplicate Detection)
+* **What it is**: AI-driven deduplication engine.
+* **Pitch explanation**: "MPs are flooded with duplicate complaints about the same pothole or broken pipe. This module uses Gemini's `text-embedding-004` model to convert every complaint into a high-dimensional vector. It runs real-time cosine similarity checks against the last 500 complaints in that constituency. If a new report is a duplicate (similarity > 92%), it is flagged, saved for the citizen, but filtered out of the MP's dashboard—cutting through the noise. **It also leverages GPS coordinates: it auto-scopes the lookup to candidates within the same physical constituency boundary resolved by the citizen's GPS coordinates, ensuring spatial accuracy.**"
+
+
+### 6. `dialogflow.py` (Conversational AI Webhook)
+* **What it is**: Multi-channel intake router (WhatsApp, SMS, IVR).
+* **Pitch explanation**: "This endpoint acts as the backend fulfillment webhook for Google Dialogflow CX. It allows citizens to file grievances or check complaint status via WhatsApp, SMS, or interactive voice calls (IVR). The conversational agent collects details, auto-classifies them, and saves them directly into the main database, creating a friction-free intake channel."
+
+### 7. `suggestion_service.py` (Pipeline Orchestrator)
+* **What it is**: The transaction coordinator.
+* **Pitch explanation**: "The brain of the backend. It coordinates the transactional workflow. When a submission arrives, it saves files, triggers audio transcription, enriches the request with Gemini Vision photo analysis, runs the deduplication engine, auto-detects administrative boundaries via GPS, routes it to the correct local ward officer, and triggers the audio playback confirmation."
+
+### 8. `mediapipeClassifier.ts` (On-Device Vision Classifier)
+* **What it is**: Browser-side client-side machine learning.
+* **Pitch explanation**: "For rural areas with poor internet connectivity, we don't want to waste bandwidth sending large images to the server. This module uses Google MediaPipe (running EfficientNet Lite 4 WASM) on-device inside the citizen's browser. It classifies uploaded photos (e.g. detecting garbage vs potholes) locally in ~200ms before upload, sending a category hint to help the server process it faster."
+
+### 9. `migrate_ai_fields.py` (Database Migration Script)
+* **What it is**: Database schema preparation.
+* **Pitch explanation**: "An administrative utility that alters database tables (SQLite for local/offline demos and PostgreSQL for production) to prepare the schema to store AI metadata (AI confidence, reasoning text, vision analysis json, duplicate flags, and embedding vectors) without corrupting existing citizen data."
+

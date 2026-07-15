@@ -38,7 +38,7 @@ flowchart TD
     end
 
     subgraph "Cloud Services & Media Storage"
-        AIService["Gemini 1.5 Flash AI API"]
+        AIService["Gemini Flash AI API"]
         FileService["File Upload Service"]
         GCS[("Google Cloud Storage (GCS)")]
     end
