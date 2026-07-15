@@ -178,12 +178,17 @@ source venv/bin/activate
 # 2. Install all required dependencies
 pip install -r backend/requirements.txt
 
-# 3. Start the FastAPI development server
-POSTGRES_PASSWORD="" PYTHONPATH=backend uvicorn app.main:app --reload --port 8001
+# 3. Run SQLite / PostgreSQL migrations to prepare AI database columns
+POSTGRES_PASSWORD="" PYTHONPATH=backend ./venv/bin/python3 backend/app/scripts/migrate_ai_fields.py
+
+# 4. Start the FastAPI development server
+POSTGRES_PASSWORD="" PYTHONPATH=backend ./venv/bin/uvicorn app.main:app --reload --port 8001
 ```
-*Note: Automatically falls back to local SQLite (`sqlite:///./civic_pulse.db`) if no PostgreSQL password/host is defined. Set environment variables to enable Google Cloud integrations:*
-* `GEMINI_API_KEY`: Set this to your Google AI Studio or Vertex AI Gemini API key to enable active LLM issue translation, classification, and scoring.
+*Note: Automatically falls back to local SQLite (`sqlite:///./civic_pulse.db`) if no PostgreSQL password/host is defined. Env vars can be saved in a `.env` file at the project root to enable Google Cloud integrations:*
+* `GEMINI_API_KEY`: Set this to your Google AI Studio or Vertex AI Gemini API key to enable active LLM issue translation, classification, scoring, and voice transcription.
+* `MOCK_AI_PIPELINE`: Set to `false` to enable live Gemini API calls instead of simulated responses.
 * `GCS_BUCKET_NAME`: Set this to your Google Cloud Storage bucket name to upload citizen images and voice clips directly to the cloud.
+
 
 #### 2. Frontend React Setup
 ```bash

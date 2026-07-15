@@ -50,9 +50,9 @@ class AIService:
         if self.api_key and not settings.MOCK_AI_PIPELINE:
             try:
                 genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel("gemini-2.5-flash")
+                self.model = genai.GenerativeModel("gemini-flash-latest")
                 self.use_gemini = True
-                logger.info("[AI] Gemini 2.5 Flash configured successfully.")
+                logger.info("[AI] Gemini Flash configured successfully.")
             except Exception as e:
                 logger.warning(
                     f"[AI] Failed to configure Gemini client: {e}. Falling back to mock NLP."
@@ -114,6 +114,11 @@ class AIService:
                         mime_type = "audio/ogg"
                     elif actual_path.endswith(".m4a"):
                         mime_type = "audio/m4a"
+                    elif actual_path.endswith(".webm"):
+                        mime_type = "audio/webm"
+                    elif actual_path.endswith(".mp4"):
+                        mime_type = "audio/mp4"
+
 
                     with open(actual_path, "rb") as f:
                         audio_bytes = f.read()

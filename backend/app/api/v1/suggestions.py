@@ -125,3 +125,16 @@ def get_duplicate_clusters(
     scoped = deps.resolve_scope(current_user, constituency_id)
     return service.get_duplicate_clusters(constituency_id=scoped)
 
+
+@router.post("/transcribe")
+def transcribe_audio_endpoint(
+    audio: UploadFile = File(...),
+    service: SuggestionService = Depends(deps.get_suggestion_service),
+) -> Any:
+    """
+    Transcribe raw audio on-the-fly and return the transcription preview + detected language.
+    Useful for displaying live translation previews before submission.
+    """
+    return service.transcribe_audio_preview(audio)
+
+

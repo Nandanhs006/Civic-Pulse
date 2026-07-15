@@ -9,8 +9,10 @@
 
 > **auto_awesome** — Gemini API, Vertex AI (model building, fine-tuning, agents), Google AI Studio
 
-### Gemini API — `gemini-2.5-flash`
+### Gemini API — `gemini-flash-latest`
 **Status: ✅ Live** | Key: `GEMINI_API_KEY`
+
+
 
 The core intelligence layer. Every citizen complaint passes through Gemini for:
 
@@ -247,9 +249,30 @@ Citizen Submission
                                        └──► Citizen hears confirmation in their language
 ```
 
+
+---
+
+## 🗣️ Voice Recording & Real-time Speech-to-Text Preview
+
+### 1. Browser Playback Fix (No More Corrupt Containers)
+To resolve browser compatibility issues where users could not play back or hear their recorded audio clips (especially on macOS/iOS Safari and Chrome):
+* Previously, the recorder hook forced `{ type: 'audio/wav' }` on the generated file Blob.
+* We updated the hook to dynamically capture the `MediaRecorder`'s native container `mimeType` (e.g., `audio/webm` or `audio/mp4`).
+* This preserves container headers intact so that standard HTML5 `<audio>` elements can play them back flawlessly.
+
+### 2. Live Speech-to-Text Preview
+Citizens get a live preview of what the AI transcribed from their audio *before* they click submit:
+* When recording completes, the React frontend auto-uploads the audio blob to the backend's `/suggestions/transcribe` preview endpoint.
+* The backend processes the audio on-the-fly (via Cloud STT v2 or Gemini voice fallback).
+* The transcript is rendered dynamically inside a green, glassy AI review card next to the audio player and automatically pre-fills the description text area.
+* Citizens can review, edit, or submit the text directly.
+
+**Endpoint:** `POST /api/v1/suggestions/transcribe`
+
 ---
 
 ## 📁 File Map
+
 
 | File | Module | Status |
 |---|---|---|
