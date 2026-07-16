@@ -1,16 +1,28 @@
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.schemas import SuggestionOut, MapIssueOut, SuggestionSyncIn, SuggestionSyncOut
 from app.services.suggestion_service import SuggestionService
+from app.services import issue_timeline
+from app.services.spam_filter import spam_check
 from app.db.models.suggestion import Suggestion
 from app.db.models.user import User
+from pydantic import BaseModel
 
 router = APIRouter()
 
 
-@router.post("/", response_model=SuggestionOut, status_code=status.HTTP_201_CREATED)
+class AdvanceRequest(BaseModel):
+    note: Optional[str] = None
+
+
+class AssignRequest(BaseModel):
+    department: str
+
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
 def submit_suggestion(
     content: Optional[str] = Form(None),
     citizen_phone: Optional[str] = Form(None),
@@ -33,6 +45,21 @@ def submit_suggestion(
             detail="Either text content or audio voice recording must be provided.",
         )
 
+    # AI spam filter: drop obvious test / gibberish entries before they are
+    # persisted, so they never count toward any dashboard, map or routing.
+    is_spam, reason = spam_check(content)
+    if is_spam:
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "is_spam": True,
+                "message": (
+                    "This looks like a test or non-issue and was not submitted "
+                    f"({reason}). If this is a real problem, please add more detail."
+                ),
+            },
+        )
+
     db_suggestion = service.create_suggestion(
         content=content,
         citizen_phone=citizen_phone,
@@ -43,7 +70,13 @@ def submit_suggestion(
         audio_file=audio,
         image_file=image,
     )
-    return db_suggestion
+    # AI routing: auto-assign a department + advance routine issues; critical /
+    # ambiguous ones stay in the MP's review queue.
+    try:
+        issue_timeline.auto_route(service.db, db_suggestion)
+    except Exception as exc:  # noqa: BLE001 — never fail the submission over routing
+        print(f"[route] auto-route failed: {exc}")
+    return SuggestionOut.model_validate(db_suggestion)
 
 
 @router.get("/", response_model=List[SuggestionOut])
@@ -143,6 +176,55 @@ def read_suggestion(
             status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found"
         )
     return suggestion
+
+
+@router.get("/{ident}/timeline")
+def get_timeline(ident: str, db: Session = Depends(deps.get_db)) -> Any:
+    """Public issue tracking: e-com-style stage timeline by id OR tracking code."""
+    s = issue_timeline.resolve_identifier(db, ident)
+    if not s:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No issue found for that code"
+        )
+    return issue_timeline.build_timeline(db, s)
+
+
+@router.get("/meta/departments")
+def list_departments() -> Any:
+    """Departments an MP can route issues to, + the default per category."""
+    return {"departments": issue_timeline.DEPARTMENTS, "by_category": issue_timeline.DEPT_BY_CATEGORY}
+
+
+@router.post("/{sid}/assign")
+def assign_department(
+    sid: str,
+    payload: AssignRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """MP / PMO assigns an issue to a government department (moves it to Assigned)."""
+    s = db.query(Suggestion).filter(Suggestion.id == sid).first()
+    if not s:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+    role = getattr(current_user, "role", None)
+    actor = "PMO" if role == "pmo" else "MP office"
+    return issue_timeline.assign_department(db, s, payload.department, actor=actor)
+
+
+@router.post("/{sid}/advance")
+def advance_stage(
+    sid: str,
+    payload: AdvanceRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """MP / local body advances an issue to its next stage."""
+    s = db.query(Suggestion).filter(Suggestion.id == sid).first()
+    if not s:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+    role = getattr(current_user, "role", None)
+    actor = "PMO" if role == "pmo" else ("MP office" if role == "mp" else "MP office")
+    return issue_timeline.advance(db, s, actor=actor, note=payload.note)
 
 
 @router.get("/duplicates/clusters")

@@ -57,7 +57,6 @@ export interface MediaPipeResult {
 }
 
 // ── Global state ──────────────────────────────────────────────────────────────
-let _vision: any = null;
 let _classifier: any = null;
 let _initAttempted = false;
 
@@ -79,13 +78,10 @@ async function initMediaPipe(): Promise<boolean> {
   _initAttempted = true;
 
   try {
-    // Dynamic import — only loads if MediaPipe CDN is reachable
-    const vision = await import(
-      /* webpackIgnore: true */
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm'
-    );
-
-    _vision = vision;
+    // Dynamic import — only loads if MediaPipe CDN is reachable. A non-literal
+    // specifier keeps tsc from resolving it; @vite-ignore keeps Vite from bundling.
+    const visionUrl = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm';
+    const vision = await import(/* @vite-ignore */ visionUrl);
 
     const filesetResolver = await vision.FilesetResolver.forVisionTasks(
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'

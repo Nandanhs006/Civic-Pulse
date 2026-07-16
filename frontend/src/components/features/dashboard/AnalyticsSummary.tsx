@@ -93,16 +93,16 @@ const AnalyticsSummary: React.FC<AnalyticsSummaryProps> = ({ summary }) => {
                 return (
                   <div key={category} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 40px', alignItems: 'center', gap: '16px' }}>
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>{t('category.' + category)}</span>
-                    <div style={{ height: '8px', background: 'hsla(224, 25%, 6%, 0.5)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '10px', background: 'var(--bg-subtle, rgba(128,128,128,0.15))', borderRadius: '5px', overflow: 'hidden' }}>
                       <div style={{
                         height: '100%',
-                        width: `${percentage}%`,
-                        background: 'linear-gradient(90deg, var(--primary), var(--secondary))',
-                        borderRadius: '4px',
+                        width: `${Math.max(percentage, count > 0 ? 6 : 0)}%`,
+                        background: 'linear-gradient(90deg, var(--saffron, #FF9933), var(--secondary))',
+                        borderRadius: '5px',
                         transition: 'width 1s ease-out'
                       }}></div>
                     </div>
-                    <span style={{ fontSize: '14px', fontWeight: 600, textAlign: 'right' }}>{count}</span>
+                    <span style={{ fontSize: '14px', fontWeight: 700, textAlign: 'right' }}>{count}</span>
                   </div>
                 );
               })

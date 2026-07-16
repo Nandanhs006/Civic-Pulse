@@ -5,8 +5,9 @@ import { MapIssue, Hierarchy } from '../../../types';
 import { useLang } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
 import RoutingTree from '../../common/RoutingTree';
+import IssueTimeline from '../../common/IssueTimeline';
 import { severityOf, SEVERITY_COLOR } from './severity';
-import { X, Image as ImageIcon, CalendarDays } from 'lucide-react';
+import { X, Image as ImageIcon, CalendarDays, ListChecks } from 'lucide-react';
 
 interface IssueDetailPanelProps {
   issue: MapIssue;
@@ -85,6 +86,14 @@ const IssueDetailPanel: React.FC<IssueDetailPanelProps> = ({ issue, onClose }) =
         </span>
         <span>{t('map.priorityLabel')}: <strong style={{ color: 'var(--text-main)' }}>{issue.priority_score}/100</strong></span>
         <span>{t('map.statusLabel')}: <strong style={{ color: 'var(--text-main)' }}>{t('status.' + issue.status)}</strong></span>
+      </div>
+
+      {/* Tracking timeline */}
+      <div style={{ borderTop: '1px solid var(--border-subtle, rgba(128,128,128,.15))', paddingTop: 12 }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <ListChecks size={14} /> {t('track.heading')}
+        </div>
+        <IssueTimeline issueId={issue.id} canAdvance={user?.role === 'mp' || user?.role === 'pmo'} />
       </div>
 
       <div>

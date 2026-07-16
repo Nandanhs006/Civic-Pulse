@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, GeoJSON } from 'react-leaflet';
 import L from 'leaflet';
-import { Suggestion, Ward } from '../../../types';
+import { Suggestion } from '../../../types';
+import { colorOf } from '../map/severity';
 import { useTheme } from '../../../context/ThemeContext';
 import { useLang } from '../../../context/LanguageContext';
 
@@ -16,20 +17,25 @@ L.Icon.Default.mergeOptions({
 
 interface MapViewProps {
   suggestions: Suggestion[];
-  wards: Ward[];
   onSelectSuggestion?: (sug: Suggestion) => void;
   center?: [number, number];
   zoom?: number;
   boundary?: any; // GeoJSON Feature of the constituency to highlight
 }
 
-// Fit the map to the constituency boundary when one is provided.
+// Fit the map to the constituency boundary and LOCK zoom-out at that level:
+// the constituency always fills the view and the user can only zoom in / pan
+// within it, never zoom out past the seat.
 const FitBoundary: React.FC<{ data: any }> = ({ data }) => {
   const map = useMap();
   useEffect(() => {
     try {
       const bounds = L.geoJSON(data).getBounds();
-      if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] });
+      if (!bounds.isValid()) return;
+      map.setMinZoom(0);                       // unlock before refitting (seat may change)
+      map.fitBounds(bounds, { padding: [24, 24] });
+      map.setMinZoom(map.getZoom());           // can't zoom out below the fitted level
+      map.setMaxBounds(bounds.pad(0.4));       // keep panning around the constituency
     } catch {
       /* ignore malformed geometry */
     }
@@ -61,15 +67,10 @@ const MapView: React.FC<MapViewProps> = ({
   // Match the basemap to the active theme
   const tileVariant = theme === 'light' ? 'light_all' : 'dark_all';
 
-  // Custom icon colors based on priority score (red = high, yellow = medium, green = low)
-  const createMarkerIcon = (priority: number) => {
-    let color = 'hsl(142, 70%, 45%)'; // green
-    if (priority > 75) {
-      color = 'hsl(346, 84%, 55%)'; // red
-    } else if (priority > 45) {
-      color = 'hsl(38, 92%, 50%)'; // yellow
-    }
-
+  // Marker colour = the shared, status-aware severity (same as the public map),
+  // so an issue looks identical everywhere (resolved -> green regardless of score).
+  const createMarkerIcon = (sug: Suggestion) => {
+    const color = colorOf(sug);
     return L.divIcon({
       html: `<div style="
         background-color: ${color};
@@ -88,9 +89,10 @@ const MapView: React.FC<MapViewProps> = ({
   return (
     <div style={{ height: '460px', width: '100%', position: 'relative', overflow: 'hidden', borderRadius: '12px', isolation: 'isolate' }}>
       <MapContainer
-        center={defaultCenter} 
-        zoom={zoomLevel} 
-        scrollWheelZoom={true} 
+        center={defaultCenter}
+        zoom={zoomLevel}
+        scrollWheelZoom={true}
+        maxBoundsViscosity={1.0}
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
@@ -120,7 +122,7 @@ const MapView: React.FC<MapViewProps> = ({
               <Marker
                 key={sug.id}
                 position={markerCoords}
-                icon={createMarkerIcon(sug.priority_score)}
+                icon={createMarkerIcon(sug)}
                 eventHandlers={{
                   click: () => onSelectSuggestion && onSelectSuggestion(sug),
                 }}
@@ -136,8 +138,8 @@ const MapView: React.FC<MapViewProps> = ({
                     <div style={{ marginTop: '8px', display: 'flex', gap: '8px', fontSize: '11px' }}>
                       <span style={{
                         padding: '2px 6px',
-                        background: sug.priority_score > 75 ? '#fee2e2' : '#fef3c7',
-                        color: sug.priority_score > 75 ? '#991b1b' : '#92400e',
+                        background: colorOf(sug) + '22',
+                        color: colorOf(sug),
                         borderRadius: '4px',
                         fontWeight: 600
                       }}>

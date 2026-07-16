@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.db.base import Base
 from app.api.deps import get_db
+from app.middleware.rate_limit import check_rate_limit
 from app.db.models.ward import Ward
 from app.db.models.ward_officer import WardOfficer
 
@@ -152,6 +153,10 @@ def client(db) -> Generator:
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    # Disable IP rate-limiting in tests: the limiter is IP+path based with an
+    # hour-long window backed by Redis, so a running local Redis carries state
+    # across test runs and would spuriously 429 submissions. Production keeps it.
+    app.dependency_overrides[check_rate_limit] = lambda: None
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

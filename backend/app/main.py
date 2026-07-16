@@ -14,6 +14,10 @@ from app.api.v1 import (
     mps,
     hierarchy,
     ward,
+    safety,
+    civic,
+    airquality,
+    mplads,
     dialogflow,
 )
 from app.db.session import engine, SessionLocal
@@ -85,6 +89,27 @@ app.include_router(
     prefix=f"{settings.API_V1_STR}/ward",
     tags=["Ward"],
 )
+app.include_router(
+    safety.router,
+    prefix=f"{settings.API_V1_STR}/safety",
+    tags=["Safety"],
+    dependencies=[Depends(check_rate_limit)],
+)
+app.include_router(
+    civic.router,
+    prefix=f"{settings.API_V1_STR}/civic",
+    tags=["Civic"],
+)
+app.include_router(
+    airquality.router,
+    prefix=f"{settings.API_V1_STR}/airquality",
+    tags=["AirQuality"],
+)
+app.include_router(
+    mplads.router,
+    prefix=f"{settings.API_V1_STR}/mplads",
+    tags=["MPLADS"],
+)
 # Dialogflow CX Webhook (conversational AI intake — pitch-ready, always active)
 app.include_router(
     dialogflow.router,
@@ -93,6 +118,16 @@ app.include_router(
 )
 
 import asyncio
+import threading
+
+
+def _run_full_seed() -> None:
+    """Run the full seed pipeline in a background thread so startup is non-blocking."""
+    try:
+        from app.scripts import seed_all
+        seed_all.main()
+    except Exception as exc:
+        print(f"[Seed] Background seed failed: {exc}")
 
 
 @app.get(f"{settings.API_V1_STR}/test-timeout", tags=["Debug"])
@@ -103,6 +138,18 @@ async def debug_test_timeout(seconds: float = 35.0):
 
 # Prometheus Instrumentation
 Instrumentator().instrument(app).expose(app)
+
+
+def _warm_caches() -> None:
+    """Pre-warm slow external-data caches so the first user request is instant."""
+    try:
+        from app.services.air_quality import get_stations
+        get_stations()  # CPCB AQI (live -> fallback), cached for the TTL
+    except Exception as exc:  # noqa: BLE001
+        print(f"[Warmup] air-quality cache warm failed: {exc}")
+
+
+threading.Thread(target=_warm_caches, daemon=True).start()
 
 
 @app.on_event("startup")
@@ -320,6 +367,10 @@ async def startup_event():
         db.rollback()
     finally:
         db.close()
+
+    # Kick off full data pipeline (MPs, MLAs, demo issues) in background so
+    # the server is healthy immediately and seeding runs concurrently.
+    threading.Thread(target=_run_full_seed, daemon=True).start()
 
 
 @app.get("/health", tags=["Debug"])
