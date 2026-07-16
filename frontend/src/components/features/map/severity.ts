@@ -1,6 +1,10 @@
-import { MapIssue } from '../../../types';
-
 export type Severity = 'critical' | 'moderate' | 'low' | 'resolved';
+
+/** Anything with a priority_score + status can be bucketed (MapIssue, Suggestion). */
+export interface Scored {
+  priority_score: number;
+  status: string;
+}
 
 export const SEVERITY_COLOR: Record<Severity, string> = {
   critical: '#ef4444', // red
@@ -21,9 +25,20 @@ const RESOLVED_STATUSES = new Set([
   'Reviewed', 'Approved', 'Sanctioned', 'Work In Progress', 'Completed', 'Rejected',
 ]);
 
-export function severityOf(issue: MapIssue): Severity {
-  if (RESOLVED_STATUSES.has(issue.status)) return 'resolved';
-  if (issue.priority_score > 75) return 'critical';
-  if (issue.priority_score >= 45) return 'moderate';
+/** Single source of truth for score -> severity buckets (used everywhere). */
+export function bucketOf(score: number): Exclude<Severity, 'resolved'> {
+  if (score > 75) return 'critical';
+  if (score >= 45) return 'moderate';
   return 'low';
+}
+
+/** Status-aware severity: acted-on issues are 'resolved' regardless of score. */
+export function severityOf(issue: Scored): Severity {
+  if (RESOLVED_STATUSES.has(issue.status)) return 'resolved';
+  return bucketOf(issue.priority_score);
+}
+
+/** Convenience: the display colour for any scored item. */
+export function colorOf(issue: Scored): string {
+  return SEVERITY_COLOR[severityOf(issue)];
 }

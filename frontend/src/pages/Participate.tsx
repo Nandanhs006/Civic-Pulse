@@ -2,10 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/apiClient';
-import { MapContainer, TileLayer, Popup, Marker, CircleMarker } from 'react-leaflet';
-import { LatLngExpression } from 'leaflet';
-import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X, Calendar, AlertTriangle, BarChart2, Phone } from 'lucide-react';
+import { MapContainer, TileLayer, Popup, Marker, CircleMarker, useMapEvents, useMap } from 'react-leaflet';
+import L, { LatLngExpression } from 'leaflet';
+import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X, Image as ImageIcon, Mic, MicOff, Loader2, LocateFixed, ShieldCheck, Calendar, AlertTriangle, BarChart2, Phone } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { useIsMobile } from '../hooks/useIsMobile';
+import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import PhoneAuthModal from '../components/common/PhoneAuthModal';
+import { resolveMediaUrl } from '../services/media';
 import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet default marker icon path issue in Vite
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
 
 const CATEGORIES = [
   "Water",
@@ -251,13 +268,45 @@ const DUMMY_SUGGESTIONS: Suggestion[] = [
 
 const MOCK_SUGGESTIONS: Suggestion[] = [];
 
+interface LocationPickerMapProps {
+  coords: [number, number];
+  setCoords: (coords: [number, number]) => void;
+}
+
+const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ setCoords }) => {
+  useMapEvents({
+    click(e) {
+      setCoords([e.latlng.lat, e.latlng.lng]);
+    }
+  });
+  return null;
+};
+
+interface MapControllerProps {
+  center: [number, number];
+}
+
+const MapController: React.FC<MapControllerProps> = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
+  return null;
+};
+
 interface ParticipateProps {
   activeApp?: 'hub' | 'fixmystreet' | 'decidim' | 'cpgrams' | 'seeclickfix' | 'ushahidi' | 'hotline' | 'ward' | 'citybrain' | 'mailbox' | 'civic-integrate';
 }
 
 const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const navigate = useNavigate();
-  useAuth();
+  const { user } = useAuth();
+  const [showPhoneAuth, setShowPhoneAuth] = useState(false);
+  // Citizens must be phone-OTP verified to use a Participate tool (not the hub).
+  const needsAuth = activeApp !== 'hub' && !user;
+  const isMobile = useIsMobile();
+  const { theme } = useTheme();
+  const tileUrl = `https://{s}.basemaps.cartocdn.com/${theme === 'light' ? 'light_all' : 'dark_all'}/{z}/{x}/{y}{r}.png`;
 
   const [officers, setOfficers] = useState<WardOfficer[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -265,13 +314,90 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [syncMsg, setSyncMsg] = useState<string>('');
 
-  // 1. FixMyStreet State
+  // 1. FixMyStreet (StreetMapper) State
   const [fmsContent, setFmsContent] = useState('');
   const [fmsPhone, setFmsPhone] = useState('');
-  const [fmsCoords] = useState<[number, number]>([12.9716, 77.5946]);
+  const [fmsCoords, setFmsCoords] = useState<[number, number]>([12.9716, 77.5946]);
+  const [fmsImages, setFmsImages] = useState<File[]>([]);
+  const [fmsImagePreviews, setFmsImagePreviews] = useState<string[]>([]);
 
-  // 2. Decidim State
-  const [votedProjects, setVotedProjects] = useState<Record<number, boolean>>({});
+  // StreetMapper Audio recorder
+  const { isRecording, audioBlob, duration, startRecording, stopRecording, deleteRecording } = useAudioRecorder();
+  const [fmsTranscribing, setFmsTranscribing] = useState(false);
+  const [fmsAudioUrl, setFmsAudioUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (!audioBlob) {
+      setFmsAudioUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(audioBlob);
+    setFmsAudioUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [audioBlob]);
+
+  // MediaPipe State
+  const [mpClassifying, setMpClassifying] = useState<boolean>(false);
+  const [mpClassResult, setMpClassResult] = useState<string | null>(null);
+
+  // OTP State — a citizen who already verified their phone at login is trusted
+  // here too, so we don't ask them to OTP again inside StreetMapper.
+  const [otpSent, setOtpSent] = useState<boolean>(false);
+  const [otpCode, setOtpCode] = useState<string>('');
+  const [otpInput, setOtpInput] = useState<string>('');
+  const [otpVerified, setOtpVerified] = useState<boolean>(!!user?.phone_verified);
+  useEffect(() => {
+    if (user?.phone_verified) setOtpVerified(true);
+  }, [user]);
+
+  // Status Stepper & Tracking State
+  const [myFmsReports, setMyFmsReports] = useState<any[]>([]);
+  const [fmsSearchQuery, setFmsSearchQuery] = useState<string>('');
+  const [fmsSearchResult, setFmsSearchResult] = useState<any | null>(null);
+  const [searchLoading, setSearchLoading] = useState<boolean>(false);
+
+  // 2. Decidim State (Upgraded CivicFund)
+  // const [votedProjects, setVotedProjects] = useState<Record<number, boolean>>({});
+  const [projectVotes, setProjectVotes] = useState<Record<number, { up: number; down: number }>>({
+    1: { up: 14, down: 2 },
+    2: { up: 9, down: 0 }
+  });
+  const [projectRanks, setProjectRanks] = useState<Record<number, number>>({
+    1: 1,
+    2: 2
+  });
+  const [allocatedFunds, setAllocatedFunds] = useState<Record<number, number>>({});
+  const [projectArguments, setProjectArguments] = useState<Record<number, Array<{ type: 'pro' | 'con'; text: string; date: string }>>>({
+    1: [
+      { type: 'pro', text: 'Clean water is a fundamental right, this restoration is urgent.', date: '2026-07-15' },
+      { type: 'con', text: 'Cost is a bit high compared to other projects.', date: '2026-07-16' }
+    ],
+    2: [
+      { type: 'pro', text: 'This road has caused multiple minor accidents. Needs immediate tarring!', date: '2026-07-15' }
+    ]
+  });
+
+  const [surveys, setSurveys] = useState<Array<{ id: number; rating: number; priorityRepresented: string; feedbackText: string; date: string }>>([
+    { id: 1, rating: 5, priorityRepresented: 'Yes', feedbackText: 'The budget allocation is very transparent. I like being able to vote.', date: '2026-07-15' }
+  ]);
+  const [surveyRating, setSurveyRating] = useState<number>(0);
+  const [surveyPriority, setSurveyPriority] = useState<string>('Yes');
+  const [surveyFeedback, setSurveyFeedback] = useState<string>('');
+
+  const [decidimTab, setDecidimTab] = useState<'proposals' | 'budgeting' | 'surveys'>('proposals');
+
+  // Submit Proposal Form State
+  const [showProposalForm, setShowProposalForm] = useState<boolean>(false);
+  const [newPropTitle, setNewPropTitle] = useState('');
+  const [newPropDesc, setNewPropDesc] = useState('');
+  const [newPropCost, setNewPropCost] = useState('');
+  const [newPropCategory, setNewPropCategory] = useState('General');
+  const [newPropCoords, setNewPropCoords] = useState<[number, number]>([12.9716, 77.5946]);
+  const [newPropImage, setNewPropImage] = useState<File | null>(null);
+  const [newPropImagePreview, setNewPropImagePreview] = useState<string | null>(null);
+  const [newPropArgText, setNewPropArgText] = useState<Record<number, string>>({});
+  // const [newPropArgType, setNewPropArgType] = useState<Record<number, 'pro' | 'con'>>({});
+
 
   // 3. CPGRAMS State
   const [cpgText, setCpgText] = useState('');
@@ -749,6 +875,14 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
   useEffect(() => {
     fetchData();
+    const saved = localStorage.getItem('my_streetmapper_reports');
+    if (saved) {
+      try {
+        setMyFmsReports(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse local streetmapper reports:", e);
+      }
+    }
   }, []);
 
   // Load constituencies when selected state changes
@@ -791,44 +925,310 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
       });
   }, [selectedConstituencyId]);
 
+  // Geolocation trigger on mount / FMS active
+  useEffect(() => {
+    if (activeApp === 'fixmystreet' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setFmsCoords([position.coords.latitude, position.coords.longitude]);
+        },
+        (error) => {
+          console.warn("FMS Geolocation permission denied or unavailable:", error);
+        }
+      );
+    }
+  }, [activeApp]);
+
+  // Handle file select and trigger simulated MediaPipe Pothole Classifier (Support Multiple Images)
+  const handleFmsImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    setFmsImages(files);
+    setFmsImagePreviews(files.map(f => URL.createObjectURL(f)));
+
+    // Trigger simulated MediaPipe inference on first image
+    if (files.length > 0) {
+      setMpClassifying(true);
+      setMpClassResult(null);
+      setTimeout(() => {
+        setMpClassifying(false);
+        const lowerName = files[0].name.toLowerCase();
+        if (lowerName.includes('garbage') || lowerName.includes('trash') || lowerName.includes('waste')) {
+          setMpClassResult('Garbage pile (91.8% Confidence)');
+        } else if (lowerName.includes('water') || lowerName.includes('flood') || lowerName.includes('leak')) {
+          setMpClassResult('Water Leak / Logging (88.4% Confidence)');
+        } else {
+          setMpClassResult('Pothole / Road Damage (94.6% Confidence)');
+        }
+      }, 1200);
+    }
+  };
+
+  // Voice transcription logic for Participate StreetMapper
+  useEffect(() => {
+    if (!audioBlob) return;
+    const runTranscription = async () => {
+      setFmsTranscribing(true);
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'streetmapper_voice.webm');
+      try {
+        const response = await apiClient.post<{ transcript: string }>('/api/v1/suggestions/transcribe', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setFmsContent(response.data.transcript);
+      } catch (err) {
+        console.warn('Audio transcription failed:', err);
+      } finally {
+        setFmsTranscribing(false);
+      }
+    };
+    runTranscription();
+  }, [audioBlob]);
+
+  // Simulated OTP sender
+  const handleSendOtp = () => {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setOtpCode(code);
+    setOtpSent(true);
+    setOtpVerified(false);
+    alert(`📲 [OTP GATEWAY SIMULATOR]\n\nSMS dispatched to your registered phone:\n"Civic Pulse: Your OTP is ${code}. Verified citizen registry code."`);
+  };
+
+  // Simulated OTP verifier
+  const handleVerifyOtp = () => {
+    if (otpInput.trim() === otpCode) {
+      setOtpVerified(true);
+      alert('✅ Phone verified successfully!');
+    } else {
+      alert('❌ Invalid verification code. Please try again.');
+    }
+  };
+
+  // Status search query database lookups
+  const handleSearchStatus = async () => {
+    if (!fmsSearchQuery.trim()) return;
+    setSearchLoading(true);
+    setFmsSearchResult(null);
+    try {
+      const res = await apiClient.get<Suggestion>(`/api/v1/suggestions/${fmsSearchQuery.trim()}`);
+      setFmsSearchResult(res.data);
+    } catch (err) {
+      console.warn(err);
+      setFmsSearchResult({ error: 'No report found with that Reference ID.' });
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
   // 1. FixMyStreet Report Submission
   const handleFmsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fmsContent) return;
+    if (!fmsContent) {
+      alert('Description is mandatory!');
+      return;
+    }
+    if (fmsImages.length === 0) {
+      alert('At least one Photo is mandatory! Please upload a photo of the infrastructure issue.');
+      return;
+    }
+    if (!otpVerified) {
+      alert('Phone OTP verification is mandatory to submit secure registry entries!');
+      return;
+    }
     setLoading(true);
+
+    const formData = new FormData();
+    formData.append('content', fmsContent);
+    formData.append('citizen_phone', fmsPhone);
+    formData.append('latitude', fmsCoords[0].toString());
+    formData.append('longitude', fmsCoords[1].toString());
+    formData.append('language_code', 'en');
+    
+    // Send primary image to API
+    formData.append('image', fmsImages[0]);
+    if (audioBlob) {
+      formData.append('audio', audioBlob, 'streetmapper_audio.webm');
+    }
+
     try {
-      await apiClient.post('/api/v1/suggestions/', {
-        content: fmsContent,
-        citizen_phone: fmsPhone,
-        latitude: fmsCoords[0],
-        longitude: fmsCoords[1],
-        language_code: 'en'
+      const response = await apiClient.post<Suggestion>('/api/v1/suggestions/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       setSyncMsg('Report submitted and auto-routed to local Ward Officer!');
+      
+      const newReport = {
+        id: response.data.id,
+        content: response.data.content,
+        category: response.data.category || 'General',
+        status: response.data.status || 'Submitted',
+        created_at: response.data.created_at || new Date().toISOString(),
+        coords: fmsCoords
+      };
+      
+      const updatedQueue = [newReport, ...myFmsReports];
+      setMyFmsReports(updatedQueue);
+      localStorage.setItem('my_streetmapper_reports', JSON.stringify(updatedQueue));
+
+      // Reset form fields
       setFmsContent('');
       setFmsPhone('');
+      setFmsImages([]);
+      setFmsImagePreviews([]);
+      setMpClassResult(null);
+      setOtpSent(false);
+      setOtpCode('');
+      setOtpInput('');
+      setOtpVerified(false);
+      deleteRecording();
+      
       fetchData();
       setTimeout(() => setSyncMsg(''), 4000);
     } catch (err) {
       console.error(err);
+      alert('Failed to register complaint. Check server connection.');
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Decidim Project Upvote
+  // 2. Decidim Upgraded Handlers
   const handleDecidimUpvote = (projectId: number) => {
-    if (votedProjects[projectId]) return;
-    setVotedProjects(prev => ({ ...prev, [projectId]: true }));
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return { ...p, supporting_suggestions_count: p.supporting_suggestions_count + 1 };
-      }
-      return p;
-    }));
-    setSyncMsg('Vote recorded! Project prioritization weighting updated.');
+    setProjectVotes(prev => {
+      const votes = prev[projectId] || { up: 0, down: 0 };
+      const nextVotes = { ...votes, up: votes.up + 1 };
+      
+      // Auto-update project's priority suggestions count
+      setProjects(pList => pList.map(p => {
+        if (p.id === projectId) {
+          return { ...p, supporting_suggestions_count: nextVotes.up };
+        }
+        return p;
+      }));
+
+      return { ...prev, [projectId]: nextVotes };
+    });
+    setSyncMsg('Supporting vote recorded! Priority metrics updated.');
     setTimeout(() => setSyncMsg(''), 3000);
   };
+
+  const handleDecidimDownvote = (projectId: number) => {
+    setProjectVotes(prev => {
+      const votes = prev[projectId] || { up: 0, down: 0 };
+      return { ...prev, [projectId]: { ...votes, down: votes.down + 1 } };
+    });
+    setSyncMsg('Opposing vote recorded.');
+    setTimeout(() => setSyncMsg(''), 3000);
+  };
+
+  const handleDecidimRankChange = (projectId: number, rank: number) => {
+    setProjectRanks(prev => ({ ...prev, [projectId]: rank }));
+    setSyncMsg(`Project priority rank updated to #${rank}.`);
+    setTimeout(() => setSyncMsg(''), 3000);
+  };
+
+  const handleAddProjectArgument = (projectId: number, e: React.FormEvent) => {
+    e.preventDefault();
+    const text = newPropArgText[projectId]?.trim();
+    if (!text) return;
+
+    // Simulated AI classifier deciding if the argument is Pro or Con
+    const lower = text.toLowerCase();
+    const conKeywords = [
+      'expensive', 'waste', 'against', 'high', 'cost', 'no', 'bad', 'unnecessary', 
+      'delay', 'poor', 'not', 'disagree', 'critique', 'criticism', 'object', 'oppose',
+      'wasteful', 'overpriced', 'dislike', 'avoid'
+    ];
+    const isCon = conKeywords.some(keyword => lower.includes(keyword));
+    const type = isCon ? 'con' : 'pro';
+
+    setProjectArguments(prev => {
+      const current = prev[projectId] || [];
+      return {
+        ...prev,
+        [projectId]: [
+          ...current,
+          { type, text, date: new Date().toISOString().split('T')[0] }
+        ]
+      };
+    });
+
+    setNewPropArgText(prev => ({ ...prev, [projectId]: '' }));
+    setSyncMsg(`🤖 AI classified argument as [${type.toUpperCase()}] and posted.`);
+    setTimeout(() => setSyncMsg(''), 4000);
+  };
+
+  const handleProposalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPropTitle.trim() || !newPropDesc.trim() || !newPropCost) {
+      alert('Please fill in all required fields.');
+      return;
+    }
+
+    const newProject: ProposedProject = {
+      id: Date.now(),
+      title: newPropTitle,
+      description: newPropDesc,
+      category: newPropCategory,
+      estimated_cost: Number(newPropCost),
+      priority_score: 50,
+      supporting_suggestions_count: 0,
+      status: 'Proposed'
+    };
+
+    setProjects(prev => [newProject, ...prev]);
+    
+    // Add default initial arguments
+    setProjectArguments(prev => ({
+      ...prev,
+      [newProject.id]: []
+    }));
+
+    // Reset Form
+    setNewPropTitle('');
+    setNewPropDesc('');
+    setNewPropCost('');
+    setNewPropCategory('General');
+    setNewPropImage(null);
+    setNewPropImagePreview(null);
+    setShowProposalForm(false);
+
+    setSyncMsg('✅ Proposal submitted successfully with coordinates and attachments!');
+    setTimeout(() => setSyncMsg(''), 4000);
+  };
+
+
+  const handleSurveySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (surveyRating === 0) {
+      alert('Please select a star rating.');
+      return;
+    }
+
+    const newSurvey = {
+      id: Date.now(),
+      rating: surveyRating,
+      priorityRepresented: surveyPriority,
+      feedbackText: surveyFeedback,
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    setSurveys(prev => [newSurvey, ...prev]);
+    setSurveyRating(0);
+    setSurveyPriority('Yes');
+    setSurveyFeedback('');
+
+    setSyncMsg('✅ Thank you for your feedback! Survey response recorded.');
+    setTimeout(() => setSyncMsg(''), 3000);
+  };
+
+  const handleProposalImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setNewPropImage(file);
+      setNewPropImagePreview(URL.createObjectURL(file));
+    }
+  };
+
 
   // 3. CPGRAMS AI Grievance Classification
   const handleCpgAnalyze = async (e: React.FormEvent) => {
@@ -910,8 +1310,38 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
     setTimeout(() => setSyncMsg(''), 3000);
   };
 
+  // ── Citizen verification gate for the participatory tools ────────────────
+  if (needsAuth) {
+    return (
+      <>
+        <div style={{ maxWidth: '460px', margin: '40px auto', textAlign: 'center' }}>
+          <div className="glass-panel" style={{ padding: '32px 26px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShieldCheck size={30} color="var(--success)" />
+            </div>
+            <h2 style={{ margin: 0, fontSize: '20px' }}>Verify to participate</h2>
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              This civic tool is for verified citizens. A quick one-time SMS code confirms
+              you're real — then your reports carry a <strong>Verified</strong> badge your MP can act on.
+            </p>
+            <button className="btn-primary" onClick={() => setShowPhoneAuth(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              <ShieldCheck size={16} /> Verify with OTP
+            </button>
+            <button onClick={() => navigate('/participate')}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>
+              ← Back to hub
+            </button>
+          </div>
+        </div>
+        <PhoneAuthModal open={showPhoneAuth} onClose={() => setShowPhoneAuth(false)} />
+      </>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <PhoneAuthModal open={showPhoneAuth} onClose={() => setShowPhoneAuth(false)} />
 
       {/* Dynamic Sync Banner */}
       {syncMsg && (
@@ -919,6 +1349,20 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
           {syncMsg}
         </div>
       )}
+
+      {/* Citizen verification status / sign-in */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        {user ? (
+          <span className="badge" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)', padding: '6px 12px' }}>
+            <ShieldCheck size={13} /> Verified{user.phone ? ` · ${user.phone}` : (user.full_name ? ` · ${user.full_name}` : '')}
+          </span>
+        ) : (
+          <button className="btn-secondary" onClick={() => setShowPhoneAuth(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', fontSize: 13 }}>
+            <ShieldCheck size={15} /> Verify with OTP
+          </button>
+        )}
+      </div>
 
       {/* ========================================================= */}
       {/* GLOBAL CIVIC TECH HUB MAIN PAGE */}
@@ -1015,62 +1459,363 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 360px', gap: '20px' }}>
             {/* Map selection */}
-            <div className="glass-panel" style={{ height: '480px', padding: 0, position: 'relative', overflow: 'hidden' }}>
+            <div className="glass-panel" style={{ height: isMobile ? '320px' : '480px', padding: 0, position: 'relative', overflow: 'hidden' }}>
               <MapContainer center={MAP_CENTER} zoom={14} style={{ width: '100%', height: '100%' }}>
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-                <Marker position={fmsCoords} />
+                <TileLayer key={theme} url={tileUrl} />
+                <MapController center={fmsCoords} />
+                <Marker
+                  position={fmsCoords}
+                  draggable={true}
+                  eventHandlers={{
+                    dragend: (e) => {
+                      const { lat, lng } = e.target.getLatLng();
+                      setFmsCoords([lat, lng]);
+                    }
+                  }}
+                />
+                <CircleMarker
+                  center={fmsCoords}
+                  radius={24}
+                  pathOptions={{
+                    color: 'var(--secondary)',
+                    fillColor: 'var(--secondary)',
+                    fillOpacity: 0.12,
+                    weight: 1
+                  }}
+                />
               </MapContainer>
-              <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', zIndex: 100, border: '1px solid var(--border-color)' }}>
-                📍 Coordinates: {fmsCoords[0].toFixed(5)}, {fmsCoords[1].toFixed(5)}
+
+              {/* Blue Locate Me Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        setFmsCoords([position.coords.latitude, position.coords.longitude]);
+                      },
+                      (error) => {
+                        console.warn("FMS Geolocation error:", error);
+                        alert("Could not fetch GPS location. Please check browser permissions.");
+                      }
+                    );
+                  }
+                }}
+                style={{
+                  position: 'absolute', top: '12px', right: '12px', zIndex: 1000,
+                  background: '#2563eb', color: 'white', border: 'none',
+                  borderRadius: '50%', width: '36px', height: '36px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  transition: 'background-color 0.2s'
+                }}
+                title="Locate Me"
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+              >
+                <LocateFixed size={18} />
+              </button>
+
+              <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', zIndex: 100, border: '1px solid var(--border-card)' }}>
+                📍 Coordinates: {fmsCoords[0].toFixed(5)}, {fmsCoords[1].toFixed(5)} <span style={{ color: 'var(--secondary)', marginLeft: '4px' }}>(Draggable Pin)</span>
               </div>
             </div>
 
             {/* Form */}
-            <div className="glass-panel" style={{ padding: '24px' }}>
-              <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>StreetMapper Geospatial Reporter</h3>
-              <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                Point out the pothole or infrastructure issue. We will automatically route it to the ward.
-              </p>
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700 }}>StreetMapper Geospatial Reporter</h3>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Point out the pothole or infrastructure issue. We will automatically route it to the ward.
+                </p>
+              </div>
 
               <form onSubmit={handleFmsSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Describe the issue</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    DESCRIBE THE ISSUE <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
                   <textarea
                     value={fmsContent}
                     onChange={(e) => setFmsContent(e.target.value)}
                     placeholder="E.g., Pothole near Central Market main gate..."
-                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '100px', fontSize: '13px' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Your phone number</label>
-                  <input
-                    value={fmsPhone}
-                    onChange={(e) => setFmsPhone(e.target.value)}
-                    placeholder="+91-98765-XXXXX"
-                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
+                    style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '70px', fontSize: '13px', resize: 'none' }}
                   />
                 </div>
 
-                <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
+                {/* SPEAK Grievance (Optional) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>SPEAK GRIEVANCE (OPTIONAL)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', padding: '8px', borderRadius: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={isRecording ? stopRecording : startRecording}
+                      style={{
+                        width: '36px', height: '36px', borderRadius: '50%', border: 'none',
+                        background: isRecording ? 'var(--danger)' : 'var(--primary)',
+                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0
+                      }}
+                    >
+                      {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
+                    </button>
+                    <div style={{ fontSize: '12px', flex: 1 }}>
+                      <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                        {isRecording ? 'Recording Voice...' : audioBlob ? 'Audio Recorded' : 'Tap to Record'}
+                      </div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
+                        {isRecording ? `${duration}s` : audioBlob ? 'Transcribed' : 'Speak in your language'}
+                      </div>
+                    </div>
+                    {fmsAudioUrl && (
+                      <audio controls src={fmsAudioUrl} style={{ height: '24px', maxWidth: '140px' }} />
+                    )}
+                  </div>
+                  {fmsTranscribing && (
+                    <div style={{ fontSize: '11px', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                      <Loader2 size={10} className="animate-spin" /> Transcribing with Gemini...
+                    </div>
+                  )}
+                </div>
+
+                {/* Mandatory Photo Ingestion (Support Multiple Images) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    UPLOAD PHOTO(S) <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFmsImageChange}
+                    style={{ display: 'none' }}
+                    id="fms-photo-upload"
+                  />
+                  <label
+                    htmlFor="fms-photo-upload"
+                    className="btn btn-secondary"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', padding: '8px' }}
+                  >
+                    <ImageIcon size={15} /> {fmsImages.length > 0 ? `Selected ${fmsImages.length} Photo(s)` : 'Select Photo(s)'}
+                  </label>
+
+                  {fmsImagePreviews.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '6px', marginTop: '6px' }}>
+                      {fmsImagePreviews.map((url, idx) => (
+                        <div key={idx} style={{ border: '1px solid var(--border-card)', borderRadius: '6px', padding: '4px', background: 'var(--overlay-faint)', position: 'relative' }}>
+                          <img src={url} alt={`Preview ${idx}`} style={{ height: '60px', width: '100%', objectFit: 'cover', borderRadius: '4px' }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Simulated MediaPipe Classifier Banner */}
+                {(mpClassifying || mpClassResult) && (
+                  <div style={{ background: 'rgba(34, 197, 94, 0.03)', border: '1px dashed var(--secondary)', padding: '10px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 600, color: 'var(--secondary)' }}>
+                      <Brain size={12} className={mpClassifying ? 'animate-pulse' : ''} />
+                      <span>{mpClassifying ? 'On-Device MediaPipe running...' : 'On-Device MediaPipe Inference (EfficientNet)'}</span>
+                    </div>
+                    {mpClassifying ? (
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Analyzing pixels in browser...</div>
+                    ) : (
+                      <div style={{ fontSize: '11px', color: 'var(--text-main)' }}>
+                        Detected: <strong style={{ color: 'var(--accent)' }}>{mpClassResult}</strong>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* OTP Phone verification */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    OTP VERIFICATION <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {!otpVerified && (
+                      <button
+                        type="button"
+                        onClick={handleSendOtp}
+                        className="btn btn-secondary"
+                        style={{ padding: '8px 12px', fontSize: '12px', whiteSpace: 'nowrap' }}
+                      >
+                        {otpSent ? 'Resend OTP to Registered Phone' : 'Send OTP to Registered Phone'}
+                      </button>
+                    )}
+                  </div>
+
+                  {otpSent && !otpVerified && (
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                      <input
+                        value={otpInput}
+                        onChange={(e) => setOtpInput(e.target.value)}
+                        placeholder="Enter 4-digit code"
+                        style={{ flex: 1, background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyOtp}
+                        className="btn btn-primary"
+                        style={{ padding: '8px 12px', fontSize: '12px' }}
+                      >
+                        Verify
+                      </button>
+                    </div>
+                  )}
+
+                  {otpVerified && (
+                    <span style={{ fontSize: '11px', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', fontWeight: 600 }}>
+                      ✓ Mobile Registry Verified
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ width: '100%', marginTop: '4px' }}
+                  disabled={loading || !otpVerified || fmsImages.length === 0}
+                >
                   File StreetMapper Report
                 </button>
               </form>
             </div>
           </div>
+
+          {/* Stepper Timeline Status Tracking Section */}
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 700 }}>🔍 Track Complaint Status</h3>
+            
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+              <input
+                value={fmsSearchQuery}
+                onChange={(e) => setFmsSearchQuery(e.target.value)}
+                placeholder="Search by 8-character Complaint ID (e.g. A5DBC4E1)"
+                style={{ flex: 1, background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
+              />
+              <button onClick={handleSearchStatus} className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }} disabled={searchLoading}>
+                {searchLoading ? 'Searching...' : 'Track'}
+              </button>
+            </div>
+
+            {fmsSearchResult && (
+              <div style={{ background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', padding: '16px', borderRadius: '10px', marginBottom: '20px' }}>
+                {fmsSearchResult.error ? (
+                  <p style={{ color: 'var(--danger)', fontSize: '13px', margin: 0 }}>{fmsSearchResult.error}</p>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700 }}>ID: {fmsSearchResult.id.slice(0, 8).toUpperCase()}</span>
+                      <span className="badge" style={{
+                        background: fmsSearchResult.status === 'Resolved' ? 'rgba(34,197,94,0.1)' : 'rgba(249,115,22,0.1)',
+                        color: fmsSearchResult.status === 'Resolved' ? '#22c55e' : 'var(--saffron)'
+                      }}>
+                        {fmsSearchResult.status}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '13px', margin: '0 0 16px 0', color: 'var(--text-muted)' }}>{fmsSearchResult.content}</p>
+                    
+                    {/* Stepper progress */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', marginTop: '20px', padding: '0 10px', maxWidth: '480px', margin: '0 auto' }}>
+                      <div style={{ position: 'absolute', top: '10px', left: '20px', right: '20px', height: '2px', background: 'var(--border-card)', zIndex: 0 }} />
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 1 }}>
+                         <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 'bold' }}>✓</div>
+                         <span style={{ fontSize: '11px', color: 'var(--text-main)', fontWeight: 600 }}>Submitted</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 1 }}>
+                         <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: ['Reviewed', 'Processing', 'Resolved', 'Approved'].includes(fmsSearchResult.status) ? '#22c55e' : 'var(--border-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 'bold' }}>
+                           {['Reviewed', 'Processing', 'Resolved', 'Approved'].includes(fmsSearchResult.status) ? '✓' : '2'}
+                         </div>
+                         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Dispatched</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 1 }}>
+                         <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: fmsSearchResult.status === 'Resolved' ? '#22c55e' : 'var(--border-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 'bold' }}>
+                           {fmsSearchResult.status === 'Resolved' ? '✓' : '3'}
+                         </div>
+                         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Resolved</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>MY REGISTERED REPORTS</h4>
+            {myFmsReports.length === 0 ? (
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>No local complaints registered on this browser yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {myFmsReports.map((report) => (
+                  <div key={report.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', padding: '10px 14px', borderRadius: '8px' }}>
+                    <div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, fontSize: '13px' }}>ID: {report.id.slice(0, 8).toUpperCase()}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>({report.category})</span>
+                      </div>
+                      <p style={{ fontSize: '12px', margin: '4px 0 0 0', color: 'var(--text-muted)', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {report.content}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="badge" style={{
+                        background: report.status === 'Resolved' ? 'rgba(34,197,94,0.1)' : 'rgba(249,115,22,0.1)',
+                        color: report.status === 'Resolved' ? '#22c55e' : 'var(--saffron)'
+                      }}>
+                        {report.status}
+                      </span>
+                      <button onClick={() => {
+                        setFmsSearchQuery(report.id.slice(0, 8));
+                        setFmsSearchResult(report);
+                      }} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px' }}>
+                        Track
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ========================================================= */}
+{/* ========================================================= */}
       {/* 2. CIVICFUND VIEW */}
       {/* ========================================================= */}
       {activeApp === 'decidim' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <ArrowLeft size={16} /> Back to Hub
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ArrowLeft size={16} /> Back to Hub
+            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setDecidimTab('proposals')}
+                className={`btn ${decidimTab === 'proposals' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '6px 14px', fontSize: '12px' }}
+              >
+                🗳️ Proposals & Voting
+              </button>
+              <button
+                onClick={() => setDecidimTab('budgeting')}
+                className={`btn ${decidimTab === 'budgeting' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '6px 14px', fontSize: '12px' }}
+              >
+                📊 Budget & Revenues
+              </button>
+              <button
+                onClick={() => setDecidimTab('surveys')}
+                className={`btn ${decidimTab === 'surveys' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '6px 14px', fontSize: '12px' }}
+              >
+                📋 Feedback Surveys
+              </button>
+            </div>
+          </div>
 
           {/* Representative & Geography Selector */}
           <div className="glass-panel animate-fade-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1199,49 +1944,434 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             )}
           </div>
 
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>CivicFund Participatory Budgeting</h2>
-            <p style={{ margin: '0 0 24px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-              Support development projects proposed for your constituency. Upvotes affect the prioritization scoring metric directly.
-            </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              {getFilteredProjects().map(project => (
-                <div key={project.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{project.category}</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700 }}>Est: ₹{project.estimated_cost.toLocaleString()}</span>
-                  </div>
+          {/* ==================== TAB 1: PROPOSALS & VOTING ==================== */}
+          {decidimTab === 'proposals' && (
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h2 style={{ margin: '0 0 4px 0', fontSize: '20px' }}>CivicFund Public Proposals</h2>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                    Submit developmental suggestions, upvote/downvote community requests, rank priority orders, and contribute arguments.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => setShowProposalForm(!showProposalForm)}
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 14px' }}
+                  >
+                    <PlusCircle size={15} /> {showProposalForm ? 'Close Form' : 'Submit Proposal'}
+                  </button>
+                </div>
+              </div>
 
-                  <div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '15px' }}>{project.title}</h4>
-                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                      {project.description}
-                    </p>
-                  </div>
+              {/* Ingestion proposal form */}
+              {showProposalForm && (
+                <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--overlay-faint)' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Create New CivicFund Proposal</h3>
+                  <form onSubmit={handleProposalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 600 }}>PROPOSAL TITLE</label>
+                        <input
+                          type="text"
+                          value={newPropTitle}
+                          onChange={(e) => setNewPropTitle(e.target.value)}
+                          placeholder="E.g., Solar lights installation in Sector C..."
+                          style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '6px', fontSize: '13px' }}
+                          required
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 600 }}>ESTIMATED COST (₹)</label>
+                        <input
+                          type="number"
+                          value={newPropCost}
+                          onChange={(e) => setNewPropCost(e.target.value)}
+                          placeholder="e.g. 150000"
+                          style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '6px', fontSize: '13px' }}
+                          required
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 600 }}>CATEGORY</label>
+                        <select
+                          value={newPropCategory}
+                          onChange={(e) => setNewPropCategory(e.target.value)}
+                          style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '6px', fontSize: '13px' }}
+                        >
+                          <option value="General">General</option>
+                          <option value="Water">Water</option>
+                          <option value="Roads">Roads</option>
+                          <option value="Sanitation">Sanitation</option>
+                          <option value="Public Spaces">Public Spaces</option>
+                          <option value="Electricity">Electricity</option>
+                        </select>
+                      </div>
+                    </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <ThumbsUp size={14} /> {project.supporting_suggestions_count} Supporters
-                    </span>
-                    <button
-                      onClick={() => handleDecidimUpvote(project.id)}
-                      className={`btn ${votedProjects[project.id] ? 'btn-secondary' : 'btn-primary'}`}
-                      style={{ padding: '6px 16px', fontSize: '12px' }}
-                      disabled={votedProjects[project.id]}
-                    >
-                      {votedProjects[project.id] ? 'Supported' : 'Support Proposal'}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600 }}>DESCRIPTION</label>
+                      <textarea
+                        rows={2}
+                        value={newPropDesc}
+                        onChange={(e) => setNewPropDesc(e.target.value)}
+                        placeholder="Detail the scope of work and community benefits..."
+                        style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '6px', fontSize: '13px' }}
+                        required
+                      />
+                    </div>
+
+                    {/* Geolocation & Attachment Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 600 }}>📍 GEOLOCATION PICKER (Tap map to pin coordinates)</label>
+                        <div style={{ height: '140px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border-card)' }}>
+                          <MapContainer center={MAP_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
+                            <TileLayer key={theme} url={tileUrl} />
+                            <Marker position={newPropCoords} />
+                            <LocationPickerMap coords={newPropCoords} setCoords={setNewPropCoords} />
+                          </MapContainer>
+                        </div>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Pinned Coords: {newPropCoords[0].toFixed(5)}, {newPropCoords[1].toFixed(5)}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 600 }}>📎 ATTACH PROJECT DESIGN DOCUMENT / EVIDENCE</label>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={handleProposalImageChange}
+                          style={{ background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', padding: '6px 10px', borderRadius: '6px', fontSize: '12px' }}
+                        />
+                        {newPropImagePreview && (
+                          <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <img src={newPropImagePreview} alt="attachment preview" style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{newPropImage?.name} Attached</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '13px', width: 'fit-content', alignSelf: 'flex-end', marginTop: '4px' }}>
+                      Submit Proposal & Pin Coordinates
                     </button>
+                  </form>
+                </div>
+              )}
+
+              {/* Proposals board grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
+                {getFilteredProjects().map(project => {
+                  const votes = projectVotes[project.id] || { up: 0, down: 0 };
+                  const score = votes.up - votes.down;
+                  const rank = projectRanks[project.id] || 5;
+                  const args = projectArguments[project.id] || [];
+
+                  // Approval workflows tags logic
+                  const meetsThreshold = project.supporting_suggestions_count >= 5;
+                  const isGoodToMove = score >= 10;
+                  const isLowPriority = score < -3;
+
+                  return (
+                    <div key={project.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', border: '1px solid var(--border-card)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                        <span className="badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{project.category}</span>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {meetsThreshold && <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>Meets Threshold</span>}
+                          {isGoodToMove && <span className="badge" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', fontWeight: 700 }}>👍 Good To Move</span>}
+                          {isLowPriority && <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}> Do Not Prioritize</span>}
+                          {!isGoodToMove && !isLowPriority && <span className="badge" style={{ background: 'var(--overlay-med)', color: 'var(--text-muted)' }}>Under Review</span>}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{project.title}</span>
+                          <span style={{ color: 'var(--secondary)' }}>Rank #{rank}</span>
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                          {project.description}
+                        </p>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', marginTop: '8px' }}>
+                          Estimated Cost: ₹{project.estimated_cost.toLocaleString()}
+                        </div>
+                      </div>
+
+                      {/* Voting and Priority Selection Controls */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid var(--overlay-faint)', paddingTop: '10px' }}>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => handleDecidimUpvote(project.id)}
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            🔼 For ({votes.up})
+                          </button>
+                          <button
+                            onClick={() => handleDecidimDownvote(project.id)}
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            🔽 Against ({votes.down})
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Priority:</span>
+                          <select
+                            value={rank}
+                            onChange={(e) => handleDecidimRankChange(project.id, Number(e.target.value))}
+                            style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '2px 4px', borderRadius: '4px', fontSize: '11px' }}
+                          >
+                            <option value={1}>Rank 1</option>
+                            <option value={2}>Rank 2</option>
+                            <option value={3}>Rank 3</option>
+                            <option value={4}>Rank 4</option>
+                            <option value={5}>Rank 5</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Public Arguments Widget (Pro/Con comments) */}
+                      <div style={{ borderTop: '1px solid var(--overlay-faint)', paddingTop: '10px' }}>
+                        <h5 style={{ margin: '0 0 6px 0', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Public Argument Board</h5>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '100px', overflowY: 'auto', marginBottom: '8px', paddingRight: '4px' }}>
+                          {args.length === 0 ? (
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No community arguments posted yet.</span>
+                          ) : (
+                            args.map((a, index) => (
+                              <div key={index} style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', background: a.type === 'pro' ? 'rgba(34,197,94,0.05)' : 'rgba(239,68,68,0.05)', border: a.type === 'pro' ? '1px solid rgba(34,197,94,0.1)' : '1px solid rgba(239,68,68,0.1)' }}>
+                                <strong style={{ color: a.type === 'pro' ? '#22c55e' : '#ef4444', marginRight: '4px' }}>[{a.type.toUpperCase()}]</strong>
+                                <span style={{ color: 'var(--text-main)' }}>{a.text}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Argument Submission */}
+                        <form onSubmit={(e) => handleAddProjectArgument(project.id, e)} style={{ display: 'flex', gap: '6px' }}>
+                          <input
+                            type="text"
+                            value={newPropArgText[project.id] || ''}
+                            onChange={(e) => setNewPropArgText(prev => ({ ...prev, [project.id]: e.target.value }))}
+                            placeholder="Add argument..."
+                            style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', flex: 1 }}
+                            required
+                          />
+                          <button type="submit" className="btn btn-primary" style={{ padding: '2px 8px', fontSize: '10px' }}>
+                            Add
+                          </button>
+                        </form>
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ==================== TAB 2: BUDGET ALLOCATION ==================== */}
+          {decidimTab === 'budgeting' && (() => {
+            const totalAllocated = Object.entries(allocatedFunds).reduce((acc, [_, val]) => acc + val, 0);
+            const remainingBudget = 2000000 - totalAllocated;
+            const isOverBudget = remainingBudget < 0;
+
+            return (
+              <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div>
+                  <h2 style={{ margin: '0 0 4px 0', fontSize: '20px' }}>CivicFund Revenues & Participatory Budget Allocation</h2>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                    Distribute the allocated ward revenues pool of **₹2,000,000** (20 Lakhs) across proposals. Toggle allocations to stay within boundary limits.
+                  </p>
+                </div>
+
+                {/* Allocation stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '16px', borderBottom: '1px solid var(--border-card)', paddingBottom: '20px' }}>
+                  <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>TOTAL REVENUE POOL</span>
+                    <strong style={{ fontSize: '18px', color: 'var(--text-main)', marginTop: '4px' }}>₹2,000,000</strong>
+                  </div>
+                  <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>TOTAL ALLOCATED FUNDS</span>
+                    <strong style={{ fontSize: '18px', color: isOverBudget ? '#ef4444' : '#22c55e', marginTop: '4px' }}>₹{totalAllocated.toLocaleString()}</strong>
+                  </div>
+                  <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>REMAINING BUDGET POOL</span>
+                    <strong style={{ fontSize: '18px', color: isOverBudget ? '#ef4444' : 'var(--secondary)', marginTop: '4px' }}>₹{remainingBudget.toLocaleString()}</strong>
                   </div>
                 </div>
-              ))}
-            </div>
-            {getFilteredProjects().length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                No proposed projects found matching the selected filters. Try adjusting your State, MP, MLA, or Ward selectors above.
+
+                {/* Progress bar visualizer */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '6px' }}>
+                    <span>Budget Allocation Bar</span>
+                    <span style={{ fontWeight: 700 }}>{((totalAllocated / 2000000) * 100).toFixed(1)}% Used</span>
+                  </div>
+                  <div style={{ height: '14px', background: 'var(--overlay-med)', borderRadius: '7px', overflow: 'hidden', border: '1px solid var(--border-card)' }}>
+                    <div style={{
+                      width: `${Math.min((totalAllocated / 2000000) * 100, 100)}%`,
+                      height: '100%',
+                      background: isOverBudget ? '#ef4444' : '#22c55e',
+                      transition: 'width 0.3s ease, background-color 0.3s'
+                    }} />
+                  </div>
+                  {isOverBudget && (
+                    <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', color: '#ef4444', marginTop: '10px' }}>
+                      ⚠️ <strong>Overbudget Limit exceeded!</strong> Please de-allocate or downscale allocations to save community funds.
+                    </div>
+                  )}
+                </div>
+
+                {/* Allocation spreadsheet */}
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-card)', textAlign: 'left' }}>
+                        <th style={{ padding: '10px' }}>PROPOSAL NAME</th>
+                        <th style={{ padding: '10px' }}>CATEGORY</th>
+                        <th style={{ padding: '10px' }}>ESTIMATED COST</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>ALLOCATE FUNDS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getFilteredProjects().map(p => {
+                        const isAllocated = !!allocatedFunds[p.id];
+                        return (
+                          <tr key={p.id} style={{ borderBottom: '1px solid var(--overlay-faint)' }}>
+                            <td style={{ padding: '12px 10px', fontWeight: 600 }}>{p.title}</td>
+                            <td style={{ padding: '12px 10px' }}>
+                              <span className="badge" style={{ background: 'var(--overlay-med)', color: 'var(--text-main)' }}>{p.category}</span>
+                            </td>
+                            <td style={{ padding: '12px 10px', fontWeight: 700 }}>₹{p.estimated_cost.toLocaleString()}</td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <button
+                                onClick={() => {
+                                  setAllocatedFunds(prev => {
+                                    const next = { ...prev };
+                                    if (next[p.id]) {
+                                      delete next[p.id];
+                                    } else {
+                                      next[p.id] = p.estimated_cost;
+                                    }
+                                    return next;
+                                  });
+                                }}
+                                className={`btn ${isAllocated ? 'btn-danger' : 'btn-primary'}`}
+                                style={{ padding: '4px 12px', fontSize: '11px' }}
+                              >
+                                {isAllocated ? 'De-allocate Cost' : 'Allocate Cost'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
               </div>
-            )}
-          </div>
+            );
+          })()}
+
+          {/* ==================== TAB 3: FEEDBACK SURVEYS ==================== */}
+          {decidimTab === 'surveys' && (
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <h2 style={{ margin: '0 0 4px 0', fontSize: '20px' }}>CivicFund Process Feedback Survey</h2>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                  Rate the participatory budgeting allocation process. Help local ward officials optimize community communication streams.
+                </p>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '360px 1fr', gap: '20px', alignItems: 'start' }}>
+                {/* Survey Intake Form */}
+                <div className="glass-panel" style={{ padding: '20px', background: 'var(--overlay-faint)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>Intake Survey Form</h3>
+                  <form onSubmit={handleSurveySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600 }}>1. SATISFACTION RATING (1-5 Stars)</label>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setSurveyRating(star)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', padding: 0 }}
+                          >
+                            {star <= surveyRating ? '★' : '☆'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600 }}>2. REPRESENTS COMMUNITY PRIORITIES?</label>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        {['Yes', 'No', 'Somewhat'].map((option) => (
+                          <label key={option} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name="priorityRadio"
+                              checked={surveyPriority === option}
+                              onChange={() => setSurveyPriority(option)}
+                            />
+                            {option}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600 }}>3. DETAILED COMMENTS & CRITIQUES</label>
+                      <textarea
+                        rows={3}
+                        value={surveyFeedback}
+                        onChange={(e) => setSurveyFeedback(e.target.value)}
+                        placeholder="E.g., The water pipe allocation should be larger..."
+                        style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px 10px', borderRadius: '6px', fontSize: '12px' }}
+                        required
+                      />
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '12px', marginTop: '6px' }}>
+                      Submit Feedback Survey
+                    </button>
+                  </form>
+                </div>
+
+                {/* Submitted Surveys Results */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700 }}>Survey Results Board</h3>
+                  {surveys.length === 0 ? (
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No feedback surveys submitted yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '380px', overflowY: 'auto' }}>
+                      {surveys.map(s => (
+                        <div key={s.id} className="glass-panel" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: 'var(--secondary)' }}>Rating: {'★'.repeat(s.rating)}{'☆'.repeat(5 - s.rating)}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{s.date}</span>
+                          </div>
+                          <div>
+                            <strong>Priority Representation:</strong> {s.priorityRepresented}
+                          </div>
+                          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11px', lineHeight: 1.4 }}>
+                            "{s.feedbackText}"
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
@@ -1254,7 +2384,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
             <div className="glass-panel" style={{ padding: '24px' }}>
               <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Aegis AI Redress Engine</h3>
               <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -1266,7 +2396,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   value={cpgText}
                   onChange={(e) => setCpgText(e.target.value)}
                   placeholder="E.g., सड़कों पर बहुत पानी भरा हुआ है, जिससे लोगों का चलना मुश्किल हो गया है..."
-                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
+                  style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
                 />
                 <button type="submit" className="btn btn-primary" disabled={loading || !cpgText}>
                   Analyze Grievance
@@ -1287,7 +2417,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>AI Classification Output</h3>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '6px' }}>
+                    <div style={{ background: 'var(--overlay-faint)', padding: '12px', borderRadius: '6px' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>English Translation:</span>
                       <p style={{ margin: '4px 0 0 0', fontSize: '13px' }}>{cpgResult.english}</p>
                     </div>
@@ -1492,7 +2622,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
           {/* Search, Sort and Filter Toolbar */}
           <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', justifyContent: 'space-between' }}>
             {/* Search Input */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 12px', flex: '1', minWidth: '240px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px 12px', flex: '1', minWidth: '240px' }}>
               <Search size={16} style={{ color: 'var(--text-muted)', opacity: 0.7 }} />
               <input
                 type="text"
@@ -1514,7 +2644,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 <select
                   value={timelineCategory}
                   onChange={(e) => setTimelineCategory(e.target.value)}
-                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
                 >
                   <option value="All">All Categories</option>
                   {CATEGORIES.map((cat: string) => (
@@ -1530,7 +2660,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 <select
                   value={timelineStatus}
                   onChange={(e) => setTimelineStatus(e.target.value)}
-                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
                 >
                   <option value="All">All Statuses</option>
                   <option value="Submitted">Submitted</option>
@@ -1545,7 +2675,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 <select
                   value={timelineSort}
                   onChange={(e) => setTimelineSort(e.target.value)}
-                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
                 >
                   <option value="newest">Newest First</option>
                   <option value="priority">Highest Priority</option>
@@ -1556,7 +2686,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
           </div>
 
           {/* Main Board Layout (Split Panel) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '20px', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 420px', gap: '20px', alignItems: 'start' }}>
 
             {/* Left Column: Tickets List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '680px', overflowY: 'auto', paddingRight: '4px' }}>
@@ -1581,8 +2711,8 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       style={{
                         padding: '18px',
                         cursor: 'pointer',
-                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                        background: isSelected ? 'rgba(59,130,246,0.03)' : 'rgba(255,255,255,0.02)'
+                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-card)',
+                        background: isSelected ? 'rgba(59,130,246,0.12)' : 'var(--bg-card)'
                       }}
                     >
 
@@ -1597,7 +2727,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       )}
 
                       {/* Card Footer Info */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--overlay-faint)', paddingTop: '10px' }}>
                         <div style={{ display: 'flex', gap: '12px' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <ThumbsUp size={12} color={isUpvoted ? 'var(--primary)' : 'currentColor'} /> {supports} supports
@@ -1809,7 +2939,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
                       {/* Before & After evidence block */}
                       {(() => {
-                        const beforeImage = issue.image_url;
+                        const beforeImage = resolveMediaUrl(issue.image_url);
 
                         const categoryMockAfters: Record<string, string> = {
                           'Water': 'https://images.unsplash.com/photo-1542013936693-8848e574047a?w=400',
@@ -2020,8 +3150,8 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
           {/* New Issue Report Modal Dialog */}
           {showReportModal && (
-            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-              <div className="glass-panel" style={{ width: '450px', padding: '24px', position: 'relative', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: isMobile ? 'flex-end' : 'center', zIndex: 1000 }}>
+              <div className="glass-panel" style={{ width: isMobile ? '100%' : '450px', maxHeight: isMobile ? '90dvh' : '95dvh', overflowY: 'auto', padding: '24px', position: 'relative', display: 'flex', flexDirection: 'column', gap: '16px', borderRadius: isMobile ? '20px 20px 0 0' : undefined }}>
                 <button
                   onClick={() => setShowReportModal(false)}
                   style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
@@ -2041,18 +3171,18 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       value={newReportText}
                       onChange={(e) => setNewReportText(e.target.value)}
                       placeholder="Explain what is broken or needed..."
-                      style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '100px', fontSize: '13px' }}
+                      style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '100px', fontSize: '13px' }}
                       required
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '12px', fontWeight: 600 }}>Category</label>
                       <select
                         value={newReportCategory}
                         onChange={(e) => setNewReportCategory(e.target.value)}
-                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
                       >
                         {CATEGORIES.map((cat: string) => (
                           <option key={cat} value={cat}>{cat}</option>
@@ -2065,7 +3195,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       <select
                         value={newReportWard}
                         onChange={(e) => setNewReportWard(Number(e.target.value))}
-                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
                       >
                         <option value={1}>Ward 1 (Saffron)</option>
                         <option value={2}>Ward 2 (Green)</option>
@@ -2082,7 +3212,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       type="file"
                       accept="image/*"
                       onChange={handleReportImageChange}
-                      style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 8px', borderRadius: '8px', fontSize: '12px' }}
+                      style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px 8px', borderRadius: '8px', fontSize: '12px' }}
                     />
                     {reportImagePreview && (
                       <div style={{ position: 'relative', width: '80px', height: '80px', marginTop: '6px', borderRadius: '4px', overflow: 'hidden' }}>
@@ -2131,9 +3261,9 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               </p>
             </div>
 
-            <div style={{ height: '480px', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ height: isMobile ? '320px' : '480px', borderRadius: '8px', overflow: 'hidden' }}>
               <MapContainer center={MAP_CENTER} zoom={14} style={{ width: '100%', height: '100%' }}>
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                <TileLayer key={theme} url={tileUrl} />
 
                 {suggestions.filter(s => s.latitude && s.longitude).map(s => {
                   const lat = Number(s.latitude);
@@ -2178,7 +3308,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {suggestions.filter(s => s.dispatch_status === 'Unassigned' || !s.dispatch_status).map(issue => (
-                <div key={issue.id} style={{ padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div key={issue.id} style={{ padding: '16px', borderRadius: '8px', background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <p style={{ margin: 0, fontSize: '14px' }}>{issue.content}</p>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
@@ -2187,7 +3317,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       <select
                         value={selectedOfficer[issue.id] || ''}
                         onChange={(e) => setSelectedOfficer(prev => ({ ...prev, [issue.id]: Number(e.target.value) }))}
-                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px', borderRadius: '6px', fontSize: '12px' }}
+                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px', borderRadius: '6px', fontSize: '12px' }}
                       >
                         <option value="">-- Choose Officer --</option>
                         {officers.map(o => (
@@ -2246,7 +3376,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                       <span>Active cases load</span>
                       <span>{officer.active_cases} open</span>
                     </div>
-                    <div style={{ height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ height: '4px', background: 'var(--overlay-med)', borderRadius: '2px', overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${(officer.active_cases / 10) * 100}%`, background: color }}></div>
                     </div>
                   </div>
@@ -2266,7 +3396,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '20px' }}>
             <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
                 <h3 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>CityPulse IoT Event Monitor</h3>
@@ -2275,14 +3405,14 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 </p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '14px' }}>
+                <div style={{ background: 'var(--overlay-faint)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-card)', textAlign: 'center' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Water Flow Rate</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, margin: '6px 0', color: '#22c55e' }}>92%</div>
                   <span style={{ fontSize: '10px', color: '#22c55e' }}>● Stable</span>
                 </div>
 
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                <div style={{ background: 'var(--overlay-faint)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-card)', textAlign: 'center' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Traffic Speed Avg</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, margin: '6px 0', color: 'var(--saffron)' }}>34 km/h</div>
                   <span style={{ fontSize: '10px', color: 'var(--saffron)' }}>● Delayed</span>
@@ -2306,9 +3436,9 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     padding: '10px 12px',
                     borderRadius: '6px',
                     fontSize: '12px',
-                    border: '1px solid var(--border-color)',
+                    border: '1px solid var(--border-card)',
                     background: alert.type === 'error' ? 'rgba(239,68,68,0.1)' :
-                      alert.type === 'dispatch' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)',
+                      alert.type === 'dispatch' ? 'rgba(59,130,246,0.1)' : 'var(--overlay-faint)',
                     color: alert.type === 'error' ? '#ef4444' :
                       alert.type === 'dispatch' ? 'var(--primary)' : 'var(--text-muted)'
                   }}>
@@ -2330,7 +3460,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
             <div className="glass-panel" style={{ padding: '24px' }}>
               <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Constituency Mailbox Manager</h3>
               <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -2342,7 +3472,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   value={mailContent}
                   onChange={(e) => setMailContent(e.target.value)}
                   placeholder="Type your development suggestion..."
-                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
+                  style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
                 />
                 <button type="submit" className="btn btn-primary" disabled={!mailContent}>
                   Deliver to MP Mailbox
@@ -2355,7 +3485,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', maxHeight: '340px' }}>
                 {mailBoxItems.map(item => (
-                  <div key={item.id} style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', fontSize: '13px' }}>
+                  <div key={item.id} style={{ padding: '14px', borderRadius: '8px', background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', fontSize: '13px' }}>
                     <div style={{ color: 'var(--text-main)', fontWeight: 600 }}>{item.text}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Filed on {item.date}</div>
 

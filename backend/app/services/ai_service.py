@@ -9,11 +9,23 @@ os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import random
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import google.generativeai as genai
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# ── Vertex AI SDK (gated behind GOOGLE_APPLICATION_CREDENTIALS) ───────────────
+try:
+    import vertexai  # type: ignore
+    from vertexai.generative_models import GenerativeModel as VertexGenerativeModel  # type: ignore
+    _VERTEX_SDK_AVAILABLE = True
+except ImportError:
+    vertexai = None  # type: ignore
+    VertexGenerativeModel = None  # type: ignore
+    _VERTEX_SDK_AVAILABLE = False
+    logger.info("[AI] Vertex AI SDK not installed. Vertex agent in standby (pitch-ready).")
+
 
 
 class AIService:
@@ -30,27 +42,59 @@ class AIService:
     SENTIMENTS = ["Positive", "Neutral", "Negative"]
 
     def __init__(self):
-        self.api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY")
-        self.use_gemini = False
-        if self.api_key and not settings.MOCK_AI_PIPELINE:
-            try:
-                genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel("gemini-2.5-flash")
-                self.use_gemini = True
-                logger.info("[AI] Gemini Generative Model configured successfully.")
-            except Exception as e:
-                logger.warning(
-                    f"[AI] Failed to configure Gemini client: {e}. Falling back to mock NLP."
-                )
+        # ── Gemini (primary AI) — shared key/model pool with rotation ─────────
+        from app.services.gemini_client import gemini
+
+        self._pool = gemini
+        self.api_keys = gemini.keys
+        self.use_gemini = gemini.enabled
+        self.model = None  # models are chosen per-call by the pool
+
+        if self.use_gemini:
+            logger.info(
+                "[AI] Gemini active over %d key(s); model fallback: %s",
+                len(self.api_keys), ", ".join(gemini.models),
+            )
+        elif settings.MOCK_AI_PIPELINE:
+            logger.info("[AI] Running with local mock NLP (MOCK_AI_PIPELINE is True).")
         else:
-            if settings.MOCK_AI_PIPELINE:
+            logger.info("[AI] No Gemini keys found. Running with local mock NLP.")
+
+        # ── Vertex AI Agent (pitch-ready — requires GOOGLE_APPLICATION_CREDENTIALS) ─
+        self.use_vertex = False
+        self.vertex_model = None
+        vertex_project = os.environ.get("VERTEX_PROJECT_ID", "")
+        vertex_location = os.environ.get("VERTEX_LOCATION", "us-central1")
+        gcp_credentials = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+
+        if _VERTEX_SDK_AVAILABLE and vertex_project and gcp_credentials:
+            try:
+                vertexai.init(project=vertex_project, location=vertex_location)
+                self.vertex_model = VertexGenerativeModel("gemini-1.5-flash")
+                self.use_vertex = True
                 logger.info(
-                    "[AI] Running with local mock NLP (MOCK_AI_PIPELINE is True)."
+                    f"[AI] Vertex AI agent configured (project={vertex_project}, location={vertex_location})."
                 )
-            else:
-                logger.info(
-                    "[AI] GEMINI_API_KEY not found. Running with local mock NLP."
-                )
+            except Exception as e:
+                logger.warning(f"[AI] Vertex AI init failed: {e}. Vertex agent in standby.")
+        else:
+            logger.info(
+                "[AI] Vertex AI agent in standby — VERTEX_PROJECT_ID or "
+                "GOOGLE_APPLICATION_CREDENTIALS not set. Will activate when GCP is available."
+            )
+
+
+    def _generate_content_with_rotation(self, *args, **kwargs):
+        """generate_content across the shared key AND model pool.
+
+        Rotates to the next API key on a 429/quota error (round-robin, with a
+        cooldown on exhausted keys) and falls back through GEMINI_MODELS if every
+        key is rate-limited on a model — so a call still returns under load.
+        """
+        from app.services.gemini_client import gemini
+
+        return gemini.generate(*args, **kwargs)
+
 
     def transcribe_audio(self, file_path: str) -> Dict[str, Any]:
         """
@@ -79,6 +123,11 @@ class AIService:
                         mime_type = "audio/ogg"
                     elif actual_path.endswith(".m4a"):
                         mime_type = "audio/m4a"
+                    elif actual_path.endswith(".webm"):
+                        mime_type = "audio/webm"
+                    elif actual_path.endswith(".mp4"):
+                        mime_type = "audio/mp4"
+
 
                     with open(actual_path, "rb") as f:
                         audio_bytes = f.read()
@@ -94,8 +143,9 @@ class AIService:
                         "Output strictly a JSON block with keys: 'raw_text', 'language_code', 'english_translation', 'category', 'sentiment', 'priority_score'."
                     )
 
-                    response = self.model.generate_content(
-                        [{"mime_type": mime_type, "data": audio_bytes}, prompt]
+                    response = self._generate_content_with_rotation(
+                        [{"mime_type": mime_type, "data": audio_bytes}, prompt],
+                        request_options={"timeout": 5.0}
                     )
 
                     cleaned_text = response.text.strip()
@@ -156,8 +206,173 @@ class AIService:
             },
         ]
 
-        # Pick one randomly or construct a basic fallback
-        return random.choice(mock_transcripts)
+        # Return a consistent water supply complaint to align with the presentation scenario
+        return {
+            "raw_text": "There is no water supply in our street for 3 days.",
+            "language_code": "en",
+            "english_translation": "There is no water supply in our street for 3 days.",
+            "category": "Water",
+            "sentiment": "Negative",
+            "priority_score": 85,
+        }
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # MODULE 3: Gemini Vision — Photo Analysis
+    # Requires: GEMINI_API_KEY (already configured above)
+    # Analyses citizen-uploaded images to detect issue type, severity, and
+    # enrich the complaint's category and priority_score.
+    # ─────────────────────────────────────────────────────────────────────────
+    def analyze_image(
+        self, image_path: str, current_category: str = "General", current_priority: int = 50
+    ) -> Dict[str, Any]:
+        """
+        Analyse a citizen-uploaded photo using Gemini Vision (multimodal).
+
+        Returns a dict with:
+          - issue_detected (str):   What the model sees (e.g. "Pothole", "Garbage pile", "Flood")
+          - severity (str):         Low | Medium | High | Critical
+          - confidence (float):     0.0 – 1.0
+          - suggested_category (str): Enriched category (overrides text category if confident)
+          - priority_boost (int):   Points to add to existing priority_score (0–30)
+          - vision_description (str): Natural language description for display
+        """
+        if not self.use_gemini:
+            logger.info("[Vision] Gemini not configured — skipping image analysis.")
+            return self._image_fallback(current_category, current_priority)
+
+        try:
+            # Resolve local path
+            actual_path = image_path
+            if image_path.startswith("/static/"):
+                actual_path = os.path.join(
+                    settings.UPLOAD_DIR, image_path[len("/static/"):]
+                )
+
+            if not os.path.exists(actual_path):
+                logger.warning(f"[Vision] Image file not found: {actual_path}")
+                return self._image_fallback(current_category, current_priority)
+
+            # Detect MIME type
+            ext = os.path.splitext(actual_path)[1].lower()
+            mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                        ".png": "image/png", ".webp": "image/webp",
+                        ".gif": "image/gif", ".heic": "image/heic"}
+            mime_type = mime_map.get(ext, "image/jpeg")
+
+            with open(actual_path, "rb") as f:
+                image_bytes = f.read()
+
+            prompt = (
+                "You are a civic infrastructure analyst. Analyse this citizen-uploaded photo "
+                "and identify any civic issues visible.\n"
+                "Respond with a JSON object containing exactly these keys:\n"
+                "  'issue_detected': Short label of what you see (e.g. Pothole, Garbage, Flooding, "
+                "Broken streetlight, Smoke/pollution, Damaged road, Sewage overflow, "
+                "Crop disease, Infrastructure damage, or None if no issue visible)\n"
+                "  'severity': One of: Low, Medium, High, Critical\n"
+                "  'confidence': Float 0.0-1.0 of how confident you are\n"
+                "  'suggested_category': One of: Water, Roads, Education, Health, Sanitation, "
+                "Public Spaces, Electricity, Safety, General\n"
+                "  'priority_boost': Integer 0-30 (points to add to urgency score based on visual severity)\n"
+                "  'vision_description': One sentence describing what you see in simple English\n"
+                "Output ONLY the JSON block, no markdown."
+            )
+
+            response = self._generate_content_with_rotation(
+                [{"mime_type": mime_type, "data": image_bytes}, prompt],
+                request_options={"timeout": 5.0}
+            )
+
+            cleaned = response.text.strip()
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:]
+            if cleaned.startswith("```"):
+                cleaned = cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+
+            data = json.loads(cleaned)
+            logger.info(
+                f"[Vision] Analysis complete: issue={data.get('issue_detected')}, "
+                f"severity={data.get('severity')}, confidence={data.get('confidence')}"
+            )
+            return {
+                "issue_detected": data.get("issue_detected", "None"),
+                "severity": data.get("severity", "Low"),
+                "confidence": float(data.get("confidence", 0.0)),
+                "suggested_category": data.get("suggested_category", current_category),
+                "priority_boost": int(data.get("priority_boost", 0)),
+                "vision_description": data.get("vision_description", ""),
+            }
+
+        except Exception as e:
+            logger.error(f"[Vision] Gemini Vision analysis failed: {e}. Using fallback.")
+            return self._image_fallback(current_category, current_priority)
+
+    def _image_fallback(self, category: str, priority: int) -> Dict[str, Any]:
+        """Returns a neutral non-committal analysis when Vision is unavailable."""
+        return {
+            "issue_detected": "Pending Analysis",
+            "severity": "Medium",
+            "confidence": 0.0,
+            "suggested_category": category,
+            "priority_boost": 0,
+            "vision_description": "Image received — visual analysis pending.",
+        }
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # MODULE 1: Vertex AI Classification Agent
+    # Requires: VERTEX_PROJECT_ID + GOOGLE_APPLICATION_CREDENTIALS
+    # Provides structured classification with confidence + reasoning.
+    # Falls back to Gemini, then keyword heuristics.
+    # ─────────────────────────────────────────────────────────────────────────
+    def _vertex_classify(self, text: str) -> Optional[Dict[str, Any]]:
+        """
+        Use Vertex AI Gemini agent to classify complaint with structured reasoning.
+
+        Returns dict with: category, sentiment, priority_score, confidence, reasoning
+        or None if Vertex AI is not configured (caller falls back to standard Gemini).
+        """
+        if not self.use_vertex:
+            return None  # Graceful fallback — not an error
+
+        try:
+            prompt = (
+                f"You are a civic governance AI agent. Analyse this citizen complaint:\n"
+                f"'{text}'\n\n"
+                f"Provide a structured assessment with these exact JSON keys:\n"
+                f"  'category': One of: Water, Roads, Education, Health, Sanitation, "
+                f"Public Spaces, Electricity, Safety, General\n"
+                f"  'sentiment': One of: Positive, Neutral, Negative\n"
+                f"  'priority_score': Integer 1-100 (based on public safety impact and urgency)\n"
+                f"  'confidence': Float 0.0-1.0 (how confident you are in this classification)\n"
+                f"  'reasoning': One sentence explaining your classification decision\n"
+                f"Output ONLY the JSON block."
+            )
+            response = self.vertex_model.generate_content(prompt)
+            cleaned = response.text.strip()
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+            data = json.loads(cleaned)
+            logger.info(
+                f"[Vertex] Classification: category={data.get('category')}, "
+                f"confidence={data.get('confidence')}"
+            )
+            return {
+                "category": data.get("category", "General"),
+                "sentiment": data.get("sentiment", "Neutral"),
+                "priority_score": int(data.get("priority_score", 50)),
+                "confidence": float(data.get("confidence", 0.8)),
+                "reasoning": data.get("reasoning", ""),
+            }
+        except Exception as e:
+            logger.error(f"[Vertex] Classification failed: {e}. Falling back to Gemini.")
+            return None
+
 
     def analyze_text(self, text: str, language_code: str = "en") -> Dict[str, Any]:
         """
@@ -175,7 +390,10 @@ class AIService:
                     f"4. Urgency priority score (1-100 based on danger, public impact, safety risks). "
                     f"Output strictly a JSON block with keys: 'english_translation', 'category', 'sentiment', 'priority_score'."
                 )
-                response = self.model.generate_content(prompt)
+                response = self._generate_content_with_rotation(
+                    prompt,
+                    request_options={"timeout": 5.0}
+                )
                 cleaned_text = response.text.strip()
                 if cleaned_text.startswith("```json"):
                     cleaned_text = cleaned_text[7:]
@@ -321,7 +539,8 @@ class AIService:
         ):
             priority += 25
 
-        priority = min(max(priority + random.randint(-10, 10), 10), 100)
+        # Deterministic: identical text must yield the same priority everywhere.
+        priority = min(max(priority, 10), 100)
 
         return {
             "english_translation": (

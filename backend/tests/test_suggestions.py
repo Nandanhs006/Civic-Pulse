@@ -15,8 +15,11 @@ def test_submit_text_suggestion(client):
     data = response.json()
     assert data["content"] == "Road water leakage near city hall."
     assert data["category"] == "Water"  # Categorized by mock NLP rule
-    assert data["status"] == "Submitted"
     assert "priority_score" in data
+    # A routine (non-critical) issue is AUTO-routed by AI to its department and
+    # advanced to the Assigned stage; only critical ones stay for MP review.
+    assert data["department"] == "BWSSB (Water Supply)"
+    assert data["status"] in ("Approved", "Submitted")
 
 
 def test_submit_audio_suggestion(client):
@@ -74,8 +77,8 @@ def test_get_bigquery_federated_analytics(client):
     data = res.json()
     assert data["connection_status"] == "Dashboard Connection (Live Sync)"
     assert "avg_tat_days" in data
-    assert "dispatch_saturation" in data
-    assert "officer_load" in data
+    assert "resolution_rate" in data
+    assert isinstance(data["pipeline"], list) and len(data["pipeline"]) == 5
 
 
 def test_suggestion_uuid_prefix_and_rollback(client, db):

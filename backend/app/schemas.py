@@ -27,7 +27,16 @@ class UserOut(UserBase):
     id: int
     role: Optional[str] = None
     constituency_id: Optional[int] = None
+    phone: Optional[str] = None
+    phone_verified: Optional[bool] = False
     model_config = ConfigDict(from_attributes=True)
+
+
+class PhoneLoginRequest(BaseModel):
+    """Firebase Phone-Auth: the client sends the Firebase ID token it obtained
+    after the SMS OTP was confirmed (or a "mock:<phone>" token in demo mode)."""
+    id_token: str
+    full_name: Optional[str] = None
 
 
 # Ward Schemas
@@ -77,9 +86,18 @@ class SuggestionOut(BaseModel):
     assembly_constituency_id: Optional[int] = None
     assigned_officer_id: Optional[int] = None
     dispatch_status: Optional[str] = "Unassigned"
+    department: Optional[str] = None
+    # AI Enhancement Fields
+    ai_confidence: Optional[float] = None
+    ai_reasoning: Optional[str] = None
+    image_analysis: Optional[str] = None   # JSON string of vision output
+    is_duplicate: bool = False
+    duplicate_of_id: Optional[str] = None
+    citizen_verified: Optional[bool] = False
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 
 # Public map issue (no citizen phone / PII)
@@ -98,6 +116,10 @@ class MapIssueOut(BaseModel):
     assembly_constituency_id: Optional[int] = None
     ward_id: Optional[int] = None
     created_at: datetime
+    state: Optional[str] = None
+    city: Optional[str] = None
+    mp: Optional[str] = None
+    citizen_verified: Optional[bool] = False
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -239,3 +261,95 @@ class WardOfficerOut(BaseModel):
 class WardDispatchInput(BaseModel):
     suggestion_id: str
     officer_id: int
+
+
+# Women-safety SOS ("amplify + inform" model). Anonymized — no personal data.
+class SosRequest(BaseModel):
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    note: Optional[str] = None
+    share_precise: bool = False  # share exact location with responders who ack
+
+
+class SosResponse(BaseModel):
+    incident_id: Optional[int] = None
+    logged: bool = True  # False when outside the Bengaluru service area
+    emergency_number: str = "112"  # India ERSS / national emergency number
+    resolve_token: Optional[str] = None  # secret for the creator to mark-safe
+    share_precise: bool = False
+    credibility_score: Optional[int] = None   # advisory triage — never suppresses
+    credibility_level: Optional[str] = None
+    credibility_note: Optional[str] = None
+    constituency: Optional[ConstituencyOut] = None
+    mp: Optional[MPOut] = None
+    message: str
+
+
+class MessageRequest(BaseModel):
+    responder_id: str
+    text: str
+    is_owner: bool = False
+
+
+class MessageOut(BaseModel):
+    id: int
+    responder_id: str
+    is_owner: bool = False
+    text: str
+    created_at: Optional[datetime] = None
+
+
+class AckRequest(BaseModel):
+    responder_id: str          # anonymous browser token (localStorage)
+    responding: bool = False   # True = "I'm heading over"
+
+
+class ResolveRequest(BaseModel):
+    resolve_token: str
+
+
+class ShareRequest(BaseModel):
+    resolve_token: str
+    share_precise: bool
+
+
+class IncidentStatus(BaseModel):
+    incident_id: int
+    status: str
+    aware_count: int = 0
+    responding_count: int = 0
+    share_precise: bool = False
+
+
+class SafetyIncidentPoint(BaseModel):
+    id: int
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    constituency_id: Optional[int] = None
+    hour: Optional[int] = None
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SafetySummary(BaseModel):
+    total: int = 0
+    last_30_days: int = 0
+    by_hour: List[int] = []  # 24 buckets, index = hour of day (local server time)
+
+
+# Sync Schemas
+class SuggestionSyncIn(BaseModel):
+    offline_uuid: str
+    content: Optional[str] = None
+    citizen_phone: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    constituency_id: Optional[int] = None
+    language_code: Optional[str] = "en"
+    created_at_offline: Optional[str] = None
+
+
+class SuggestionSyncOut(BaseModel):
+    offline_uuid: str
+    live_id: Optional[str] = None
+    status: str  # "synced", "duplicate", "error"

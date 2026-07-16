@@ -1,14 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import apiClient from '../services/apiClient';
-import { Mic, MicOff, Send, CheckCircle2, Image, MapPin, Loader2, UserCheck, Trash2 } from 'lucide-react';
+import { Mic, MicOff, Send, CheckCircle2, Image, MapPin, Loader2, UserCheck, Trash2, Brain, BadgeCheck, ShieldCheck } from 'lucide-react';
 import { Suggestion, Constituency, MP, Hierarchy } from '../types';
 import ConstituencyPicker, { Autofill } from '../components/common/ConstituencyPicker';
+import IssueTimeline from '../components/common/IssueTimeline';
 import Avatar from '../components/common/Avatar';
 import RoutingTree from '../components/common/RoutingTree';
+import PhoneAuthModal from '../components/common/PhoneAuthModal';
 import { useLang } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 const Portal: React.FC = () => {
+  const isMobile = useIsMobile();
+  const { user } = useAuth();
+  const [showPhoneAuth, setShowPhoneAuth] = useState(false);
   const [phone, setPhone] = useState('');
   const [content, setContent] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -26,6 +33,8 @@ const Portal: React.FC = () => {
   const [sentToMp, setSentToMp] = useState<MP | null>(null);
 
   const { isRecording, audioBlob, duration, startRecording, stopRecording, deleteRecording } = useAudioRecorder();
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcriptionPreview, setTranscriptionPreview] = useState<string | null>(null);
 
   // Object URL for reviewing the captured clip; revoked when the blob changes.
   const audioUrl = useMemo(() => (audioBlob ? URL.createObjectURL(audioBlob) : null), [audioBlob]);
@@ -34,6 +43,35 @@ const Portal: React.FC = () => {
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
   }, [audioUrl]);
+
+  // Automatic audio transcription on completion
+  useEffect(() => {
+    if (!audioBlob) {
+      setTranscriptionPreview(null);
+      return;
+    }
+
+    const autoTranscribe = async () => {
+      setTranscribing(true);
+      const formData = new FormData();
+      // Use webm container to match native browser recordings
+      formData.append('audio', audioBlob, 'temp_audio.webm');
+      try {
+        const response = await apiClient.post<{ transcript: string }>('/api/v1/suggestions/transcribe', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setTranscriptionPreview(response.data.transcript);
+        setContent(response.data.transcript);
+      } catch (err) {
+        console.warn('Audio transcription preview failed:', err);
+      } finally {
+        setTranscribing(false);
+      }
+    };
+
+    autoTranscribe();
+  }, [audioBlob]);
+
   const { t } = useLang();
 
   // Tree follows the SELECTED constituency. The GPS-derived MLA/civic tiers are
@@ -48,18 +86,30 @@ const Portal: React.FC = () => {
     };
   }, [constituency, targetMp, hierarchy]);
 
-  // Capture GPS on mount (used as supporting metadata / map pin / auto-detect).
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
-          setGpsReal(true);
-        },
-        () => setCoords({ lat: 22.9734, lng: 78.6569 }) // fallback: centre of India (not auto-detected)
-      );
-    }
+  // Request the browser location and drive constituency auto-detection.
+  // Reusable so it runs on mount AND from an explicit "Detect location" button
+  // (a user gesture is what reliably resolves the permission prompt in many
+  // browsers — otherwise autofill silently waits for one).
+  const requestLocation = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setDetecting(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+        setGpsReal(true);
+      },
+      () => {
+        setCoords({ lat: 22.9734, lng: 78.6569 }); // fallback: centre of India (not auto-detected)
+        setGpsReal(false);
+        setDetecting(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
   }, []);
+
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
 
   // Auto-detect constituency from real GPS: precise boundary lookup first,
   // then fall back to reverse-geocoded name matching if that misses.
@@ -149,9 +199,15 @@ const Portal: React.FC = () => {
     if (imageFile) formData.append('image', imageFile, imageFile.name);
 
     try {
-      const response = await apiClient.post<Suggestion>('/api/v1/suggestions/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const response = await apiClient.post<Suggestion & { is_spam?: boolean; message?: string }>(
+        '/api/v1/suggestions/', formData, { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      // AI dropped it as a test / non-issue — don't show the success flow.
+      if (response.data.is_spam) {
+        alert(response.data.message || t('portal.spamRejected'));
+        setSubmitting(false);
+        return;
+      }
       setSuccessData(response.data);
       setSentToMp(targetMp);
       setPhone('');
@@ -176,6 +232,11 @@ const Portal: React.FC = () => {
 
   return (
     <div style={{ maxWidth: '720px', margin: '10px auto', padding: '0 8px' }} className="animate-fade-in">
+      <PhoneAuthModal
+        open={showPhoneAuth}
+        onClose={() => setShowPhoneAuth(false)}
+        onSuccess={() => { if (user?.phone) setPhone(user.phone); }}
+      />
       <div style={{ marginBottom: '26px', textAlign: 'center' }}>
         <h1 style={{ fontSize: 'clamp(24px, 6vw, 34px)', marginBottom: '8px', color: 'var(--text-main)' }}>
           {t('portal.heroA')} <span style={{ color: 'var(--saffron)' }}>{t('portal.heroB')}</span>
@@ -189,6 +250,17 @@ const Portal: React.FC = () => {
         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px' }}>
           <CheckCircle2 size={60} color="var(--success)" />
           <h2 style={{ fontSize: '24px' }}>{t('portal.successTitle')}</h2>
+          <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-card)', padding: '10px 20px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', width: '100%', maxWidth: '320px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>COMPLAINT REFERENCE ID</span>
+            <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--accent)', fontFamily: 'monospace', letterSpacing: '0.1em' }}>
+              {successData.id.slice(0, 8).toUpperCase()}
+            </span>
+            {successData.citizen_phone && (
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                📲 Reference ID sent via SMS to {successData.citizen_phone}
+              </span>
+            )}
+          </div>
           {displayHierarchy?.parliamentary ? (
             <div style={{ width: '100%', textAlign: 'left' }}>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', textAlign: 'center' }}>
@@ -228,15 +300,43 @@ const Portal: React.FC = () => {
               </div>
             </div>
           </div>
+          {/* Live tracking timeline (with the citizen's tracking ID) */}
+          <div style={{ ...softPanel, width: '100%', textAlign: 'left' }}>
+            <IssueTimeline issueId={successData.id} />
+          </div>
           <button onClick={() => setSuccessData(null)} className="btn-primary" style={{ marginTop: '10px' }}>
             {t('portal.submitAnother')}
           </button>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+          {/* Verified-citizen prompt: OTP-verified reports carry a badge MPs act on */}
+          {user?.phone_verified ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--success)' }}>
+              <BadgeCheck size={16} /> Verified citizen{user.phone ? ` · ${user.phone}` : ''} — this report will be marked <strong>Verified</strong>.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', borderRadius: 8, padding: '10px 14px' }}>
+              <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+                Verify your mobile to earn a <strong style={{ color: 'var(--text-main)' }}>Verified citizen</strong> badge so your MP can act & contact you.
+              </span>
+              <button type="button" className="btn-secondary" onClick={() => setShowPhoneAuth(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12.5, whiteSpace: 'nowrap' }}>
+                <ShieldCheck size={14} /> Verify with OTP
+              </button>
+            </div>
+          )}
           {/* Constituency routing */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: isMobile ? 'flex-start' : 'center',
+                justifyContent: 'space-between',
+                flexDirection: isMobile ? 'column' : 'row',
+                gap: isMobile ? '4px' : '8px',
+              }}
+            >
               <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>
                 {t('portal.step1')}
               </label>
@@ -248,7 +348,17 @@ const Portal: React.FC = () => {
                 <span style={{ fontSize: '12px', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <MapPin size={12} /> {t('portal.autofilled')}
                 </span>
-              ) : null}
+              ) : (
+                <button
+                  onClick={requestLocation}
+                  style={{
+                    fontSize: '12px', color: 'var(--secondary)', background: 'none', border: 'none',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', padding: 0,
+                  }}
+                >
+                  <MapPin size={12} /> {t('portal.detectLocation')}
+                </button>
+              )}
             </div>
             <ConstituencyPicker value={constituency?.id ?? null} onChange={setConstituency} autofill={autofill} />
 
@@ -297,40 +407,69 @@ const Portal: React.FC = () => {
             </div>
 
             {audioBlob && !isRecording && audioUrl && (
-              <div
-                style={{
-                  ...softPanel,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
-                  {t('portal.reviewRecording')}
-                </span>
-                <audio controls src={audioUrl} style={{ flex: 1, minWidth: '180px', height: '36px' }} />
-                <button
-                  type="button"
-                  onClick={deleteRecording}
-                  title={t('portal.deleteRecording')}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div
                   style={{
+                    ...softPanel,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 12px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--danger)',
-                    background: 'transparent',
-                    color: 'var(--danger)',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
+                    gap: '12px',
+                    flexWrap: 'wrap',
                   }}
                 >
-                  <Trash2 size={16} />
-                  {t('portal.deleteRecording')}
-                </button>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                    {t('portal.reviewRecording')}
+                  </span>
+                  <audio controls src={audioUrl} style={{ flex: 1, minWidth: '180px', height: '36px' }} />
+                  <button
+                    type="button"
+                    onClick={deleteRecording}
+                    title={t('portal.deleteRecording')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid var(--danger)',
+                      background: 'transparent',
+                      color: 'var(--danger)',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Trash2 size={16} />
+                    {t('portal.deleteRecording')}
+                  </button>
+                </div>
+
+                {/* Transcription Preview Box */}
+                {(transcribing || transcriptionPreview) && (
+                  <div
+                    style={{
+                      ...softPanel,
+                      border: '1px dashed var(--secondary)',
+                      background: 'rgba(34, 197, 94, 0.04)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <Brain size={16} className={transcribing ? 'animate-pulse text-secondary' : 'text-secondary'} style={{ color: 'var(--secondary)' }} />
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--secondary)' }}>
+                        {transcribing ? 'Transcribing audio via AI...' : 'Speech-to-Text Preview (AI Transcribed)'}
+                      </span>
+                    </div>
+                    {transcribing ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        <Loader2 size={14} className="animate-spin" /> Processing voice intake...
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: '13px', fontStyle: 'italic', margin: 0, color: 'var(--text-main)' }}>
+                        "{transcriptionPreview}"
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

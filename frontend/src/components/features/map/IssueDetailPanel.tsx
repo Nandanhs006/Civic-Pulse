@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../../../services/apiClient';
 import { MapIssue, Hierarchy } from '../../../types';
 import { useLang } from '../../../context/LanguageContext';
+import { useAuth } from '../../../context/AuthContext';
 import RoutingTree from '../../common/RoutingTree';
+import IssueTimeline from '../../common/IssueTimeline';
 import { severityOf, SEVERITY_COLOR } from './severity';
-import { X, Image as ImageIcon, CalendarDays } from 'lucide-react';
+import { resolveMediaUrl } from '../../../services/media';
+import { X, Image as ImageIcon, CalendarDays, ListChecks, BadgeCheck } from 'lucide-react';
 
 interface IssueDetailPanelProps {
   issue: MapIssue;
@@ -23,6 +27,8 @@ const chip = (color?: string): React.CSSProperties => ({
 
 const IssueDetailPanel: React.FC<IssueDetailPanelProps> = ({ issue, onClose }) => {
   const { t } = useLang();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [hierarchy, setHierarchy] = useState<Hierarchy | null>(null);
   const [imgBroken, setImgBroken] = useState(false);
 
@@ -62,7 +68,7 @@ const IssueDetailPanel: React.FC<IssueDetailPanelProps> = ({ issue, onClose }) =
       {/* Photo */}
       {issue.image_url && !imgBroken ? (
         <img
-          src={issue.image_url}
+          src={resolveMediaUrl(issue.image_url)}
           alt="Issue"
           onError={() => setImgBroken(true)}
           style={{ width: '100%', height: 170, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border-card)' }}
@@ -75,6 +81,12 @@ const IssueDetailPanel: React.FC<IssueDetailPanelProps> = ({ issue, onClose }) =
 
       <p style={{ fontSize: '14px', color: 'var(--text-main)', margin: 0, lineHeight: 1.5 }}>{text}</p>
 
+      {issue.citizen_verified && (
+        <span className="badge" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)', width: 'fit-content' }}>
+          <BadgeCheck size={13} /> Verified citizen report
+        </span>
+      )}
+
       <div style={{ display: 'flex', gap: 16, fontSize: '12.5px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <CalendarDays size={14} /> {t('map.reported')}: {date}
@@ -83,11 +95,22 @@ const IssueDetailPanel: React.FC<IssueDetailPanelProps> = ({ issue, onClose }) =
         <span>{t('map.statusLabel')}: <strong style={{ color: 'var(--text-main)' }}>{t('status.' + issue.status)}</strong></span>
       </div>
 
+      {/* Tracking timeline */}
+      <div style={{ borderTop: '1px solid var(--border-subtle, rgba(128,128,128,.15))', paddingTop: 12 }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <ListChecks size={14} /> {t('track.heading')}
+        </div>
+        <IssueTimeline issueId={issue.id} canAdvance={user?.role === 'mp' || user?.role === 'pmo'} />
+      </div>
+
       <div>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
           {t('map.representatives')}
         </div>
-        <RoutingTree hierarchy={hierarchy} />
+        <RoutingTree
+          hierarchy={hierarchy}
+          onMpClick={user?.role === 'pmo' ? (cid) => navigate(`/pmo/mp/${cid}`) : undefined}
+        />
       </div>
     </div>
   );

@@ -1,13 +1,30 @@
 import { useState, useRef } from 'react';
 
+const getSupportedMimeType = (): string => {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/ogg',
+    'audio/mp4',
+  ];
+  for (const type of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+  return '';
+};
+
 export const useAudioRecorder = () => {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [duration, setDuration] = useState<number>(0);
-  
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mimeTypeRef = useRef<string>('');
 
   const startRecording = async () => {
     try {
@@ -16,7 +33,13 @@ export const useAudioRecorder = () => {
       setAudioBlob(null);
       setDuration(0);
 
-      const mediaRecorder = new MediaRecorder(stream);
+      const mimeType = getSupportedMimeType();
+      mimeTypeRef.current = mimeType;
+
+      const mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -26,10 +49,13 @@ export const useAudioRecorder = () => {
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const blob = new Blob(audioChunksRef.current, {
+          type: mimeTypeRef.current || mediaRecorder.mimeType || 'audio/webm',
+        });
         setAudioBlob(blob);
         stream.getTracks().forEach((track) => track.stop());
       };
+
 
       mediaRecorder.start();
       setIsRecording(true);

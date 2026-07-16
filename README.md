@@ -24,6 +24,7 @@ flowchart TD
     subgraph "Clients & Gateways"
         Citizen["Citizen Portal"]
         Admin["MP & PMO Admin Dashboard"]
+        Offline["Apps / Offline Channels"]
         Nginx["Nginx Reverse Proxy & Load Balancer"]
     end
 
@@ -38,7 +39,7 @@ flowchart TD
     end
 
     subgraph "Cloud Services & Media Storage"
-        AIService["Gemini 1.5 Flash AI API"]
+        AIService["Gemini Flash AI API"]
         FileService["File Upload Service"]
         GCS[("Google Cloud Storage (GCS)")]
     end
@@ -56,6 +57,7 @@ flowchart TD
     %% Connections
     Citizen -->|Voice/Text/Photo Suggestions| Nginx
     Admin -->|Dashboard API & Analytics Calls| Nginx
+    Offline -->|Sync suggestions & Webhooks| Nginx
     Nginx -->|Round-Robin Balance| FastAPI1
     Nginx -->|Round-Robin Balance| FastAPI2
 
@@ -81,7 +83,151 @@ flowchart TD
     Prom -->|Scrape / Query| Grafana
 ```
 
+### 📱 Mobile & Offline Intake Architecture
+
+For low-connectivity, cellular-only, and remote rural citizens:
+
+```
+┌───────────────────────────────── Citizen Channels ──────────────────────────────────┐
+│                                                                                     │
+│    [Mobile App (Flutter)]               [WhatsApp]                     [Basic SMS]  │
+│              │                               │                              │       │
+│       (Offline Queue)                 (Dialogflow CX)               (SMS Gateway API)│
+│              │                               │                              │       │
+│              ▼                               ▼                              ▼       │
+└──────────────┬───────────────────────────────┬──────────────────────────────┬───────┘
+               │                               │                              │
+               ▼                               ▼                              ▼
+    ┌──────────────────────────────────────────────────────────────────────────────────┐
+    │                         Civic Pulse HTTPS API Gateway                            │
+    └──────────────────────────────────────────────────────────────────────────────────┘
+```
+
 ---
+
+## 🧠 AI / ML Module Architecture
+
+`suggestion_service.py` is the main central engine (The Orchestrator) of the backend. It coordinates intake from all client sources and forwards payloads to the dedicated AI/ML services:
+
+```
+                  ┌──────────────────────────────────────────┐
+                  │   Intake (Web / Mobile App / WhatsApp)   │
+                  └────────────────────┬─────────────────────┘
+                                       │
+                                       ▼
+                  ┌──────────────────────────────────────────┐
+                  │          suggestion_service.py           │
+                  └──────┬─────────────┬──────────────┬──────┘
+                         │             │              │
+        ┌────────────────┴┐    ┌───────┴────────┐    ┌┴────────────────┐
+        │   Transcription │    │   AI Engine    │    │  Deduplication  │
+        │  (stt_service)  │    │  (ai_service)  │    │ (embedding_svc) │
+        └─────────────────┘    └────────────────┘    └─────────────────┘
+```
+
+The following spider diagram visualizes how the 8 core AI & Machine Learning modules interact, coordinate, and fall back during a citizen request lifespan:
+
+```mermaid
+flowchart TD
+    subgraph "On-Device Client (Browser/Mobile)"
+        ClientVision["mediapipeClassifier.ts<br>(On-Device EfficientNet Lite Hint)"]
+    end
+
+    subgraph "Intake Webhook Gateway"
+        DFWebhook["dialogflow.py<br>(Conversational Webhook Callback)"]
+    end
+
+    subgraph "Core Orchestration"
+        Orchestrator["suggestion_service.py<br>(Pipeline Coordinator)"]
+    end
+
+    subgraph "AI/ML Dedicated Services"
+        STT["stt_service.py<br>(Cloud Speech-to-Text v2)"]
+        Translation["translation_service.py<br>(Cloud Translation v3)"]
+        GeminiCore["ai_service.py<br>(Gemini Flash & Vertex AI)"]
+        Embeddings["embedding_service.py<br>(Gemini Embeddings-004)"]
+        TTS["tts_service.py<br>(Cloud Text-to-Speech WaveNet)"]
+    end
+
+    %% Flow connections
+    ClientVision -->|1. Pre-classified image category hint| Orchestrator
+    DFWebhook -->|1. User chat intake / text / GPS| Orchestrator
+    
+    Orchestrator -->|2. Multilingual Audio Intake| STT
+    STT -->|Fallback| GeminiCore
+    
+    Orchestrator -->|3. Regional Text Translation| Translation
+    Translation -->|Fallback| GeminiCore
+    
+    Orchestrator -->|4. Structured Classification & Scoring| GeminiCore
+    Orchestrator -->|5. Cosine Similarity Duplicate Check| Embeddings
+    Orchestrator -->|6. Multilingual Confirmation Audio| TTS
+    
+    TTS -.->|Audio URL returned to| DFWebhook
+    Orchestrator -.->|Live reference ID returned to| DFWebhook
+```
+
+### Module Breakdown & Pitch Breakdown
+
+#### 1. `ai_service.py` (Gemini & Vertex AI Core)
+* **What it is**: The primary intelligence engine.
+* **Pitch explanation**: "This module connects directly to Google Gemini and Vertex AI. It takes raw, unstructured text from a citizen and instantly processes it: translating it from 20+ regional Indian languages, categorizing it (e.g. Roads, Water, Safety), performing sentiment analysis to detect frustration levels, and calculating a priority score. If GCP credentials are present, it dynamically loads Vertex AI to generate structured reasoning explaining *why* it scored the grievance that way."
+
+```mermaid
+flowchart TD
+    subgraph "AI Severity Classification Pipeline"
+        Input["Citizen Grievance Ingestion"] --> NLP["ai_service.py <br>(Gemini Core NLP Analysis)"]
+        NLP -->|Extracts Urgency Score| BaseScore["Base Priority Score <br>(Scale 1-100)"]
+        
+        Photo{"Photo Attached?"}
+        Photo -->|Yes| Vision["ai_service.py <br>(Gemini Vision Photo Severity Analyzer)"]
+        Photo -->|No| FinalScore
+        
+        Vision -->|Visual Gravity Check| Boost["Priority Boost <br>(Up to +20 Score)"]
+        BaseScore --> FinalScore["Final Consolidated Score"]
+        Boost --> FinalScore
+        
+        FinalScore --> Decision{"Score Threshold Check"}
+        
+        Decision -->|Score >= 70| Critical["🔴 Critical Severity"]
+        Decision -->|Score 40 to 69| Moderate["🟡 Moderate Severity"]
+        Decision -->|Score < 40| Low["🟢 Low Severity"]
+        
+        Admin["Admin Dashboard Status"] -->|Completed| Resolved["🔵 Resolved Status"]
+    end
+```
+
+
+#### 2. `stt_service.py` (Cloud Speech-to-Text v2)
+* **What it is**: High-fidelity Indian dialect transcriber.
+* **Pitch explanation**: "This module handles multilingual voice intake. It is built on Google's next-generation Cloud Speech-to-Text v2 API, optimized with the `latest_long` audio model. It supports auto-detecting and transcribing 20+ Indian languages (Hindi, Tamil, Telugu, Kannada, etc.) dynamically. If the cloud API is offline, the pipeline gracefully falls back to Gemini's inline audio ingestion without disrupting the citizen."
+
+#### 3. `translation_service.py` (Translation API v3)
+* **What it is**: Dedicated real-time translation bridge.
+* **Pitch explanation**: "To ensure maximum classification accuracy, this module handles translating incoming regional complaints into clean English before they hit the core NLP classifier. It utilizes Google Cloud Translation v3, which supports custom glossaries. This means local civic terms like *'Gram Panchayat'*, *'Tehsil'*, or *'Patwari'* are translated correctly, preserving context that standard translation tools lose."
+
+#### 4. `tts_service.py` (Text-to-Speech WaveNet Confirmations)
+* **What it is**: Multilingual audio acknowledgment generator.
+* **Pitch explanation**: "A key feature for low-literacy or rural citizens. When a citizen submits a complaint, this module uses Google Wavenet voices (configured for 11 regional Indian languages) to generate an on-the-fly MP3 audio confirmation (e.g., *'Your complaint has been registered under ID ABC123'*) spoken back to them in their own native tongue. It plays instantly in the citizen's browser upon submission."
+
+#### 5. `embedding_service.py` (Gemini Embeddings & Duplicate Detection)
+* **What it is**: AI-driven deduplication engine.
+* **Pitch explanation**: "MPs are flooded with duplicate complaints about the same pothole or broken pipe. This module uses Gemini's `text-embedding-004` model to convert every complaint into a high-dimensional vector. It runs real-time cosine similarity checks against the last 500 complaints in that constituency. If a new report is a duplicate (similarity > 92%), it is flagged, saved for the citizen, but filtered out of the MP's dashboard—cutting through the noise. **It also leverages GPS coordinates: it auto-scopes the lookup to candidates within the same physical constituency boundary resolved by the citizen's GPS coordinates, ensuring spatial accuracy.**"
+
+#### 6. `dialogflow.py` (Conversational AI Webhook)
+* **What it is**: Multi-channel intake router (WhatsApp, SMS, IVR).
+* **Pitch explanation**: "This endpoint acts as the backend fulfillment webhook for Google Dialogflow CX. It allows citizens to file grievances or check complaint status via WhatsApp, SMS, or interactive voice calls (IVR). The conversational agent collects details, auto-classifies them, and saves them directly into the main database, creating a friction-free intake channel. **A webhook is critical here because Dialogflow itself is only a conversational parser with no database or backend logic access. Dialogflow acts as the front desk receptionist (collecting user information politely) while the Webhook acts as the office database administrator (taking that info, saving it to PostgreSQL/SQLite, running duplication checks, and returning a real tracking ID).**"
+
+#### 7. `suggestion_service.py` (Pipeline Orchestrator)
+* **What it is**: The transaction coordinator.
+* **Pitch explanation**: "The brain of the backend. It coordinates the transactional workflow. When a submission arrives, it saves files, triggers audio transcription, enriches the request with Gemini Vision photo analysis, runs the deduplication engine, auto-detects administrative boundaries via GPS, routes it to the correct local ward officer, and triggers the audio playback confirmation."
+
+#### 8. `mediapipeClassifier.ts` (On-Device Vision Classifier)
+* **What it is**: Browser-side client-side machine learning.
+* **Pitch explanation**: "For rural areas with poor internet connectivity, we don't want to waste bandwidth sending large images to the server. This module uses Google MediaPipe (running EfficientNet Lite 4 WASM) on-device inside the citizen's browser. It classifies uploaded photos (e.g. detecting garbage vs potholes) locally in ~200ms before upload, sending a category hint to help the server process it faster."
+
+---
+
 
 ## System Data Model (OLTP vs. OLAP)
 
@@ -178,12 +324,17 @@ source venv/bin/activate
 # 2. Install all required dependencies
 pip install -r backend/requirements.txt
 
-# 3. Start the FastAPI development server
-POSTGRES_PASSWORD="" PYTHONPATH=backend uvicorn app.main:app --reload --port 8001
+# 3. Run SQLite / PostgreSQL migrations to prepare AI database columns
+POSTGRES_PASSWORD="" PYTHONPATH=backend ./venv/bin/python3 backend/app/scripts/migrate_ai_fields.py
+
+# 4. Start the FastAPI development server
+POSTGRES_PASSWORD="" PYTHONPATH=backend ./venv/bin/uvicorn app.main:app --reload --port 8001
 ```
-*Note: Automatically falls back to local SQLite (`sqlite:///./civic_pulse.db`) if no PostgreSQL password/host is defined. Set environment variables to enable Google Cloud integrations:*
-* `GEMINI_API_KEY`: Set this to your Google AI Studio or Vertex AI Gemini API key to enable active LLM issue translation, classification, and scoring.
+*Note: Automatically falls back to local SQLite (`sqlite:///./civic_pulse.db`) if no PostgreSQL password/host is defined. Env vars can be saved in a `.env` file at the project root to enable Google Cloud integrations:*
+* `GEMINI_API_KEY`: Set this to your Google AI Studio or Vertex AI Gemini API key to enable active LLM issue translation, classification, scoring, and voice transcription.
+* `MOCK_AI_PIPELINE`: Set to `false` to enable live Gemini API calls instead of simulated responses.
 * `GCS_BUCKET_NAME`: Set this to your Google Cloud Storage bucket name to upload citizen images and voice clips directly to the cloud.
+
 
 #### 2. Frontend React Setup
 ```bash
@@ -297,3 +448,90 @@ Because analytical queries run directly in-place over the PostgreSQL database ut
 * **Mobile Intake**: Native Flutter or Android apps for offline/field-based issue logging.
 * **SMS & Chat Flow**: WhatsApp Business API and SMS gateway integrations for low-connectivity users via Dialogflow.
 
+---
+
+## 📸 Platform Screenshots & Walkthrough
+
+![Light Mode](frontend/public/images/web_ss/light.png)
+Light Mode availability: A clean, high-contrast, modern layout optimized for daytime viewing and administrative work.
+
+![Dark Mode](frontend/public/images/web_ss/dark.png)
+Dark Mode availability: A premium dark-mode interface leveraging deep slate tones, reducing eye strain for late-night reviews.
+
+![MP Login](frontend/public/images/web_ss/mp_L.png)
+MP Login: Secure credentials-based authentication gateway ensuring data privacy and role-based access control.
+
+![MP Dashboard Overview](frontend/public/images/web_ss/mp1.png)
+MP Dashboard: Interactive summary view for Lok Sabha MPs displaying active cases, constituency analytics, and task distributions.
+
+![MP Ward Performance](frontend/public/images/web_ss/mp2.png)
+MP Performance & Ward Analysis: Drill-down metrics per ward, showing active caseload and performance ratings of different ward officers.
+
+![PMO Dashboard Overview](frontend/public/images/web_ss/pmo1.jpeg)
+PMO Dashboard: High-level aggregates and KPIs, exposing nationwide constituency performance indices, resolution rates, and ticket turnaround times.
+
+![PMO Leaderboard](frontend/public/images/web_ss/pmo2.jpeg)
+PMO Leaderboard: Ranked sorting of constituencies based on project execution speed, citizen feedback sentiment, and resource utilization.
+
+![PMO Regional Detail](frontend/public/images/web_ss/pmo3.jpeg)
+PMO Analytics: Drill-down heatmaps and analytical breakdowns for specific states and districts.
+
+![Citizen Proposals](frontend/public/images/web_ss/participatory.png)
+Participatory Budgeting: Interface showing local ward participatory project proposals (e.g. water systems, road restoration) and active community upvoting.
+
+![Grid Officer Tasks](frontend/public/images/web_ss/gr1.png)
+Grid Representative Portal: Action dashboard for field officers to view dispatch assignments, route maps, and task priorities.
+
+![Grid Task Action](frontend/public/images/web_ss/gr2.png)
+Grievance Inspection & Update: Task detail view where officers can upload resolution evidence, comments, and change status.
+
+![StreetMapper](frontend/public/images/web_ss/streetmap_p.png)
+StreetMapper Portal: An interface for citizens to submit geolocated infrastructure issues with voice notes, descriptions, and before photos.
+
+![Civic Fund](frontend/public/images/web_ss/funds_p.png)
+Civic Fund: A detailed overview of budgeted projects, estimated costs in ₹ Rupees, and active feasibility scoring.
+
+![Hotspot Tracker](frontend/public/images/web_ss/hotspots_p.png)
+Hotspot Tracker: Leaflet-based geospatial heatmap visualizing grievance density and clustering to guide resource allocation.
+
+![Sector Directory](frontend/public/images/web_ss/ward_p.png)
+Sector Directory: Direct mapping of municipal ward officers and administrative performance indexes.
+
+![Live Map 1](frontend/public/images/web_ss/map1.jpeg)
+Live Map View 1: Detailed geospatial visualizations of civic nodes, assembly constituencies, and Lok Sabha boundary polygons.
+
+![Live Map 2](frontend/public/images/web_ss/map2.jpeg)
+Live Map View 2: Detailed assembly-constituency level mappings and civic node marker listings.
+
+![Civic Timeline](frontend/public/images/web_ss/civic_P.png)
+Civic Timeline: Chronological resolution feed displaying detailed activity history and before/after evidence side-by-side.
+
+---
+
+## 🔭 Future Phase Roadmap
+
+### 📱 Mobile & Offline Support
+* **Flutter / Android App** — Native citizen app for offline issue logging and sync.
+* **SMS Gateway** — Basic SMS intake for no-internet rural areas.
+* **WhatsApp Business API** — Conversational complaint submission via Dialogflow.
+* **Offline Queue** — Local-first reporting with background sync on connectivity restore.
+
+### 🤖 AI & ML Expansion
+* **Gemini API / Vertex AI** — Fine-tuned grievance classification and priority scoring agents.
+* **Voice & Dialect** — Cloud Speech-to-Text + Translation API for 20+ Indian regional languages.
+* **Multimodal Vision** — Gemini Vision / Vertex AI Vision to auto-classify citizen-uploaded photos (potholes, smoke, flood damage).
+* **Duplicate Detection** — Vector similarity search to group redundant reports into single resolved actions.
+
+### 🗺️ Geospatial & Public Data
+* **Google Maps Platform** — Live hotspot heatmaps for infrastructure issue clustering.
+* **Google Earth Engine** — Satellite imagery overlays for flood/crop damage in rural tracks.
+* **Public Datasets** — Integrate `data.gov.in`, Census/NFHS, CPCB air quality, and IMD weather data for smarter governance scores.
+
+### 🔥 Backend & Real-Time
+* **Firebase** — Real-time push notifications for citizens on issue status changes.
+* **Cloud Functions** — Event-driven automation for officer dispatch on new critical tickets.
+* **MediaPipe** — On-device photo classification for low-bandwidth environments.
+
+### 🔒 Scale & Security
+* **Sovereign Cloud** — Deployable on NIC or state government private cloud for data compliance.
+* **Federated Identity** — DigiLocker / Aadhaar-linked citizen authentication.

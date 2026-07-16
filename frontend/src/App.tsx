@@ -1,15 +1,20 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import TopBar from './components/layouts/TopBar';
+import Breadcrumbs from './components/layouts/Breadcrumbs';
 import Portal from './pages/Portal';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Pmo from './pages/Pmo';
+import ConstituencyView from './pages/ConstituencyView';
 import PmoAnalytics from './pages/PmoAnalytics';
 import PmoLeaderboard from './pages/PmoLeaderboard';
 import LiveMap from './pages/LiveMap';
 import Participate from './pages/Participate';
+import AppSimulator from './pages/AppSimulator';
 import RequireRole from './components/common/RequireRole';
+import SosButton from './components/common/SosButton';
+import IssueTracker from './components/common/IssueTracker';
 import { useIsMobile } from './hooks/useIsMobile';
 
 import './styles/index.css';
@@ -20,9 +25,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div style={{ background: 'var(--bg-app)', minHeight: '100vh' }}>
       <TopBar />
+      <Breadcrumbs />
       <main style={{ maxWidth: '1440px', margin: '0 auto', padding: isMobile ? '18px 14px 48px' : '28px 24px 64px' }}>
         {children}
       </main>
+      <SosButton />
+      <IssueTracker />
     </div>
   );
 };
@@ -31,7 +39,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const MapLayout: React.FC = () => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-app)' }}>
     <TopBar />
-    <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+    <Breadcrumbs />
+    {/* isolate: keep the map's overlays/zoom controls below the sticky navbar + menu */}
+    <div style={{ flex: 1, position: 'relative', minHeight: 0, isolation: 'isolate', zIndex: 0 }}>
       <LiveMap />
     </div>
   </div>
@@ -40,6 +50,7 @@ const MapLayout: React.FC = () => (
 const App: React.FC = () => (
   <Routes>
     <Route path="/" element={<Layout><Portal /></Layout>} />
+    <Route path="/simulator" element={<Layout><AppSimulator /></Layout>} />
     <Route path="/login" element={<Layout><Login /></Layout>} />
     <Route
       path="/mp"
@@ -54,6 +65,14 @@ const App: React.FC = () => (
       element={
         <RequireRole role="pmo">
           <Layout><Pmo /></Layout>
+        </RequireRole>
+      }
+    />
+    <Route
+      path="/pmo/mp/:constituencyId"
+      element={
+        <RequireRole role="pmo">
+          <Layout><ConstituencyView /></Layout>
         </RequireRole>
       }
     />

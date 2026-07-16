@@ -1,0 +1,58 @@
+name: Deploy frontend to Firebase Hosting
+
+# Builds the SPA (pointed at the Render API) and deploys it to Firebase Hosting.
+# Render is untouched — this only mirrors the frontend to Firebase.
+#
+# Requires ONE repository secret holding a Firebase service-account JSON with
+# Hosting deploy permission. Easiest setup (creates the service account AND adds
+# this exact secret automatically):
+#     firebase init hosting:github
+# which adds a secret named  FIREBASE_SERVICE_ACCOUNT_CIVIC_PULSE_7AF0F.
+# (Manual alternative: create a service account with the "Firebase Hosting Admin"
+#  role, generate a key, and add it under that same secret name.)
+#
+# The Firebase WEB config (VITE_FIREBASE_*) is public and already committed in
+# frontend/.env.production, so no extra secrets are needed for the build.
+
+on:
+  push:
+    branches:
+      - feature/india-civic-platform
+      - feature/firebase-hosting
+    paths:
+      - 'frontend/**'
+      - 'firebase.json'
+      - '.firebaserc'
+      - '.github/workflows/firebase-hosting.yml'
+  workflow_dispatch: {}
+
+jobs:
+  build-and-deploy:
+    name: Build SPA & deploy to Firebase Hosting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build (points SPA at the Render API)
+        working-directory: frontend
+        run: npm run build:firebase
+
+      - name: Deploy to Firebase Hosting (live channel)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CIVIC_PULSE_7AF0F }}
+          projectId: civic-pulse-7af0f
+          channelId: live

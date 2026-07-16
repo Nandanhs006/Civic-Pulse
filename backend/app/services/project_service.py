@@ -97,6 +97,13 @@ class ProjectService:
             cname = cnames.get(c_id, f"Constituency {c_id}")
             title = f"{category} Development Works - {cname}"
 
+            cost = float(CATEGORY_COST.get(category, 5_000_000)) * (1 + 0.1 * total)
+            justification = (
+                f"{total} unresolved '{category}' request(s) in {cname} with an average "
+                f"AI priority of {avg_priority:.0f}/100 and {negatives} negative-sentiment "
+                f"report(s). Recommended for sanction under constituency development funds."
+            )
+
             existing = (
                 self.db.query(ProposedProject)
                 .filter(
@@ -106,14 +113,15 @@ class ProjectService:
                 .first()
             )
             if existing:
+                # Recompute so the score stays consistent with current demand
+                # (previously the row was skipped and its score went stale).
+                existing.priority_score = priority_score
+                existing.supporting_suggestions_count = int(total)
+                existing.estimated_cost = cost
+                existing.ai_justification = justification
+                recommendations.append(existing)
                 continue
 
-            cost = float(CATEGORY_COST.get(category, 5_000_000)) * (1 + 0.1 * total)
-            justification = (
-                f"{total} unresolved '{category}' request(s) in {cname} with an average "
-                f"AI priority of {avg_priority:.0f}/100 and {negatives} negative-sentiment "
-                f"report(s). Recommended for sanction under constituency development funds."
-            )
             new_proj = ProposedProject(
                 title=title,
                 description=f"Auto-generated from citizen demand analysis: {justification}",

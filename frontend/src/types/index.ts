@@ -1,4 +1,4 @@
-export type Role = 'pmo' | 'mp';
+export type Role = 'pmo' | 'mp' | 'mla' | 'citizen';
 
 export interface User {
   id: number;
@@ -8,6 +8,8 @@ export interface User {
   is_admin: boolean;
   role: Role | null;
   constituency_id: number | null;
+  phone?: string | null;
+  phone_verified?: boolean;
 }
 
 export interface Constituency {
@@ -109,6 +111,8 @@ export interface Suggestion {
   status: string;
   ward_id: number | null;
   constituency_id: number | null;
+  department: string | null;
+  citizen_verified?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -140,6 +144,7 @@ export interface MapIssue {
   english_translation: string | null;
   image_url: string | null;
   constituency_id: number | null;
+  citizen_verified?: boolean;
   created_at: string;
 }
 

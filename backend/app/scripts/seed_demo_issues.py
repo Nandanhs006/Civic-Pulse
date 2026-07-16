@@ -11,7 +11,6 @@ can be removed easily. Run:  python -m app.scripts.seed_demo_issues [count]
 import json
 import os
 import random
-import shutil
 import sys
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -58,6 +57,88 @@ STATUSES = (
 )
 SENTIMENTS = ["Negative"] * 5 + ["Neutral"] * 3 + ["Positive"] * 2
 
+# Curated, category-relevant REAL photos from Wikimedia Commons (stable CDN,
+# no API key). Filenames are descriptive so the subject is guaranteed on-topic;
+# an issue picks one at random (repetition across issues is fine).
+import urllib.parse as _uparse
+
+_COMMONS = "https://commons.wikimedia.org/wiki/Special:FilePath/"
+CATEGORY_IMG_FILES = {
+    "Water": [
+        "Leak_in_rusted_pipe_side_view.jpg",
+        "Leak_in_rusted_pipe_bottom_view.jpg",
+        "Suspected_Leaking_Water_Pipe_in_Glen_Loth,_Sutherland_-_geograph.org.uk_-_6508585.jpg",
+    ],
+    "Roads": [
+        "Newport_Carisbrooke_Road_pothole_2.JPG",
+        "Newport_Carisbrooke_Road_pothole_3.JPG",
+        "A_Road_filled_with_potholes.jpg",
+        "Pothole.jpg",
+    ],
+    "Education": [
+        "A_Classroom_in_a_Government_Primary_school_in_Kerala.jpg",
+        "Classroom_of_Jawaharlal_Nehru_Vidyapith.jpg",
+        "Tamil_Nadu_school_kids.jpg",
+    ],
+    "Health": [
+        "Calcutta_Heart_Clinic_&_Hospital_in_Salt_Lake_04.jpg",
+        "Ruby_Hall_Clinic.JPG",
+        "Calcutta_Heart_Clinic_&_Hospital_in_Salt_Lake_15.jpg",
+    ],
+    "Sanitation": [
+        "Garbage_in_Kathmandu.jpg",
+        "Hyderabad_Street_Garbage_collection_2005.jpg",
+        "Garbage_1.jpg",
+    ],
+    "Public Spaces": [
+        "Outdoor_gym_in_Telok_Blangah_Hill_Park_01.jpg",
+        "Outdoor_gym_in_Telok_Blangah_Hill_Park_04.jpg",
+        "Outdoor_gym_in_Telok_Blangah_Hill_Park_03.jpg",
+    ],
+    "Electricity": [
+        "Mere_Lane_lamp_standard_1.jpg",
+        "Rome_(Italy),_street_light_--_2013_--_3484.jpg",
+        "Streetlamp,_Linz_(P1130861).jpg",
+    ],
+    "Safety": [
+        "Tokyo_Shibuya_Scramble_Crossing_2018-10-09.jpg",
+        "Dotonbori,_Osaka,_at_night,_November_2016.jpg",
+        "Los_Angeles_(California,_USA),_South_Olive_Street_--_2012_--_4847.jpg",
+    ],
+}
+
+
+# Locally-bundled, category-relevant photos live in frontend/public/issue-images
+# and are served same-origin (/issue-images/<file>) by the SPA, so they always
+# load on the live map — no hotlink/CORS/rate-limit failures. Preferred over the
+# Wikimedia fallback whenever a category has local files. Add more by dropping
+# files named "<slug>_<n>.jpg" into that folder and listing them here.
+LOCAL_IMG_URL = "/issue-images/"
+LOCAL_CATEGORY_IMAGES = {
+    "Roads": ["roads_1.jpg", "roads_2.jpg", "roads_3.jpg"],
+    "Electricity": ["electricity_1.jpg"],
+    "Health": ["health_1.jpg", "health_2.jpg", "health_3.jpg", "health_4.jpg"],
+    "Education": ["education_1.jpg", "education_2.jpg", "education_3.jpg", "education_4.jpg"],
+    "Water": ["water_1.jpg", "water_2.jpg", "water_3.jpg", "water_4.jpg",
+              "water_5.jpg", "water_6.jpg", "water_7.jpg"],
+    "Safety": ["safety_1.jpg", "safety_2.jpg", "safety_3.jpg", "safety_4.jpg"],
+    "Sanitation": ["sanitation_1.jpg", "sanitation_2.jpg", "sanitation_3.jpg",
+                   "sanitation_4.jpg", "sanitation_5.jpg"],
+    "Public Spaces": ["publicspace_1.jpg", "publicspace_2.jpg", "publicspace_3.jpg"],
+}
+
+
+def _category_images(category: str) -> list:
+    local = LOCAL_CATEGORY_IMAGES.get(category)
+    if local:
+        return [LOCAL_IMG_URL + f for f in local]
+    files = CATEGORY_IMG_FILES.get(category) or CATEGORY_IMG_FILES["Roads"]
+    return [_COMMONS + _uparse.quote(f) + "?width=640" for f in files]
+
+
+def _category_image(category: str) -> str:
+    return random.choice(_category_images(category))
+
 
 def _centroid(geom: dict):
     t = geom.get("type")
@@ -72,33 +153,11 @@ def _centroid(geom: dict):
     return sum(xs) / len(xs), sum(ys) / len(ys)
 
 
-def _ensure_sample_image() -> str:
-    """Copy a bundled image into uploads so ~some issues show a photo. Returns url."""
-    dest_dir = os.path.join(settings.UPLOAD_DIR, "images")
-    os.makedirs(dest_dir, exist_ok=True)
-    dest = os.path.join(dest_dir, "demo_sample.jpg")
-    if not os.path.exists(dest):
-        src = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            "..",
-            "frontend",
-            "public",
-            "emblems",
-            "bbmp.jpg",
-        )
-        try:
-            shutil.copyfile(src, dest)
-        except Exception:  # noqa: BLE001
-            return ""
-    return "/static/images/demo_sample.jpg"
-
-
 def main() -> None:
     count = int(sys.argv[1]) if len(sys.argv) > 1 else 300
     Base.metadata.create_all(bind=engine)
     data = json.load(open(PC_GEOJSON, encoding="utf-8"))
     features = [f for f in data["features"] if f.get("geometry")]
-    sample_img = _ensure_sample_image()
 
     db = SessionLocal()
     geo = GeoService(db)
@@ -106,13 +165,24 @@ def main() -> None:
     now = datetime.now(timezone.utc)
     created = 0
     try:
-        existing_demo = (
+        existing = (
             db.query(Suggestion)
             .filter(Suggestion.content.like(f"{DEMO_MARKER}%"))
-            .count()
+            .all()
         )
-        if existing_demo:
-            print(f"[seed] {existing_demo} demo issues already present; skipping.")
+        if existing:
+            # Don't re-create, but backfill/refresh images so already-seeded demo
+            # issues (e.g. on a persistent deploy DB seeded before images existed)
+            # get a category-relevant, same-origin photo that actually renders.
+            fixed = 0
+            for s in existing:
+                want = _category_image(s.category or "Roads")
+                if s.image_url != want and (not s.image_url or "/issue-images/" in want):
+                    s.image_url = want
+                    fixed += 1
+            if fixed:
+                db.commit()
+            print(f"[seed] {len(existing)} demo issues present; backfilled {fixed} images.")
             return
         wards = db.query(Ward).all()
         for _ in range(count):
@@ -157,9 +227,7 @@ def main() -> None:
                 constituency_id=cid,
                 assembly_constituency_id=assembly_constituency_id,
                 ward_id=ward_id,
-                image_url=(
-                    sample_img if (sample_img and random.random() < 0.15) else None
-                ),
+                image_url=_category_image(category),
                 created_at=now
                 - timedelta(days=random.randint(0, 60), hours=random.randint(0, 23)),
             )
