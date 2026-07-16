@@ -271,11 +271,15 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const [mpClassifying, setMpClassifying] = useState<boolean>(false);
   const [mpClassResult, setMpClassResult] = useState<string | null>(null);
 
-  // OTP State
+  // OTP State — a citizen who already verified their phone at login is trusted
+  // here too, so we don't ask them to OTP again inside StreetMapper.
   const [otpSent, setOtpSent] = useState<boolean>(false);
   const [otpCode, setOtpCode] = useState<string>('');
   const [otpInput, setOtpInput] = useState<string>('');
-  const [otpVerified, setOtpVerified] = useState<boolean>(false);
+  const [otpVerified, setOtpVerified] = useState<boolean>(!!user?.phone_verified);
+  useEffect(() => {
+    if (user?.phone_verified) setOtpVerified(true);
+  }, [user]);
 
   // Status Stepper & Tracking State
   const [myFmsReports, setMyFmsReports] = useState<any[]>([]);

@@ -38,6 +38,10 @@ def phone_login(payload: PhoneLoginRequest, db: Session = Depends(deps.get_db)) 
             detail="Phone verification failed. Please retry the OTP.",
         )
 
+    given_name = (payload.full_name or "").strip()
+    # Anonymous citizens (no name) are labelled by their phone number.
+    placeholder_names = {phone, "Verified Citizen", ""}
+
     user = db.query(User).filter(User.phone == phone).first()
     if not user:
         # Synthetic email keeps the JWT subject / lookup path identical to staff
@@ -48,7 +52,7 @@ def phone_login(payload: PhoneLoginRequest, db: Session = Depends(deps.get_db)) 
             user = User(
                 email=synthetic_email,
                 hashed_password=security.get_password_hash(secrets.token_urlsafe(24)),
-                full_name=(payload.full_name or "").strip() or "Verified Citizen",
+                full_name=given_name or phone,
                 is_active=True,
                 is_admin=False,
                 role="citizen",
@@ -59,8 +63,10 @@ def phone_login(payload: PhoneLoginRequest, db: Session = Depends(deps.get_db)) 
         else:
             user.phone = phone
     user.phone_verified = True
-    if payload.full_name and (not user.full_name or user.full_name == "Verified Citizen"):
-        user.full_name = payload.full_name.strip()
+    # Only ask for a name on first login; later logins keep the stored name, but
+    # a name given later still upgrades an anonymous (number-labelled) account.
+    if given_name and (user.full_name in placeholder_names or not user.full_name):
+        user.full_name = given_name
     db.commit()
     db.refresh(user)
 

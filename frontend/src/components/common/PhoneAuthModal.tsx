@@ -125,10 +125,6 @@ const PhoneAuthModal: React.FC<Props> = ({ open, onClose, onSuccess, title, reas
         {step === 'phone' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>NAME (OPTIONAL)</label>
-              <input className="glass-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>MOBILE NUMBER</label>
               <div className="glass-input" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px' }}>
                 <Phone size={16} color="var(--text-muted)" />
@@ -139,12 +135,18 @@ const PhoneAuthModal: React.FC<Props> = ({ open, onClose, onSuccess, title, reas
                   type="tel"
                   inputMode="numeric"
                   maxLength={10}
+                  autoFocus
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   placeholder="98765 43210"
                   style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-main)', fontSize: 15, letterSpacing: 1, padding: '12px 0' }}
                 />
               </div>
+            </div>
+            {/* Name is optional and only used the first time — later logins keep it. */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>NAME <span style={{ fontWeight: 400 }}>(optional — first time only)</span></label>
+              <input className="glass-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Leave blank to stay anonymous" />
             </div>
             {error && <span style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</span>}
             <button className="btn-primary" disabled={busy} onClick={sendOtp}
