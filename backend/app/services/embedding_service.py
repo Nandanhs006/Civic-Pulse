@@ -64,20 +64,21 @@ class EmbeddingService:
 
     def __init__(self) -> None:
         self.api_key = os.environ.get("GEMINI_API_KEY", "")
+        self.api_keys = [k.strip() for k in self.api_key.split(",") if k.strip()] if self.api_key else []
         self.enabled = False
 
         if not _GENAI_AVAILABLE:
             logger.info("[Embedding] SDK unavailable. Duplicate detection in standby.")
             return
 
-        if not self.api_key:
+        if not self.api_keys:
             logger.info("[Embedding] GEMINI_API_KEY not set. Duplicate detection in standby.")
             return
 
         try:
-            genai.configure(api_key=self.api_key)
+            genai.configure(api_key=self.api_keys[0])
             self.enabled = True
-            logger.info("[Embedding] Gemini text-embedding-004 configured. Duplicate detection active.")
+            logger.info(f"[Embedding] Gemini text-embedding-004 configured with {len(self.api_keys)} key(s). Duplicate detection active.")
         except Exception as e:
             logger.warning(f"[Embedding] Failed to configure Gemini for embeddings: {e}")
 
@@ -97,17 +98,25 @@ class EmbeddingService:
         if not self.enabled or not text or not text.strip():
             return None
 
-        try:
-            result = genai.embed_content(
-                model=self.EMBEDDING_MODEL,
-                content=text.strip(),
-                task_type="SEMANTIC_SIMILARITY",
-                request_options={"timeout": 5.0}
-            )
-            return result["embedding"]
-        except Exception as e:
-            logger.error(f"[Embedding] Failed to generate embedding: {e}")
-            return None
+        last_err = None
+        for idx, key in enumerate(self.api_keys):
+            try:
+                genai.configure(api_key=key)
+                result = genai.embed_content(
+                    model=self.EMBEDDING_MODEL,
+                    content=text.strip(),
+                    task_type="SEMANTIC_SIMILARITY",
+                    request_options={"timeout": 5.0}
+                )
+                return result["embedding"]
+            except Exception as e:
+                logger.warning(
+                    f"[Embedding] embed_content failed using key index {idx}: {e}. Trying next key..."
+                )
+                last_err = e
+        
+        logger.error(f"[Embedding] All keys failed to generate embedding. Last error: {last_err}")
+        return None
 
     def serialize_embedding(self, embedding: List[float]) -> str:
         """Serialize embedding list to compact JSON string for DB storage."""

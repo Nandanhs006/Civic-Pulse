@@ -1,6 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import { MapContainer, TileLayer, Marker, CircleMarker, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet default marker icon path issue in Vite
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
+
+interface MapControllerProps {
+  center: [number, number];
+}
+
+const MapController: React.FC<MapControllerProps> = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
+  return null;
+};
 import {
   Smartphone,
   Wifi,
@@ -14,7 +41,9 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
-  Brain
+  Brain,
+  MapPin,
+  LocateFixed
 } from 'lucide-react';
 import ConstituencyPicker from '../components/common/ConstituencyPicker';
 import { Constituency } from '../types';
@@ -39,6 +68,50 @@ const AppSimulator: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [gpsCoords] = useState<{ lat: number; lng: number }>({ lat: 12.9716, lng: 77.5946 });
+
+  // Mobile App Navigation & StreetMapper State
+  const [mobileTab, setMobileTab] = useState<'report' | 'streetmapper'>('report');
+  const [mobFmsContent, setMobFmsContent] = useState('');
+  const [mobFmsPhone] = useState('9988776655');
+  const [mobFmsCoords, setMobFmsCoords] = useState<[number, number]>([12.9716, 77.5946]);
+  const [mobFmsImages, setMobFmsImages] = useState<File[]>([]);
+  const [mobFmsImagePreviews, setMobFmsImagePreviews] = useState<string[]>([]);
+
+  // Mobile StreetMapper Audio recorder
+  const {
+    isRecording: mobFmsIsRecording,
+    audioBlob: mobFmsAudioBlob,
+    duration: mobFmsDuration,
+    startRecording: mobFmsStartRecording,
+    stopRecording: mobFmsStopRecording,
+    deleteRecording: mobFmsDeleteRecording
+  } = useAudioRecorder();
+  
+  const [mobFmsTranscribing, setMobFmsTranscribing] = useState(false);
+  const [mobFmsAudioUrl, setMobFmsAudioUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (!mobFmsAudioBlob) {
+      setMobFmsAudioUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(mobFmsAudioBlob);
+    setMobFmsAudioUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [mobFmsAudioBlob]);
+
+  const [mobMpClassifying, setMobMpClassifying] = useState(false);
+  const [mobMpClassResult, setMobMpClassResult] = useState<string | null>(null);
+
+  const [mobOtpSent, setMobOtpSent] = useState(false);
+  const [mobOtpCode, setMobOtpCode] = useState('');
+  const [mobOtpInput, setMobOtpInput] = useState('');
+  const [mobOtpVerified, setMobOtpVerified] = useState(false);
+
+  const [mobMyReports, setMobMyReports] = useState<any[]>([]);
+  const [mobSearchQuery, setMobSearchQuery] = useState('');
+  const [mobSearchResult, setMobSearchResult] = useState<any | null>(null);
+  const [mobSearchLoading, setMobSearchLoading] = useState(false);
 
   // Voice recorder hooks
   const { isRecording, audioBlob, duration, startRecording, stopRecording, deleteRecording } = useAudioRecorder();
@@ -84,17 +157,38 @@ const AppSimulator: React.FC = () => {
   const [sendingWhatsapp, setSendingWhatsapp] = useState<boolean>(false);
 
 
-  // Load offline queue on mount
+  // Load offline queue and mobile streetmapper reports on mount
   useEffect(() => {
-    const saved = localStorage.getItem('civic_pulse_offline_queue');
-    if (saved) {
+    const savedQueue = localStorage.getItem('civic_pulse_offline_queue');
+    if (savedQueue) {
       try {
-        setOfflineQueue(JSON.parse(saved));
+        setOfflineQueue(JSON.parse(savedQueue));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const savedReports = localStorage.getItem('my_streetmapper_reports_mobile');
+    if (savedReports) {
+      try {
+        setMobMyReports(JSON.parse(savedReports));
       } catch (e) {
         console.error(e);
       }
     }
   }, []);
+
+  // Set mobile GPS location on tab change
+  useEffect(() => {
+    if (mobileTab === 'streetmapper' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setMobFmsCoords([pos.coords.latitude, pos.coords.longitude]);
+        },
+        (err) => console.warn("Mobile GPS permission denied or unavailable:", err)
+      );
+    }
+  }, [mobileTab]);
 
   // Save offline queue when updated
   const saveQueue = (queue: OfflineReport[]) => {
@@ -111,6 +205,192 @@ const AppSimulator: React.FC = () => {
     setTranscriptionPreview(null);
     setSyncSuccessMsg(null);
     saveQueue([]);
+
+    // Reset mobile FMS
+    setMobFmsContent('');
+    setMobFmsImages([]);
+    setMobFmsImagePreviews([]);
+    setMobMpClassResult(null);
+    setMobOtpSent(false);
+    setMobOtpVerified(false);
+    setMobOtpInput('');
+  };
+
+  // Voice transcription logic for Mobile StreetMapper
+  useEffect(() => {
+    if (!mobFmsAudioBlob) return;
+    const runMobTranscription = async () => {
+      setMobFmsTranscribing(true);
+      const formData = new FormData();
+      formData.append('audio', mobFmsAudioBlob, 'mob_streetmapper_voice.webm');
+      try {
+        const response = await apiClient.post<{ transcript: string }>('/api/v1/suggestions/transcribe', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setMobFmsContent(response.data.transcript);
+      } catch (err) {
+        console.warn('Mobile Audio transcription failed:', err);
+      } finally {
+        setMobFmsTranscribing(false);
+      }
+    };
+    runMobTranscription();
+  }, [mobFmsAudioBlob]);
+
+  const handleMobFmsImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    setMobFmsImages(files);
+    setMobFmsImagePreviews(files.map(f => URL.createObjectURL(f)));
+
+    if (files.length > 0) {
+      setMobMpClassifying(true);
+      setMobMpClassResult(null);
+      setTimeout(() => {
+        setMobMpClassifying(false);
+        const lowerName = files[0].name.toLowerCase();
+        if (lowerName.includes('garbage') || lowerName.includes('trash') || lowerName.includes('waste')) {
+          setMobMpClassResult('Garbage pile (89.5% Confidence)');
+        } else if (lowerName.includes('water') || lowerName.includes('flood') || lowerName.includes('leak')) {
+          setMobMpClassResult('Water Leak (91.2% Confidence)');
+        } else {
+          setMobMpClassResult('Pothole / Road Damage (93.1% Confidence)');
+        }
+      }, 1200);
+    }
+  };
+
+  const handleMobSendOtp = () => {
+    if (!mobFmsPhone.trim()) {
+      alert('Please enter a phone number first!');
+      return;
+    }
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setMobOtpCode(code);
+    setMobOtpSent(true);
+    setMobOtpVerified(false);
+    alert(`📲 [OTP GATEWAY SIMULATOR]\n\nSMS dispatched to ${mobFmsPhone}:\n"Civic Pulse: Your OTP is ${code}. Verified citizen registry code."`);
+  };
+
+  const handleMobVerifyOtp = () => {
+    if (mobOtpInput.trim() === mobOtpCode) {
+      setMobOtpVerified(true);
+      alert('✅ Phone verified successfully!');
+    } else {
+      alert('❌ Invalid verification code.');
+    }
+  };
+
+  const handleMobSearchStatus = async () => {
+    if (!mobSearchQuery.trim()) return;
+    setMobSearchLoading(true);
+    setMobSearchResult(null);
+    try {
+      const res = await apiClient.get(`/api/v1/suggestions/${mobSearchQuery.trim()}`);
+      setMobSearchResult(res.data);
+    } catch (e) {
+      setMobSearchResult({ error: 'Not found.' });
+    } finally {
+      setMobSearchLoading(false);
+    }
+  };
+
+  const handleMobFmsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mobFmsContent.trim()) {
+      alert('Description is mandatory!');
+      return;
+    }
+    if (mobFmsImages.length === 0) {
+      alert('At least one photo upload is mandatory!');
+      return;
+    }
+    if (!mobFmsPhone.trim()) {
+      alert('Phone number is mandatory!');
+      return;
+    }
+    if (!mobOtpVerified) {
+      alert('OTP Verification is required!');
+      return;
+    }
+
+    if (!isOnline) {
+      // Offline mode: Queue report as offline
+      const reportUuid = `streetmapper_off_${Math.random().toString(36).substr(2, 9)}`;
+      const offlineReport: OfflineReport = {
+        offline_uuid: reportUuid,
+        content: `[StreetMapper] ${mobFmsContent}`,
+        citizen_phone: mobFmsPhone,
+        latitude: mobFmsCoords[0],
+        longitude: mobFmsCoords[1],
+        constituency_id: constituency?.id || 1,
+        language_code: 'en',
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      
+      const newQueue = [...offlineQueue, offlineReport];
+      saveQueue(newQueue);
+      alert('📲 Connection Offline! Stored report in local sync queue.');
+
+      // Reset
+      setMobFmsContent('');
+      setMobFmsImages([]);
+      setMobFmsImagePreviews([]);
+      setMobMpClassResult(null);
+      setMobOtpSent(false);
+      setMobOtpVerified(false);
+      setMobOtpInput('');
+      mobFmsDeleteRecording();
+      return;
+    }
+
+    setSyncing(true);
+    const formData = new FormData();
+    formData.append('content', mobFmsContent);
+    formData.append('citizen_phone', mobFmsPhone);
+    formData.append('latitude', mobFmsCoords[0].toString());
+    formData.append('longitude', mobFmsCoords[1].toString());
+    formData.append('language_code', 'en');
+    formData.append('image', mobFmsImages[0]);
+    if (mobFmsAudioBlob) {
+      formData.append('audio', mobFmsAudioBlob, 'mob_streetmapper_voice.webm');
+    }
+
+    try {
+      const res = await apiClient.post('/api/v1/suggestions/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setSyncSuccessMsg('StreetMapper report submitted successfully!');
+      setTimeout(() => setSyncSuccessMsg(null), 3000);
+
+      const newReport = {
+        id: res.data.id,
+        content: res.data.content,
+        category: res.data.category || 'General',
+        status: res.data.status || 'Submitted',
+        created_at: res.data.created_at || new Date().toISOString(),
+        coords: mobFmsCoords
+      };
+
+      const updated = [newReport, ...mobMyReports];
+      setMobMyReports(updated);
+      localStorage.setItem('my_streetmapper_reports_mobile', JSON.stringify(updated));
+
+      // Reset fields
+      setMobFmsContent('');
+      setMobFmsImages([]);
+      setMobFmsImagePreviews([]);
+      setMobMpClassResult(null);
+      setMobOtpSent(false);
+      setMobOtpVerified(false);
+      setMobOtpInput('');
+      mobFmsDeleteRecording();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to register complaint.');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   // Handle local voice recording transcription
@@ -476,162 +756,467 @@ const AppSimulator: React.FC = () => {
                 </div>
               )}
 
-              {/* Citizen App Form */}
-              <form onSubmit={handleMobileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                
-                {/* 1. Constituency picker */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>1. CHOOSE CONSTITUENCY</label>
-                  <ConstituencyPicker value={constituency?.id ?? null} onChange={setConstituency} />
-                </div>
+              {/* SCREEN 1: Standard Voice / Text Intake */}
+              {mobileTab === 'report' && (
+                <>
+                  {/* Citizen App Form */}
+                  <form onSubmit={handleMobileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    
+                    {/* 1. Constituency picker */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>1. CHOOSE CONSTITUENCY</label>
+                      <ConstituencyPicker value={constituency?.id ?? null} onChange={setConstituency} />
+                    </div>
 
-                {/* 2. Microphone Recorder */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>2. SPEAK Grievance (Optional)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-card)', padding: '8px', borderRadius: '10px' }}>
-                    <button
-                      type="button"
-                      onClick={isRecording ? stopRecording : startRecording}
-                      style={{
-                        width: '38px', height: '38px', borderRadius: '50%', border: 'none',
-                        background: isRecording ? 'var(--danger)' : 'var(--primary)',
-                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0
-                      }}
-                    >
-                      {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
-                    </button>
-                    <div style={{ fontSize: '11px', flex: 1 }}>
-                      <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>
-                        {isRecording ? 'Recording Audio...' : audioBlob ? 'Audio Recorded' : 'Tap to Record'}
-                      </div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
-                        {isRecording ? `${duration} seconds` : audioBlob ? 'Ready to sync' : 'Speak in your language'}
+                    {/* 2. Microphone Recorder */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>2. SPEAK Grievance (Optional)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#1c1f2b', padding: '8px', borderRadius: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={isRecording ? stopRecording : startRecording}
+                          style={{
+                            width: '38px', height: '38px', borderRadius: '50%', border: 'none',
+                            background: isRecording ? 'var(--danger)' : 'var(--primary)',
+                            color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0
+                          }}
+                        >
+                          {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
+                        </button>
+                        <div style={{ fontSize: '11px', flex: 1 }}>
+                          <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                            {isRecording ? 'Recording Audio...' : audioBlob ? 'Audio Recorded' : 'Tap to Record'}
+                          </div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
+                            {isRecording ? `${duration} seconds` : audioBlob ? 'Ready to sync' : 'Speak in your language'}
+                          </div>
+                        </div>
+                        {audioUrl && (
+                          <audio controls src={audioUrl} style={{ height: '24px', maxWidth: '140px' }} />
+                        )}
                       </div>
                     </div>
-                    {audioUrl && (
-                      <audio controls src={audioUrl} style={{ height: '24px', maxWidth: '140px' }} />
+
+                    {/* Speech to text preview bubble */}
+                    {(transcribing || transcriptionPreview) && (
+                      <div style={{ background: 'rgba(34, 197, 94, 0.04)', border: '1px dashed var(--secondary)', padding: '8px 10px', borderRadius: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 600, color: 'var(--secondary)', marginBottom: '4px' }}>
+                          <Brain size={12} className={transcribing ? 'animate-pulse' : ''} />
+                          <span>{transcribing ? 'Transcribing via Gemini...' : 'Speech-to-Text Preview'}</span>
+                        </div>
+                        {transcribing ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                            <Loader2 size={10} className="animate-spin" /> Processing...
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: '11px', margin: 0, fontStyle: 'italic', color: 'var(--text-main)' }}>"{transcriptionPreview}"</p>
+                        )}
+                      </div>
                     )}
-                  </div>
-                </div>
 
-                {/* Speech to text preview bubble */}
-                {(transcribing || transcriptionPreview) && (
-                  <div style={{ background: 'rgba(34, 197, 94, 0.04)', border: '1px dashed var(--secondary)', padding: '8px 10px', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 600, color: 'var(--secondary)', marginBottom: '4px' }}>
-                      <Brain size={12} className={transcribing ? 'animate-pulse' : ''} />
-                      <span>{transcribing ? 'Transcribing via Gemini...' : 'Speech-to-Text Preview'}</span>
-                    </div>
-                    {transcribing ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                        <Loader2 size={10} className="animate-spin" /> Processing...
-                      </div>
-                    ) : (
-                      <p style={{ fontSize: '11px', margin: 0, fontStyle: 'italic', color: 'var(--text-main)' }}>"{transcriptionPreview}"</p>
-                    )}
-                  </div>
-                )}
-
-                {/* 3. Text area */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>3. ISSUE DESCRIPTION</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Type details here..."
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    style={{
-                      background: 'var(--input-bg)', border: '1px solid var(--border-card)',
-                      borderRadius: '8px', padding: '8px', color: 'var(--text-main)', fontSize: '12px', resize: 'none'
-                    }}
-                  />
-                </div>
-
-                {/* 4. Phone input */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>4. PHONE NUMBER</label>
-                  <input
-                    type="tel"
-                    placeholder="Enter phone..."
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    style={{
-                      background: 'var(--input-bg)', border: '1px solid var(--border-card)',
-                      borderRadius: '8px', padding: '8px', color: 'var(--text-main)', fontSize: '12px'
-                    }}
-                  />
-                </div>
-
-                {/* 5. Photo attach */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>5. ATTACH PHOTO</label>
-                  <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} id="mob-image-upload" />
-                  <label
-                    htmlFor="mob-image-upload"
-                    style={{
-                      background: 'var(--input-bg)', border: '1px solid var(--border-card)', borderRadius: '8px',
-                      padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      gap: '8px', fontSize: '11px', color: 'var(--text-main)', cursor: 'pointer'
-                    }}
-                  >
-                    <ImageIcon size={14} /> Attach Camera Image
-                  </label>
-                  {imagePreview && (
-                    <div style={{ height: '70px', borderRadius: '6px', overflow: 'hidden', marginTop: '4px' }}>
-                      <img src={imagePreview} alt="Mobile preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    </div>
-                  )}
-                </div>
-
-                {/* Submit button */}
-                <button
-                  type="submit"
-                  disabled={syncing}
-                  style={{
-                    border: 'none', background: 'var(--primary)', color: 'white',
-                    padding: '10px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '5px'
-                  }}
-                >
-                  {syncing ? (
-                    <><Loader2 size={14} className="animate-spin" /> Processing...</>
-                  ) : (
-                    <><Send size={14} /> {isOnline ? 'Submit Report' : 'Save to Offline Queue'}</>
-                  )}
-                </button>
-
-              </form>
-
-              {/* Local Offline Queue Status Card */}
-              {offlineQueue.length > 0 && (
-                <div style={{ marginTop: '5px', background: 'rgba(239, 68, 68, 0.05)', border: '1px dashed var(--danger)', padding: '10px', borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <AlertCircle size={12} /> {offlineQueue.length} REPORT(S) QUEUED
-                    </span>
-                    {isOnline && (
-                      <button
-                        onClick={triggerSync}
+                    {/* 3. Text area */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>3. ISSUE DESCRIPTION</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Type details here..."
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
                         style={{
-                          border: 'none', background: 'var(--success)', color: 'white',
-                          padding: '3px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 700,
-                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px'
+                          background: '#1c1f2b', border: '1px solid var(--border-card)',
+                          borderRadius: '8px', padding: '8px', color: 'white', fontSize: '12px', resize: 'none'
+                        }}
+                      />
+                    </div>
+
+                    {/* 4. Phone input */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>4. PHONE NUMBER</label>
+                      <input
+                        type="tel"
+                        placeholder="Enter phone..."
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        style={{
+                          background: '#1c1f2b', border: '1px solid var(--border-card)',
+                          borderRadius: '8px', padding: '8px', color: 'white', fontSize: '12px'
+                        }}
+                      />
+                    </div>
+
+                    {/* 5. Photo attach */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>5. ATTACH PHOTO</label>
+                      <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} id="mob-image-upload" />
+                      <label
+                        htmlFor="mob-image-upload"
+                        style={{
+                          background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '8px',
+                          padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          gap: '8px', fontSize: '11px', color: 'var(--text-main)', cursor: 'pointer'
                         }}
                       >
-                        <RefreshCw size={10} /> Sync Now
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70px', overflowY: 'auto' }}>
-                    {offlineQueue.map((item, idx) => (
-                      <div key={idx} style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', background: 'var(--input-bg)', padding: '4px 6px', borderRadius: '4px' }}>
-                        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '170px' }}>{item.content}</span>
-                        <span>{item.timestamp}</span>
+                        <ImageIcon size={14} /> Attach Camera Image
+                      </label>
+                      {imagePreview && (
+                        <div style={{ height: '70px', borderRadius: '6px', overflow: 'hidden', marginTop: '4px' }}>
+                          <img src={imagePreview} alt="Mobile preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Submit button */}
+                    <button
+                      type="submit"
+                      disabled={syncing}
+                      style={{
+                        border: 'none', background: 'var(--primary)', color: 'white',
+                        padding: '10px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '5px'
+                      }}
+                    >
+                      {syncing ? (
+                        <><Loader2 size={14} className="animate-spin" /> Processing...</>
+                      ) : (
+                        <><Send size={14} /> {isOnline ? 'Submit Report' : 'Save to Offline Queue'}</>
+                      )}
+                    </button>
+
+                  </form>
+
+                  {/* Local Offline Queue Status Card */}
+                  {offlineQueue.length > 0 && (
+                    <div style={{ marginTop: '5px', background: 'rgba(239, 68, 68, 0.05)', border: '1px dashed var(--danger)', padding: '10px', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <AlertCircle size={12} /> {offlineQueue.length} REPORT(S) QUEUED
+                        </span>
+                        {isOnline && (
+                          <button
+                            onClick={triggerSync}
+                            style={{
+                              border: 'none', background: 'var(--success)', color: 'white',
+                              padding: '3px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 700,
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px'
+                            }}
+                          >
+                            <RefreshCw size={10} /> Sync Now
+                          </button>
+                        )}
                       </div>
-                    ))}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70px', overflowY: 'auto' }}>
+                        {offlineQueue.map((item, idx) => (
+                          <div key={idx} style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', background: '#15171e', padding: '4px 6px', borderRadius: '4px' }}>
+                            <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '170px' }}>{item.content}</span>
+                            <span>{item.timestamp}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* SCREEN 2: Mobile StreetMapper Geospatial Reporter */}
+              {mobileTab === 'streetmapper' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ textAlign: 'center', marginBottom: '2px' }}>
+                    <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: 'var(--text-main)' }}>StreetMapper GPS Pin</h4>
+                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Drag pin on map to locate pothole / issue</span>
+                  </div>
+
+                  {/* Leaflet map frame */}
+                  <div style={{ height: '130px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-card)', position: 'relative' }}>
+                    <MapContainer center={mobFmsCoords} zoom={14} style={{ width: '100%', height: '100%' }}>
+                      <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png" />
+                      <MapController center={mobFmsCoords} />
+                      <Marker
+                        position={mobFmsCoords}
+                        draggable={true}
+                        eventHandlers={{
+                          dragend: (e) => {
+                            const { lat, lng } = e.target.getLatLng();
+                            setMobFmsCoords([lat, lng]);
+                          }
+                        }}
+                      />
+                      <CircleMarker
+                        center={mobFmsCoords}
+                        radius={16}
+                        pathOptions={{ color: 'var(--secondary)', fillColor: 'var(--secondary)', fillOpacity: 0.12, weight: 1 }}
+                      />
+                    </MapContainer>
+
+                    {/* Blue Locate Me Button overlay */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (navigator.geolocation) {
+                          navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                              setMobFmsCoords([position.coords.latitude, position.coords.longitude]);
+                            },
+                            (error) => {
+                              console.warn("Mobile FMS Geolocation error:", error);
+                              alert("Could not fetch GPS location. Please check browser permissions.");
+                            }
+                          );
+                        }
+                      }}
+                      style={{
+                        position: 'absolute', top: '6px', right: '6px', zIndex: 1000,
+                        background: '#2563eb', color: 'white', border: 'none',
+                        borderRadius: '50%', width: '26px', height: '26px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                        transition: 'background-color 0.2s'
+                      }}
+                      title="Locate Me"
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                    >
+                      <LocateFixed size={13} />
+                    </button>
+
+                    <div style={{ position: 'absolute', bottom: '4px', left: '4px', background: 'rgba(14,17,24,0.85)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', zIndex: 100, border: '1px solid var(--border-card)' }}>
+                      📍 {mobFmsCoords[0].toFixed(4)}, {mobFmsCoords[1].toFixed(4)}
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleMobFmsSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {/* Content text */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        DESCRIPTION <span style={{ color: 'var(--danger)' }}>*</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="E.g., Pothole on Sector 4 main street..."
+                        value={mobFmsContent}
+                        onChange={(e) => setMobFmsContent(e.target.value)}
+                        style={{ background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px 8px', color: 'white', fontSize: '11px', resize: 'none' }}
+                      />
+                    </div>
+
+                    {/* SPEAK Grievance (Optional) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600 }}>SPEAK (OPTIONAL)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#1c1f2b', border: '1px solid var(--border-card)', padding: '6px', borderRadius: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={mobFmsIsRecording ? mobFmsStopRecording : mobFmsStartRecording}
+                          style={{
+                            width: '28px', height: '28px', borderRadius: '50%', border: 'none',
+                            background: mobFmsIsRecording ? 'var(--danger)' : 'var(--primary)',
+                            color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0
+                          }}
+                        >
+                          {mobFmsIsRecording ? <MicOff size={14} /> : <Mic size={14} />}
+                        </button>
+                        <div style={{ fontSize: '10px', flex: 1 }}>
+                          <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                            {mobFmsIsRecording ? 'Recording...' : mobFmsAudioBlob ? 'Recorded' : 'Tap to Record'}
+                          </div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '8px' }}>
+                            {mobFmsIsRecording ? `${mobFmsDuration}s` : mobFmsAudioBlob ? 'Transcribed' : 'Speak in your language'}
+                          </div>
+                        </div>
+                        {mobFmsAudioUrl && (
+                          <audio controls src={mobFmsAudioUrl} style={{ height: '20px', maxWidth: '80px' }} />
+                        )}
+                      </div>
+                      {mobFmsTranscribing && (
+                        <div style={{ fontSize: '9px', color: 'var(--secondary)' }}>
+                          Transcribing with Gemini...
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Camera upload */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        PHOTO(S) <span style={{ color: 'var(--danger)' }}>*</span>
+                      </label>
+                      <input type="file" multiple accept="image/*" onChange={handleMobFmsImageChange} style={{ display: 'none' }} id="mob-fms-image" />
+                      <label
+                        htmlFor="mob-fms-image"
+                        style={{ background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-main)', cursor: 'pointer' }}
+                      >
+                        <ImageIcon size={12} /> {mobFmsImages.length > 0 ? `Selected ${mobFmsImages.length} Photo(s)` : 'Take Issue Photo(s)'}
+                      </label>
+                      {mobFmsImagePreviews.length > 0 && (
+                        <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', marginTop: '4px', padding: '2px' }}>
+                          {mobFmsImagePreviews.map((url, idx) => (
+                            <div key={idx} style={{ height: '40px', minWidth: '40px', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-card)' }}>
+                              <img src={url} alt={`Preview ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* MediaPipe */}
+                    {(mobMpClassifying || mobMpClassResult) && (
+                      <div style={{ background: 'rgba(34, 197, 94, 0.03)', border: '1px dashed var(--secondary)', padding: '6px 8px', borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--secondary)' }}>
+                          🤖 {mobMpClassifying ? 'MediaPipe processing...' : 'MediaPipe Edge Classifier'}
+                        </span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-main)' }}>
+                          {mobMpClassifying ? 'Analyzing frames...' : mobMpClassResult}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Phone & OTP */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        OTP VERIFICATION <span style={{ color: 'var(--danger)' }}>*</span>
+                      </label>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {!mobOtpVerified && (
+                          <button type="button" onClick={handleMobSendOtp} className="btn-secondary" style={{ flex: 1, padding: '6px 8px', fontSize: '10px', borderRadius: '8px' }}>
+                            {mobOtpSent ? 'Resend OTP to Registered Phone' : 'Send OTP to Registered Phone'}
+                          </button>
+                        )}
+                      </div>
+
+                      {mobOtpSent && !mobOtpVerified && (
+                        <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                          <input
+                            value={mobOtpInput}
+                            onChange={(e) => setMobOtpInput(e.target.value)}
+                            placeholder="4-digit code"
+                            style={{ flex: 1, background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px 8px', color: 'white', fontSize: '11px' }}
+                          />
+                          <button type="button" onClick={handleMobVerifyOtp} className="btn-primary" style={{ padding: '4px 8px', fontSize: '9px', borderRadius: '8px' }}>
+                            Verify
+                          </button>
+                        </div>
+                      )}
+
+                      {mobOtpVerified && (
+                        <span style={{ fontSize: '9px', color: '#22c55e', fontWeight: 600 }}>✓ Registry Verified</span>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={syncing || !mobOtpVerified || mobFmsImages.length === 0}
+                      style={{ border: 'none', background: 'var(--primary)', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '4px' }}
+                    >
+                      <Send size={12} /> {isOnline ? 'Register Issue' : 'Queue Offline'}
+                    </button>
+                  </form>
+
+                  {/* Tracking widget inside phone screen */}
+                  <div style={{ marginTop: '6px', borderTop: '1px solid var(--border-card)', paddingTop: '10px' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)' }}>TRACK LIVE STATUS</span>
+                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px', marginBottom: '8px' }}>
+                      <input
+                        value={mobSearchQuery}
+                        onChange={(e) => setMobSearchQuery(e.target.value)}
+                        placeholder="Enter 8-char ID"
+                        style={{ flex: 1, background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px 8px', color: 'white', fontSize: '11px' }}
+                      />
+                      <button onClick={handleMobSearchStatus} className="btn-primary" style={{ padding: '6px 10px', fontSize: '10px', borderRadius: '8px' }} disabled={mobSearchLoading}>
+                        Track
+                      </button>
+                    </div>
+
+                    {mobSearchResult && (
+                      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', padding: '8px', borderRadius: '6px', marginBottom: '8px', fontSize: '11px' }}>
+                        {mobSearchResult.error ? (
+                          <span style={{ color: 'var(--danger)' }}>Not found.</span>
+                        ) : (
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginBottom: '4px' }}>
+                              <span>ID: {mobSearchResult.id.slice(0,8).toUpperCase()}</span>
+                              <span style={{ color: '#22c55e' }}>{mobSearchResult.status}</span>
+                            </div>
+                            
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', position: 'relative', padding: '0 4px' }}>
+                              <div style={{ position: 'absolute', top: '6px', left: '10px', right: '10px', height: '1px', background: 'var(--border-card)', zIndex: 0 }} />
+                              <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#22c55e', color: 'white', fontSize: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>✓</div>
+                                <span style={{ fontSize: '8px', color: 'var(--text-muted)' }}>Sent</span>
+                              </div>
+                              <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: ['Reviewed', 'Processing', 'Resolved', 'Approved'].includes(mobSearchResult.status) ? '#22c55e' : 'var(--border-card)', color: 'white', fontSize: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                  {['Reviewed', 'Processing', 'Resolved', 'Approved'].includes(mobSearchResult.status) ? '✓' : '2'}
+                                </div>
+                                <span style={{ fontSize: '8px', color: 'var(--text-muted)' }}>Routed</span>
+                              </div>
+                              <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: mobSearchResult.status === 'Resolved' ? '#22c55e' : 'var(--border-card)', color: 'white', fontSize: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                  {mobSearchResult.status === 'Resolved' ? '✓' : '3'}
+                                </div>
+                                <span style={{ fontSize: '8px', color: 'var(--text-muted)' }}>Fixed</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Local FMS report entries list */}
+                    {mobMyReports.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '72px', overflowY: 'auto' }}>
+                        {mobMyReports.map((r) => (
+                          <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', background: '#1c1f2b', padding: '4px 6px', borderRadius: '4px', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 700 }}>ID: {r.id.slice(0, 8).toUpperCase()}</span>
+                            <span style={{ color: r.status === 'Resolved' ? '#22c55e' : 'var(--saffron)' }}>{r.status}</span>
+                            <button onClick={() => { setMobSearchQuery(r.id.slice(0,8)); setMobSearchResult(r); }} style={{ border: 'none', background: 'var(--primary)', color: 'white', fontSize: '8px', padding: '1px 4px', borderRadius: '2px', cursor: 'pointer' }}>
+                              Track
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
+            </div>
+
+            {/* Simulated smartphone bottom navigation bar tab menu */}
+            <div
+              style={{
+                height: '52px',
+                background: '#1c1f2b',
+                borderTop: '1px solid #2d313f',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-around',
+                fontSize: '11px',
+                color: 'var(--text-muted)',
+                fontWeight: 600,
+                zIndex: 10,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setMobileTab('report')}
+                style={{
+                  flex: 1, height: '100%', border: 'none', background: 'transparent',
+                  color: mobileTab === 'report' ? 'var(--secondary)' : 'var(--text-muted)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', cursor: 'pointer'
+                }}
+              >
+                <Smartphone size={16} />
+                <span>Report Issue</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileTab('streetmapper')}
+                style={{
+                  flex: 1, height: '100%', border: 'none', background: 'transparent',
+                  color: mobileTab === 'streetmapper' ? 'var(--secondary)' : 'var(--text-muted)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', cursor: 'pointer'
+                }}
+              >
+                <MapPin size={16} />
+                <span>StreetMapper</span>
+              </button>
             </div>
 
             {/* Smartphone Home Bar */}
