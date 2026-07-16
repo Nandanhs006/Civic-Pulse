@@ -550,7 +550,8 @@ class AIService:
         ):
             priority += 25
 
-        priority = min(max(priority + random.randint(-10, 10), 10), 100)
+        # Deterministic: identical text must yield the same priority everywhere.
+        priority = min(max(priority, 10), 100)
 
         return {
             "english_translation": (

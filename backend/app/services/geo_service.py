@@ -15,12 +15,22 @@ from app.db.models.constituency import Constituency
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "data")
 GEOJSON_PATH = os.path.join(_DATA_DIR, "india_pc_2019_simplified.geojson")
 AC_GEOJSON_PATH = os.path.join(_DATA_DIR, "karnataka_ac.geojson")
+INDIA_AC_GEOJSON_PATH = os.path.join(_DATA_DIR, "india_ac_simplified.geojson")
+STATES_GEOJSON_PATH = os.path.join(_DATA_DIR, "india_states.geojson")
+OUTLINE_GEOJSON_PATH = os.path.join(_DATA_DIR, "india_outline.geojson")
+POLICE_GEOJSON_PATH = os.path.join(_DATA_DIR, "bengaluru_police_stations.geojson")
+CIVIC_GEOJSON_PATH = os.path.join(_DATA_DIR, "bengaluru_civic_centers.geojson")
 
 # Module-level caches (built once per process).
 _features: Optional[List[dict]] = None
 _name_map: Optional[dict] = None
 _ac_features: Optional[List[dict]] = None
 _ac_name_map: Optional[dict] = None
+_boundary_fc: Optional[dict] = None
+_india_ac_features: Optional[List[dict]] = None
+_base_layers: Optional[dict] = None
+_police_fc: Optional[dict] = None
+_civic_fc: Optional[dict] = None
 
 
 def _norm(s: Optional[str]) -> str:
@@ -143,9 +153,190 @@ def _load_ac_features() -> List[dict]:
     return _ac_features
 
 
+def _load_india_ac_features() -> List[dict]:
+    """All-India assembly-constituency polygons (simplified) for the map layer."""
+    global _india_ac_features
+    if _india_ac_features is not None:
+        return _india_ac_features
+    feats: List[dict] = []
+    try:
+        with open(INDIA_AC_GEOJSON_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:  # noqa: BLE001
+        print(f"[geo] could not load India AC boundaries: {e}")
+        _india_ac_features = []
+        return _india_ac_features
+    for feat in data.get("features", []):
+        geom = feat.get("geometry")
+        props = feat.get("properties", {})
+        if not geom:
+            continue
+        feats.append(
+            {
+                "bbox": _polygon_bbox(geom),
+                "geometry": geom,
+                "state": props.get("st_name", ""),
+                "name": _clean_ac_name(props.get("ac_name", "")),
+                "ac_no": props.get("ac_no"),
+                "pc_name": props.get("pc_name", ""),
+            }
+        )
+    _india_ac_features = feats
+    print(f"[geo] loaded {len(feats)} India AC polygons")
+    return _india_ac_features
+
+
+# Bengaluru bounding box (city + immediate suburbs). The women-safety SOS
+# feature is Bengaluru-focused, so incidents are only logged within this box.
+BANGALORE_BBOX = (77.30, 12.70, 77.90, 13.25)  # minLng, minLat, maxLng, maxLat
+
+
+def is_in_bangalore(lat: float, lng: float) -> bool:
+    minx, miny, maxx, maxy = BANGALORE_BBOX
+    return miny <= lat <= maxy and minx <= lng <= maxx
+
+
+def _read_fc(path: str) -> dict:
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:  # noqa: BLE001
+        print(f"[geo] could not load {os.path.basename(path)}: {e}")
+        return {"type": "FeatureCollection", "features": []}
+
+
+def get_base_layers() -> dict:
+    """State polygons + national outline for the map's always-on base layers."""
+    global _base_layers
+    if _base_layers is None:
+        _base_layers = {
+            "states": _read_fc(STATES_GEOJSON_PATH),
+            "outline": _read_fc(OUTLINE_GEOJSON_PATH),
+        }
+    return _base_layers
+
+
+def get_police_stations() -> dict:
+    """Bengaluru police station points (GeoJSON) for the map + nearest lookup."""
+    global _police_fc
+    if _police_fc is None:
+        _police_fc = _read_fc(POLICE_GEOJSON_PATH)
+    return _police_fc
+
+
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    import math
+
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lng2 - lng1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(min(1.0, math.sqrt(a)))
+
+
+def get_civic_centers() -> dict:
+    """Bengaluru demo civic-amenity points (GeoJSON) for the map + Near-me card."""
+    global _civic_fc
+    if _civic_fc is None:
+        _civic_fc = _read_fc(CIVIC_GEOJSON_PATH)
+    return _civic_fc
+
+
+def nearby_civic_centers(
+    lat: float, lng: float, radius_km: float = 6.0, per_category: int = 2
+) -> List[dict]:
+    """Nearest demo civic centres near a point, capped per category."""
+    scored: List[dict] = []
+    for f in get_civic_centers().get("features", []):
+        coords = (f.get("geometry") or {}).get("coordinates") or []
+        if len(coords) != 2:
+            continue
+        d = _haversine_km(lat, lng, coords[1], coords[0])
+        if d > radius_km:
+            continue
+        p = f.get("properties", {})
+        scored.append(
+            {
+                "category": p.get("category"),
+                "category_label": p.get("category_label"),
+                "name": p.get("name"),
+                "locality": p.get("locality"),
+                "latitude": coords[1],
+                "longitude": coords[0],
+                "distance_km": round(d, 2),
+            }
+        )
+    scored.sort(key=lambda x: x["distance_km"])
+    counts: dict = {}
+    out: List[dict] = []
+    for s in scored:
+        c = s["category"]
+        if counts.get(c, 0) >= per_category:
+            continue
+        counts[c] = counts.get(c, 0) + 1
+        out.append(s)
+    return out
+
+
+def nearest_police_station(lat: float, lng: float) -> Optional[dict]:
+    """Nearest bundled Bengaluru police station (offline). None if data missing."""
+    best = None
+    for f in get_police_stations().get("features", []):
+        coords = (f.get("geometry") or {}).get("coordinates") or []
+        if len(coords) != 2:
+            continue
+        plng, plat = coords[0], coords[1]
+        d = _haversine_km(lat, lng, plat, plng)
+        if best is None or d < best["distance_km"]:
+            props = f.get("properties", {})
+            best = {
+                "name": props.get("name") or "Police station",
+                "district": props.get("district"),
+                "latitude": plat,
+                "longitude": plng,
+                "distance_km": round(d, 2),
+            }
+    return best
+
+
 class GeoService:
     def __init__(self, db: Session):
         self.db = db
+
+    def get_ac_boundaries(
+        self,
+        state: Optional[str] = None,
+        bbox: Optional[Tuple[float, float, float, float]] = None,
+    ) -> dict:
+        """Assembly-constituency boundaries as a GeoJSON FeatureCollection.
+
+        Because there are ~4,180 ACs nationwide, callers should pass a ``bbox``
+        (map viewport: minx,miny,maxx,maxy) and/or ``state`` to bound the payload.
+        """
+        feats = []
+        for f in _load_india_ac_features():
+            if state and _norm(f["state"]) != _norm(state):
+                continue
+            if bbox is not None:
+                x0, y0, x1, y1 = f["bbox"]
+                bx0, by0, bx1, by1 = bbox
+                # Skip features whose bbox does not intersect the query bbox.
+                if x1 < bx0 or x0 > bx1 or y1 < by0 or y0 > by1:
+                    continue
+            feats.append(
+                {
+                    "type": "Feature",
+                    "geometry": f["geometry"],
+                    "properties": {
+                        "name": f["name"],
+                        "ac_no": f["ac_no"],
+                        "pc_name": f["pc_name"],
+                        "state": f["state"],
+                    },
+                }
+            )
+        return {"type": "FeatureCollection", "features": feats}
 
     def _get_name_map(self) -> dict:
         global _name_map
@@ -184,6 +375,43 @@ class GeoService:
             if self._match_constituency_id(f["state"], f["name"]) == constituency_id:
                 return f["geometry"]
         return None
+
+    def get_all_boundaries(self, state: Optional[str] = None) -> dict:
+        """All PC boundaries as one GeoJSON FeatureCollection for the live map.
+
+        Each feature embeds its matched DB ``constituency_id`` (may be null if
+        the polygon has no DB match) so the client can tap a polygon and look up
+        the MP without a separate point-in-polygon round trip. Built once and
+        cached; ``state`` filters the cached collection by name.
+        """
+        global _boundary_fc
+        if _boundary_fc is None:
+            feats = [
+                {
+                    "type": "Feature",
+                    "geometry": f["geometry"],
+                    "properties": {
+                        "constituency_id": self._match_constituency_id(
+                            f["state"], f["name"]
+                        ),
+                        "name": f["name"],
+                        "state": f["state"],
+                    },
+                }
+                for f in _load_features()
+            ]
+            _boundary_fc = {"type": "FeatureCollection", "features": feats}
+        if state:
+            sn = _norm(state)
+            return {
+                "type": "FeatureCollection",
+                "features": [
+                    ft
+                    for ft in _boundary_fc["features"]
+                    if _norm(ft["properties"]["state"]) == sn
+                ],
+            }
+        return _boundary_fc
 
     def _get_ac_name_map(self) -> dict:
         global _ac_name_map

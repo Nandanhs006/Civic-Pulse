@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ProposedProject } from '../../../types';
 import apiClient from '../../../services/apiClient';
 import { useLang } from '../../../context/LanguageContext';
+import { bucketOf, SEVERITY_COLOR } from '../map/severity';
 import { Briefcase, Zap, Check, Loader2, IndianRupee } from 'lucide-react';
 
 interface ProjectPrioritizerProps {
@@ -94,11 +95,11 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
           projects.map((proj) => (
             <div key={proj.id} className="glass-panel" style={{
               padding: '16px',
-              borderLeft: `4px solid ${proj.priority_score > 75 ? 'var(--danger)' : proj.priority_score > 45 ? 'var(--warning)' : 'var(--success)'}`,
+              borderLeft: `4px solid ${SEVERITY_COLOR[bucketOf(proj.priority_score)]}`,
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              background: 'hsla(224, 25%, 10%, 0.4)'
+              background: 'var(--bg-card-hover)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
@@ -111,10 +112,10 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
                     fontWeight: 700,
                     padding: '4px 8px',
                     borderRadius: '6px',
-                    background: proj.priority_score > 75 ? 'hsla(346, 84%, 55%, 0.2)' : 'hsla(38, 92%, 50%, 0.2)',
-                    color: proj.priority_score > 75 ? 'var(--danger)' : 'var(--warning)'
+                    background: SEVERITY_COLOR[bucketOf(proj.priority_score)] + '22',
+                    color: SEVERITY_COLOR[bucketOf(proj.priority_score)],
                   }}>
-                    {t('proj.priority', { score: proj.priority_score })}
+                    {t('proj.demand', { score: proj.priority_score })}
                   </span>
                   <span style={{
                     fontSize: '11px',
