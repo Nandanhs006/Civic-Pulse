@@ -241,7 +241,7 @@ const Portal: React.FC = () => {
         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px' }}>
           <CheckCircle2 size={60} color="var(--success)" />
           <h2 style={{ fontSize: '24px' }}>{t('portal.successTitle')}</h2>
-          <div style={{ background: '#1c1f2b', border: '1px solid var(--border-card)', padding: '10px 20px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', width: '100%', maxWidth: '320px' }}>
+          <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-card)', padding: '10px 20px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', width: '100%', maxWidth: '320px' }}>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>COMPLAINT REFERENCE ID</span>
             <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--accent)', fontFamily: 'monospace', letterSpacing: '0.1em' }}>
               {successData.id.slice(0, 8).toUpperCase()}

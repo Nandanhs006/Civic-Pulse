@@ -356,7 +356,7 @@ const AppSimulator: React.FC = () => {
       
       {/* Page Title & Pitch Info */}
       <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-        <h1 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>
+        <h1 style={{ fontSize: 'clamp(20px, 5vw, 28px)', color: 'var(--text-main)', marginBottom: '8px' }}>
           📱 Mobile App & SMS Gateway <span style={{ color: 'var(--secondary)' }}>Simulator</span>
         </h1>
         <p style={{ color: 'var(--text-muted)', maxWidth: '640px', margin: '0 auto' }}>
@@ -375,7 +375,8 @@ const AppSimulator: React.FC = () => {
           {/* Smartphone Frame Wrapper */}
           <div
             style={{
-              width: '350px',
+              width: '100%',
+              maxWidth: '350px',
               height: '670px',
               background: '#15171e',
               borderRadius: '40px',
@@ -405,7 +406,7 @@ const AppSimulator: React.FC = () => {
             {/* Simulated Phone Status Bar */}
             <div
               style={{
-                background: '#1c1f2b',
+                background: 'var(--bg-card)',
                 padding: '30px 18px 8px',
                 display: 'flex',
                 alignItems: 'center',
@@ -427,10 +428,10 @@ const AppSimulator: React.FC = () => {
             </div>
 
             {/* Smart Screen Content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', background: '#0e1118' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-app)' }}>
               
               {/* Internal Mobile Top Card */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1c1f2b', padding: '10px 12px', borderRadius: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '10px 12px', borderRadius: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Smartphone size={16} color="var(--secondary)" />
                   <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-main)' }}>CivicPulse Native</span>
@@ -487,7 +488,7 @@ const AppSimulator: React.FC = () => {
                 {/* 2. Microphone Recorder */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>2. SPEAK Grievance (Optional)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#1c1f2b', padding: '8px', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-card)', padding: '8px', borderRadius: '10px' }}>
                     <button
                       type="button"
                       onClick={isRecording ? stopRecording : startRecording}
@@ -539,8 +540,8 @@ const AppSimulator: React.FC = () => {
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     style={{
-                      background: '#1c1f2b', border: '1px solid var(--border-card)',
-                      borderRadius: '8px', padding: '8px', color: 'white', fontSize: '12px', resize: 'none'
+                      background: 'var(--input-bg)', border: '1px solid var(--border-card)',
+                      borderRadius: '8px', padding: '8px', color: 'var(--text-main)', fontSize: '12px', resize: 'none'
                     }}
                   />
                 </div>
@@ -554,8 +555,8 @@ const AppSimulator: React.FC = () => {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     style={{
-                      background: '#1c1f2b', border: '1px solid var(--border-card)',
-                      borderRadius: '8px', padding: '8px', color: 'white', fontSize: '12px'
+                      background: 'var(--input-bg)', border: '1px solid var(--border-card)',
+                      borderRadius: '8px', padding: '8px', color: 'var(--text-main)', fontSize: '12px'
                     }}
                   />
                 </div>
@@ -567,7 +568,7 @@ const AppSimulator: React.FC = () => {
                   <label
                     htmlFor="mob-image-upload"
                     style={{
-                      background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '8px',
+                      background: 'var(--input-bg)', border: '1px solid var(--border-card)', borderRadius: '8px',
                       padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                       gap: '8px', fontSize: '11px', color: 'var(--text-main)', cursor: 'pointer'
                     }}
@@ -622,7 +623,7 @@ const AppSimulator: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70px', overflowY: 'auto' }}>
                     {offlineQueue.map((item, idx) => (
-                      <div key={idx} style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', background: '#15171e', padding: '4px 6px', borderRadius: '4px' }}>
+                      <div key={idx} style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', background: 'var(--input-bg)', padding: '4px 6px', borderRadius: '4px' }}>
                         <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '170px' }}>{item.content}</span>
                         <span>{item.timestamp}</span>
                       </div>
@@ -645,7 +646,7 @@ const AppSimulator: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           {/* Channel Selector Tabs */}
-          <div style={{ display: 'flex', gap: '8px', background: '#15171e', padding: '6px', borderRadius: '10px', border: '1px solid var(--border-card)' }}>
+          <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-card)', padding: '6px', borderRadius: '10px', border: '1px solid var(--border-card)' }}>
             <button
               type="button"
               onClick={() => setActiveTab('whatsapp')}
@@ -792,7 +793,7 @@ const AppSimulator: React.FC = () => {
                     onChange={(e) => setSmsPhone(e.target.value)}
                     style={{
                       background: 'var(--input-bg)', border: '1px solid var(--border-card)',
-                      borderRadius: '8px', padding: '10px', color: 'white', fontSize: '13px'
+                      borderRadius: '8px', padding: '10px', color: 'var(--text-main)', fontSize: '13px'
                     }}
                   />
                 </div>
@@ -805,7 +806,7 @@ const AppSimulator: React.FC = () => {
                     onChange={(e) => setSmsBody(e.target.value)}
                     style={{
                       background: 'var(--input-bg)', border: '1px solid var(--border-card)',
-                      borderRadius: '8px', padding: '10px', color: 'white', fontSize: '13px', resize: 'none'
+                      borderRadius: '8px', padding: '10px', color: 'var(--text-main)', fontSize: '13px', resize: 'none'
                     }}
                     placeholder="e.g. REPORT Roads Pothole on main lane"
                   />
@@ -830,7 +831,7 @@ const AppSimulator: React.FC = () => {
 
               {/* Gateway Response Message */}
               {smsReply && (
-                <div style={{ marginTop: '10px', background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '10px', padding: '14px' }}>
+                <div style={{ marginTop: '10px', background: 'var(--input-bg)', border: '1px solid var(--border-card)', borderRadius: '10px', padding: '14px' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '6px' }}>
                     GATEWAY WEBHOOK RESPONSE (SENT BACK AS SMS TEXT):
                   </div>

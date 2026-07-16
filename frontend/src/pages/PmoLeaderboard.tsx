@@ -206,7 +206,7 @@ const PmoLeaderboard: React.FC = () => {
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <User size={12} /> {item.mp_name}
                         {item.mp_party && (
-                          <span style={{ marginLeft: '4px', fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', fontWeight: 700 }}>{item.mp_party}</span>
+                          <span style={{ marginLeft: '4px', fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'var(--overlay-med)', fontWeight: 700 }}>{item.mp_party}</span>
                         )}
                       </span>
                     </div>
@@ -272,13 +272,13 @@ const PmoLeaderboard: React.FC = () => {
                         </td>
                         <td style={{ padding: '16px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', flexShrink: 0 }}>
+                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--bg-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', flexShrink: 0 }}>
                               <User size={13} />
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                               <span style={{ fontWeight: 550 }}>{item.mp_name}</span>
                               {item.mp_party && (
-                                <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '4px', background: item.mp_party === 'BJP' ? 'rgba(249,115,22,0.1)' : item.mp_party === 'INC' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.05)', color: item.mp_party === 'BJP' ? 'var(--saffron)' : item.mp_party === 'INC' ? '#3b82f6' : 'var(--text-muted)', width: 'fit-content', fontWeight: 700, marginTop: '2px' }}>
+                                <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '4px', background: item.mp_party === 'BJP' ? 'rgba(249,115,22,0.1)' : item.mp_party === 'INC' ? 'rgba(59,130,246,0.1)' : 'var(--bg-subtle)', color: item.mp_party === 'BJP' ? 'var(--saffron)' : item.mp_party === 'INC' ? '#3b82f6' : 'var(--text-muted)', width: 'fit-content', fontWeight: 700, marginTop: '2px' }}>
                                   {item.mp_party}
                                 </span>
                               )}

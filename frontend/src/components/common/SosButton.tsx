@@ -430,7 +430,7 @@ const SosButton: React.FC = () => {
       {sosDisabled && (
         <div
           style={{
-            position: 'fixed', right: 18, bottom: 86, zIndex: 3500, maxWidth: 180,
+            position: 'fixed', right: 86, bottom: 30, zIndex: 3500, maxWidth: 180,
             background: 'rgba(17,24,39,0.9)', color: '#fff', fontSize: 11, lineHeight: 1.35,
             padding: '7px 10px', borderRadius: 8, textAlign: 'right', pointerEvents: 'none',
           }}
