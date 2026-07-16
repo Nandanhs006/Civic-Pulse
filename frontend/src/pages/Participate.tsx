@@ -9,6 +9,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import PhoneAuthModal from '../components/common/PhoneAuthModal';
+import { resolveMediaUrl } from '../services/media';
 import 'leaflet/dist/leaflet.css';
 
 const CATEGORIES = [
@@ -1766,7 +1767,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
                     {/* Before & After evidence block */}
                     {(() => {
-                      const beforeImage = issue.image_url;
+                      const beforeImage = resolveMediaUrl(issue.image_url);
 
                       const categoryMockAfters: Record<string, string> = {
                         'Water': 'https://images.unsplash.com/photo-1542013936693-8848e574047a?w=400',

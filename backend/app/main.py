@@ -71,7 +71,48 @@ def _run_lightweight_migrations() -> None:
             print(f"[migrate] skipped: {exc.__class__.__name__}")
 
 
+def _backfill_issue_images() -> None:
+    """Give every demo issue a category-relevant, same-origin photo.
+
+    Runs INDEPENDENTLY of the full seed pipeline (ingest_mps → ingest_mlas →
+    seed_demo_issues), because on an already-populated deploy DB that pipeline can
+    error at an ingest step and never reach the image backfill — leaving the live
+    map imageless. Idempotent: skips issues that already point at /issue-images/.
+    """
+    try:
+        from app.db.models.suggestion import Suggestion
+        from app.scripts.seed_demo_issues import (
+            _category_image,
+            DEMO_MARKER,
+            LOCAL_CATEGORY_IMAGES,
+        )
+
+        db = SessionLocal()
+        try:
+            rows = (
+                db.query(Suggestion)
+                .filter(Suggestion.content.like(f"{DEMO_MARKER}%"))
+                .all()
+            )
+            fixed = 0
+            for s in rows:
+                if s.image_url and s.image_url.startswith("/issue-images/"):
+                    continue
+                cat = s.category or "Roads"
+                if cat in LOCAL_CATEGORY_IMAGES:
+                    s.image_url = _category_image(cat)
+                    fixed += 1
+            if fixed:
+                db.commit()
+            print(f"[images] backfilled {fixed} demo issue images")
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001 — never block boot on the backfill
+        print(f"[images] backfill skipped: {exc}")
+
+
 _run_lightweight_migrations()
+_backfill_issue_images()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

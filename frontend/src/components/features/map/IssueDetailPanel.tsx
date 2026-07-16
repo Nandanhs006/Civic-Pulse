@@ -7,6 +7,7 @@ import { useAuth } from '../../../context/AuthContext';
 import RoutingTree from '../../common/RoutingTree';
 import IssueTimeline from '../../common/IssueTimeline';
 import { severityOf, SEVERITY_COLOR } from './severity';
+import { resolveMediaUrl } from '../../../services/media';
 import { X, Image as ImageIcon, CalendarDays, ListChecks, BadgeCheck } from 'lucide-react';
 
 interface IssueDetailPanelProps {
@@ -67,7 +68,7 @@ const IssueDetailPanel: React.FC<IssueDetailPanelProps> = ({ issue, onClose }) =
       {/* Photo */}
       {issue.image_url && !imgBroken ? (
         <img
-          src={issue.image_url}
+          src={resolveMediaUrl(issue.image_url)}
           alt="Issue"
           onError={() => setImgBroken(true)}
           style={{ width: '100%', height: 170, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border-card)' }}
