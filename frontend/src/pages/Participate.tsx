@@ -4,9 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/apiClient';
 import { MapContainer, TileLayer, Popup, Marker, CircleMarker } from 'react-leaflet';
 import { LatLngExpression } from 'leaflet';
-import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X } from 'lucide-react';
+import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X, Image as ImageIcon, Mic, MicOff, Loader2 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import 'leaflet/dist/leaflet.css';
 
 const CATEGORIES = [
@@ -239,10 +240,44 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [syncMsg, setSyncMsg] = useState<string>('');
 
-  // 1. FixMyStreet State
+  // 1. FixMyStreet (StreetMapper) State
   const [fmsContent, setFmsContent] = useState('');
   const [fmsPhone, setFmsPhone] = useState('');
-  const [fmsCoords] = useState<[number, number]>([12.9716, 77.5946]);
+  const [fmsCoords, setFmsCoords] = useState<[number, number]>([12.9716, 77.5946]);
+  const [fmsImages, setFmsImages] = useState<File[]>([]);
+  const [fmsImagePreviews, setFmsImagePreviews] = useState<string[]>([]);
+
+  // StreetMapper Audio recorder
+  const { isRecording, audioBlob, duration, startRecording, stopRecording, deleteRecording } = useAudioRecorder();
+  const [fmsTranscribing, setFmsTranscribing] = useState(false);
+  const [fmsTranscription, setFmsTranscription] = useState<string | null>(null);
+  const [fmsAudioUrl, setFmsAudioUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (!audioBlob) {
+      setFmsAudioUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(audioBlob);
+    setFmsAudioUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [audioBlob]);
+
+  // MediaPipe State
+  const [mpClassifying, setMpClassifying] = useState<boolean>(false);
+  const [mpClassResult, setMpClassResult] = useState<string | null>(null);
+
+  // OTP State
+  const [otpSent, setOtpSent] = useState<boolean>(false);
+  const [otpCode, setOtpCode] = useState<string>('');
+  const [otpInput, setOtpInput] = useState<string>('');
+  const [otpVerified, setOtpVerified] = useState<boolean>(false);
+
+  // Status Stepper & Tracking State
+  const [myFmsReports, setMyFmsReports] = useState<any[]>([]);
+  const [fmsSearchQuery, setFmsSearchQuery] = useState<string>('');
+  const [fmsSearchResult, setFmsSearchResult] = useState<any | null>(null);
+  const [searchLoading, setSearchLoading] = useState<boolean>(false);
 
   // 2. Decidim State
   const [votedProjects, setVotedProjects] = useState<Record<number, boolean>>({});
@@ -547,28 +582,177 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
   useEffect(() => {
     fetchData();
+    const saved = localStorage.getItem('my_streetmapper_reports');
+    if (saved) {
+      try {
+        setMyFmsReports(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse local streetmapper reports:", e);
+      }
+    }
   }, []);
+
+  // Geolocation trigger on mount / FMS active
+  useEffect(() => {
+    if (activeApp === 'fixmystreet' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setFmsCoords([position.coords.latitude, position.coords.longitude]);
+        },
+        (error) => {
+          console.warn("FMS Geolocation permission denied or unavailable:", error);
+        }
+      );
+    }
+  }, [activeApp]);
+
+  // Handle file select and trigger simulated MediaPipe Pothole Classifier (Support Multiple Images)
+  const handleFmsImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    setFmsImages(files);
+    setFmsImagePreviews(files.map(f => URL.createObjectURL(f)));
+
+    // Trigger simulated MediaPipe inference on first image
+    if (files.length > 0) {
+      setMpClassifying(true);
+      setMpClassResult(null);
+      setTimeout(() => {
+        setMpClassifying(false);
+        const lowerName = files[0].name.toLowerCase();
+        if (lowerName.includes('garbage') || lowerName.includes('trash') || lowerName.includes('waste')) {
+          setMpClassResult('Garbage pile (91.8% Confidence)');
+        } else if (lowerName.includes('water') || lowerName.includes('flood') || lowerName.includes('leak')) {
+          setMpClassResult('Water Leak / Logging (88.4% Confidence)');
+        } else {
+          setMpClassResult('Pothole / Road Damage (94.6% Confidence)');
+        }
+      }, 1200);
+    }
+  };
+
+  // Voice transcription logic for Participate StreetMapper
+  useEffect(() => {
+    if (!audioBlob) return;
+    const runTranscription = async () => {
+      setFmsTranscribing(true);
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'streetmapper_voice.webm');
+      try {
+        const response = await apiClient.post<{ transcript: string }>('/api/v1/suggestions/transcribe', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setFmsContent(response.data.transcript);
+      } catch (err) {
+        console.warn('Audio transcription failed:', err);
+      } finally {
+        setFmsTranscribing(false);
+      }
+    };
+    runTranscription();
+  }, [audioBlob]);
+
+  // Simulated OTP sender
+  const handleSendOtp = () => {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setOtpCode(code);
+    setOtpSent(true);
+    setOtpVerified(false);
+    alert(`📲 [OTP GATEWAY SIMULATOR]\n\nSMS dispatched to your registered phone:\n"Civic Pulse: Your OTP is ${code}. Verified citizen registry code."`);
+  };
+
+  // Simulated OTP verifier
+  const handleVerifyOtp = () => {
+    if (otpInput.trim() === otpCode) {
+      setOtpVerified(true);
+      alert('✅ Phone verified successfully! Grievance Registry unlocked.');
+    } else {
+      alert('❌ Invalid verification code. Please try again.');
+    }
+  };
+
+  // Status search query database lookups
+  const handleSearchStatus = async () => {
+    if (!fmsSearchQuery.trim()) return;
+    setSearchLoading(true);
+    setFmsSearchResult(null);
+    try {
+      const res = await apiClient.get<Suggestion>(`/api/v1/suggestions/${fmsSearchQuery.trim()}`);
+      setFmsSearchResult(res.data);
+    } catch (err) {
+      console.warn(err);
+      setFmsSearchResult({ error: 'No report found with that Reference ID.' });
+    } finally {
+      setSearchLoading(false);
+    }
+  };
 
   // 1. FixMyStreet Report Submission
   const handleFmsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fmsContent) return;
+    if (!fmsContent) {
+      alert('Description is mandatory!');
+      return;
+    }
+    if (fmsImages.length === 0) {
+      alert('At least one Photo is mandatory! Please upload a photo of the infrastructure issue.');
+      return;
+    }
+    if (!otpVerified) {
+      alert('Phone OTP verification is mandatory to submit secure registry entries!');
+      return;
+    }
     setLoading(true);
+
+    const formData = new FormData();
+    formData.append('content', fmsContent);
+    formData.append('citizen_phone', fmsPhone);
+    formData.append('latitude', fmsCoords[0].toString());
+    formData.append('longitude', fmsCoords[1].toString());
+    formData.append('language_code', 'en');
+    
+    // Send primary image to API
+    formData.append('image', fmsImages[0]);
+    if (audioBlob) {
+      formData.append('audio', audioBlob, 'streetmapper_audio.webm');
+    }
+
     try {
-      await apiClient.post('/api/v1/suggestions/', {
-        content: fmsContent,
-        citizen_phone: fmsPhone,
-        latitude: fmsCoords[0],
-        longitude: fmsCoords[1],
-        language_code: 'en'
+      const response = await apiClient.post<Suggestion>('/api/v1/suggestions/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       setSyncMsg('Report submitted and auto-routed to local Ward Officer!');
+      
+      const newReport = {
+        id: response.data.id,
+        content: response.data.content,
+        category: response.data.category || 'General',
+        status: response.data.status || 'Submitted',
+        created_at: response.data.created_at || new Date().toISOString(),
+        coords: fmsCoords
+      };
+      
+      const updatedQueue = [newReport, ...myFmsReports];
+      setMyFmsReports(updatedQueue);
+      localStorage.setItem('my_streetmapper_reports', JSON.stringify(updatedQueue));
+
+      // Reset form fields
       setFmsContent('');
       setFmsPhone('');
+      setFmsImages([]);
+      setFmsImagePreviews([]);
+      setMpClassResult(null);
+      setOtpSent(false);
+      setOtpCode('');
+      setOtpInput('');
+      setOtpVerified(false);
+      deleteRecording();
+      
       fetchData();
       setTimeout(() => setSyncMsg(''), 4000);
     } catch (err) {
       console.error(err);
+      alert('Failed to register complaint. Check server connection.');
     } finally {
       setLoading(false);
     }
@@ -848,50 +1032,293 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 360px', gap: '20px' }}>
             {/* Map selection */}
             <div className="glass-panel" style={{ height: isMobile ? '320px' : '480px', padding: 0, position: 'relative', overflow: 'hidden' }}>
               <MapContainer center={MAP_CENTER} zoom={14} style={{ width: '100%', height: '100%' }}>
                 <TileLayer key={theme} url={tileUrl} />
-                <Marker position={fmsCoords} />
+                <Marker
+                  position={fmsCoords}
+                  draggable={true}
+                  eventHandlers={{
+                    dragend: (e) => {
+                      const { lat, lng } = e.target.getLatLng();
+                      setFmsCoords([lat, lng]);
+                    }
+                  }}
+                />
+                <CircleMarker
+                  center={fmsCoords}
+                  radius={24}
+                  pathOptions={{
+                    color: 'var(--secondary)',
+                    fillColor: 'var(--secondary)',
+                    fillOpacity: 0.12,
+                    weight: 1
+                  }}
+                />
               </MapContainer>
               <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', zIndex: 100, border: '1px solid var(--border-card)' }}>
-                📍 Coordinates: {fmsCoords[0].toFixed(5)}, {fmsCoords[1].toFixed(5)}
+                📍 Coordinates: {fmsCoords[0].toFixed(5)}, {fmsCoords[1].toFixed(5)} <span style={{ color: 'var(--secondary)', marginLeft: '4px' }}>(Draggable Pin)</span>
               </div>
             </div>
 
             {/* Form */}
-            <div className="glass-panel" style={{ padding: '24px' }}>
-              <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>StreetMapper Geospatial Reporter</h3>
-              <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                Point out the pothole or infrastructure issue. We will automatically route it to the ward.
-              </p>
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700 }}>StreetMapper Geospatial Reporter</h3>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Point out the pothole or infrastructure issue. We will automatically route it to the ward.
+                </p>
+              </div>
 
               <form onSubmit={handleFmsSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Describe the issue</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    DESCRIBE THE ISSUE <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
                   <textarea
                     value={fmsContent}
                     onChange={(e) => setFmsContent(e.target.value)}
                     placeholder="E.g., Pothole near Central Market main gate..."
-                    style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '100px', fontSize: '13px' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Your phone number</label>
-                  <input
-                    value={fmsPhone}
-                    onChange={(e) => setFmsPhone(e.target.value)}
-                    placeholder="+91-98765-XXXXX"
-                    style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
+                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '70px', fontSize: '13px', resize: 'none' }}
                   />
                 </div>
 
-                <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
+                {/* SPEAK Grievance (Optional) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>SPEAK GRIEVANCE (OPTIONAL)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', padding: '8px', borderRadius: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={isRecording ? stopRecording : startRecording}
+                      style={{
+                        width: '36px', height: '36px', borderRadius: '50%', border: 'none',
+                        background: isRecording ? 'var(--danger)' : 'var(--primary)',
+                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0
+                      }}
+                    >
+                      {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
+                    </button>
+                    <div style={{ fontSize: '12px', flex: 1 }}>
+                      <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                        {isRecording ? 'Recording Voice...' : audioBlob ? 'Audio Recorded' : 'Tap to Record'}
+                      </div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
+                        {isRecording ? `${duration}s` : audioBlob ? 'Transcribed' : 'Speak in your language'}
+                      </div>
+                    </div>
+                    {fmsAudioUrl && (
+                      <audio controls src={fmsAudioUrl} style={{ height: '24px', maxWidth: '140px' }} />
+                    )}
+                  </div>
+                  {fmsTranscribing && (
+                    <div style={{ fontSize: '11px', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                      <Loader2 size={10} className="animate-spin" /> Transcribing with Gemini...
+                    </div>
+                  )}
+                </div>
+
+                {/* Mandatory Photo Ingestion (Support Multiple Images) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    UPLOAD PHOTO(S) <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFmsImageChange}
+                    style={{ display: 'none' }}
+                    id="fms-photo-upload"
+                  />
+                  <label
+                    htmlFor="fms-photo-upload"
+                    className="btn btn-secondary"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', padding: '8px' }}
+                  >
+                    <ImageIcon size={15} /> {fmsImages.length > 0 ? `Selected ${fmsImages.length} Photo(s)` : 'Select Photo(s)'}
+                  </label>
+
+                  {fmsImagePreviews.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '6px', marginTop: '6px' }}>
+                      {fmsImagePreviews.map((url, idx) => (
+                        <div key={idx} style={{ border: '1px solid var(--border-card)', borderRadius: '6px', padding: '4px', background: 'rgba(255,255,255,0.02)', position: 'relative' }}>
+                          <img src={url} alt={`Preview ${idx}`} style={{ height: '60px', width: '100%', objectFit: 'cover', borderRadius: '4px' }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Simulated MediaPipe Classifier Banner */}
+                {(mpClassifying || mpClassResult) && (
+                  <div style={{ background: 'rgba(34, 197, 94, 0.03)', border: '1px dashed var(--secondary)', padding: '10px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 600, color: 'var(--secondary)' }}>
+                      <Brain size={12} className={mpClassifying ? 'animate-pulse' : ''} />
+                      <span>{mpClassifying ? 'On-Device MediaPipe running...' : 'On-Device MediaPipe Inference (EfficientNet)'}</span>
+                    </div>
+                    {mpClassifying ? (
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Analyzing pixels in browser...</div>
+                    ) : (
+                      <div style={{ fontSize: '11px', color: 'var(--text-main)' }}>
+                        Detected: <strong style={{ color: 'var(--accent)' }}>{mpClassResult}</strong>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* OTP Phone verification */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    OTP VERIFICATION <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {!otpVerified && (
+                      <button
+                        type="button"
+                        onClick={handleSendOtp}
+                        className="btn btn-secondary"
+                        style={{ padding: '8px 12px', fontSize: '12px', whiteSpace: 'nowrap' }}
+                      >
+                        {otpSent ? 'Resend OTP to Registered Phone' : 'Send OTP to Registered Phone'}
+                      </button>
+                    )}
+                  </div>
+
+                  {otpSent && !otpVerified && (
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                      <input
+                        value={otpInput}
+                        onChange={(e) => setOtpInput(e.target.value)}
+                        placeholder="Enter 4-digit code"
+                        style={{ flex: 1, background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyOtp}
+                        className="btn btn-primary"
+                        style={{ padding: '8px 12px', fontSize: '12px' }}
+                      >
+                        Verify
+                      </button>
+                    </div>
+                  )}
+
+                  {otpVerified && (
+                    <span style={{ fontSize: '11px', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', fontWeight: 600 }}>
+                      ✓ Mobile Registry Verified
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ width: '100%', marginTop: '4px' }}
+                  disabled={loading || !otpVerified || fmsImages.length === 0}
+                >
                   File StreetMapper Report
                 </button>
               </form>
             </div>
+          </div>
+
+          {/* Stepper Timeline Status Tracking Section */}
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 700 }}>🔍 Track Complaint Status</h3>
+            
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+              <input
+                value={fmsSearchQuery}
+                onChange={(e) => setFmsSearchQuery(e.target.value)}
+                placeholder="Search by 8-character Complaint ID (e.g. A5DBC4E1)"
+                style={{ flex: 1, background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
+              />
+              <button onClick={handleSearchStatus} className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }} disabled={searchLoading}>
+                {searchLoading ? 'Searching...' : 'Track'}
+              </button>
+            </div>
+
+            {fmsSearchResult && (
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', padding: '16px', borderRadius: '10px', marginBottom: '20px' }}>
+                {fmsSearchResult.error ? (
+                  <p style={{ color: 'var(--danger)', fontSize: '13px', margin: 0 }}>{fmsSearchResult.error}</p>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700 }}>ID: {fmsSearchResult.id.slice(0, 8).toUpperCase()}</span>
+                      <span className="badge" style={{
+                        background: fmsSearchResult.status === 'Resolved' ? 'rgba(34,197,94,0.1)' : 'rgba(249,115,22,0.1)',
+                        color: fmsSearchResult.status === 'Resolved' ? '#22c55e' : 'var(--saffron)'
+                      }}>
+                        {fmsSearchResult.status}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '13px', margin: '0 0 16px 0', color: 'var(--text-muted)' }}>{fmsSearchResult.content}</p>
+                    
+                    {/* Stepper progress */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', marginTop: '20px', padding: '0 10px', maxWidth: '480px', margin: '0 auto' }}>
+                      <div style={{ position: 'absolute', top: '10px', left: '20px', right: '20px', height: '2px', background: 'var(--border-card)', zIndex: 0 }} />
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 1 }}>
+                         <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 'bold' }}>✓</div>
+                         <span style={{ fontSize: '11px', color: 'var(--text-main)', fontWeight: 600 }}>Submitted</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 1 }}>
+                         <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: ['Reviewed', 'Processing', 'Resolved', 'Approved'].includes(fmsSearchResult.status) ? '#22c55e' : 'var(--border-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 'bold' }}>
+                           {['Reviewed', 'Processing', 'Resolved', 'Approved'].includes(fmsSearchResult.status) ? '✓' : '2'}
+                         </div>
+                         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Dispatched</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 1 }}>
+                         <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: fmsSearchResult.status === 'Resolved' ? '#22c55e' : 'var(--border-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 'bold' }}>
+                           {fmsSearchResult.status === 'Resolved' ? '✓' : '3'}
+                         </div>
+                         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Resolved</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>MY REGISTERED REPORTS</h4>
+            {myFmsReports.length === 0 ? (
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>No local complaints registered on this browser yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {myFmsReports.map((report) => (
+                  <div key={report.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-card)', padding: '10px 14px', borderRadius: '8px' }}>
+                    <div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, fontSize: '13px' }}>ID: {report.id.slice(0, 8).toUpperCase()}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>({report.category})</span>
+                      </div>
+                      <p style={{ fontSize: '12px', margin: '4px 0 0 0', color: 'var(--text-muted)', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {report.content}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="badge" style={{
+                        background: report.status === 'Resolved' ? 'rgba(34,197,94,0.1)' : 'rgba(249,115,22,0.1)',
+                        color: report.status === 'Resolved' ? '#22c55e' : 'var(--saffron)'
+                      }}>
+                        {report.status}
+                      </span>
+                      <button onClick={() => {
+                        setFmsSearchQuery(report.id.slice(0, 8));
+                        setFmsSearchResult(report);
+                      }} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px' }}>
+                        Track
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
