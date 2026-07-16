@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import { useTheme } from '../context/ThemeContext';
 import { MapContainer, TileLayer, Marker, CircleMarker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -34,6 +35,7 @@ interface OfflineReport {
 }
 
 const AppSimulator: React.FC = () => {
+  const { theme } = useTheme();
   // Simulated Mobile App State
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [phone, setPhone] = useState<string>('9988776655');
@@ -687,7 +689,11 @@ const AppSimulator: React.FC = () => {
               {/* Internal Mobile Top Card */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '10px 12px', borderRadius: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Smartphone size={16} color="var(--secondary)" />
+                  <img
+                    src={theme === 'light' ? '/logo/logo.png' : '/logo/logo_dark.png'}
+                    alt="Civic Pulse"
+                    style={{ height: '20px', width: '20px', objectFit: 'contain' }}
+                  />
                   <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-main)' }}>CivicPulse Native</span>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
