@@ -56,6 +56,7 @@ export const useAudioRecorder = () => {
         stream.getTracks().forEach((track) => track.stop());
       };
 
+
       mediaRecorder.start();
       setIsRecording(true);
 

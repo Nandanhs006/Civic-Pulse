@@ -73,5 +73,22 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str | None = None
     UPLOAD_DIR: str = "uploads"
 
+    # ── GCP / Vertex AI (Module 1: Vertex Agent) ─────────────────────────────
+    # Set these when a GCP service account is available.
+    # Without these, Vertex AI agent stays in standby — Gemini handles classification.
+    GOOGLE_APPLICATION_CREDENTIALS: str | None = None   # Path to service account JSON
+    VERTEX_PROJECT_ID: str | None = None                # GCP project ID
+    VERTEX_LOCATION: str = "us-central1"                # Vertex AI region
+
+    # ── Cloud Speech-to-Text v2 (Module 2: STT) ───────────────────────────────
+    # Requires GOOGLE_APPLICATION_CREDENTIALS + GOOGLE_CLOUD_PROJECT.
+    # Without these, Gemini inline audio transcription is used instead.
+    GOOGLE_CLOUD_PROJECT: str | None = None             # GCP project for Cloud STT
+
+    # ── Duplicate Detection (Module 4: Embeddings) ────────────────────────────
+    # Uses GEMINI_API_KEY (already above) — no extra credentials needed.
+    DUPLICATE_SIMILARITY_THRESHOLD: float = 0.92        # Cosine similarity threshold
+    DUPLICATE_LOOKBACK_LIMIT: int = 500                 # Max candidates to compare
+
 
 settings = Settings()

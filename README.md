@@ -38,7 +38,7 @@ flowchart TD
     end
 
     subgraph "Cloud Services & Media Storage"
-        AIService["Gemini 1.5 Flash AI API"]
+        AIService["Gemini Flash AI API"]
         FileService["File Upload Service"]
         GCS[("Google Cloud Storage (GCS)")]
     end
@@ -178,12 +178,17 @@ source venv/bin/activate
 # 2. Install all required dependencies
 pip install -r backend/requirements.txt
 
-# 3. Start the FastAPI development server
-POSTGRES_PASSWORD="" PYTHONPATH=backend uvicorn app.main:app --reload --port 8001
+# 3. Run SQLite / PostgreSQL migrations to prepare AI database columns
+POSTGRES_PASSWORD="" PYTHONPATH=backend ./venv/bin/python3 backend/app/scripts/migrate_ai_fields.py
+
+# 4. Start the FastAPI development server
+POSTGRES_PASSWORD="" PYTHONPATH=backend ./venv/bin/uvicorn app.main:app --reload --port 8001
 ```
-*Note: Automatically falls back to local SQLite (`sqlite:///./civic_pulse.db`) if no PostgreSQL password/host is defined. Set environment variables to enable Google Cloud integrations:*
-* `GEMINI_API_KEY`: Set this to your Google AI Studio or Vertex AI Gemini API key to enable active LLM issue translation, classification, and scoring.
+*Note: Automatically falls back to local SQLite (`sqlite:///./civic_pulse.db`) if no PostgreSQL password/host is defined. Env vars can be saved in a `.env` file at the project root to enable Google Cloud integrations:*
+* `GEMINI_API_KEY`: Set this to your Google AI Studio or Vertex AI Gemini API key to enable active LLM issue translation, classification, scoring, and voice transcription.
+* `MOCK_AI_PIPELINE`: Set to `false` to enable live Gemini API calls instead of simulated responses.
 * `GCS_BUCKET_NAME`: Set this to your Google Cloud Storage bucket name to upload citizen images and voice clips directly to the cloud.
+
 
 #### 2. Frontend React Setup
 ```bash
@@ -297,3 +302,90 @@ Because analytical queries run directly in-place over the PostgreSQL database ut
 * **Mobile Intake**: Native Flutter or Android apps for offline/field-based issue logging.
 * **SMS & Chat Flow**: WhatsApp Business API and SMS gateway integrations for low-connectivity users via Dialogflow.
 
+---
+
+## 📸 Platform Screenshots & Walkthrough
+
+![Light Mode](frontend/public/images/web_ss/light.png)
+Light Mode availability: A clean, high-contrast, modern layout optimized for daytime viewing and administrative work.
+
+![Dark Mode](frontend/public/images/web_ss/dark.png)
+Dark Mode availability: A premium dark-mode interface leveraging deep slate tones, reducing eye strain for late-night reviews.
+
+![MP Login](frontend/public/images/web_ss/mp_L.png)
+MP Login: Secure credentials-based authentication gateway ensuring data privacy and role-based access control.
+
+![MP Dashboard Overview](frontend/public/images/web_ss/mp1.png)
+MP Dashboard: Interactive summary view for Lok Sabha MPs displaying active cases, constituency analytics, and task distributions.
+
+![MP Ward Performance](frontend/public/images/web_ss/mp2.png)
+MP Performance & Ward Analysis: Drill-down metrics per ward, showing active caseload and performance ratings of different ward officers.
+
+![PMO Dashboard Overview](frontend/public/images/web_ss/pmo1.jpeg)
+PMO Dashboard: High-level aggregates and KPIs, exposing nationwide constituency performance indices, resolution rates, and ticket turnaround times.
+
+![PMO Leaderboard](frontend/public/images/web_ss/pmo2.jpeg)
+PMO Leaderboard: Ranked sorting of constituencies based on project execution speed, citizen feedback sentiment, and resource utilization.
+
+![PMO Regional Detail](frontend/public/images/web_ss/pmo3.jpeg)
+PMO Analytics: Drill-down heatmaps and analytical breakdowns for specific states and districts.
+
+![Citizen Proposals](frontend/public/images/web_ss/participatory.png)
+Participatory Budgeting: Interface showing local ward participatory project proposals (e.g. water systems, road restoration) and active community upvoting.
+
+![Grid Officer Tasks](frontend/public/images/web_ss/gr1.png)
+Grid Representative Portal: Action dashboard for field officers to view dispatch assignments, route maps, and task priorities.
+
+![Grid Task Action](frontend/public/images/web_ss/gr2.png)
+Grievance Inspection & Update: Task detail view where officers can upload resolution evidence, comments, and change status.
+
+![StreetMapper](frontend/public/images/web_ss/streetmap_p.png)
+StreetMapper Portal: An interface for citizens to submit geolocated infrastructure issues with voice notes, descriptions, and before photos.
+
+![Civic Fund](frontend/public/images/web_ss/funds_p.png)
+Civic Fund: A detailed overview of budgeted projects, estimated costs in ₹ Rupees, and active feasibility scoring.
+
+![Hotspot Tracker](frontend/public/images/web_ss/hotspots_p.png)
+Hotspot Tracker: Leaflet-based geospatial heatmap visualizing grievance density and clustering to guide resource allocation.
+
+![Sector Directory](frontend/public/images/web_ss/ward_p.png)
+Sector Directory: Direct mapping of municipal ward officers and administrative performance indexes.
+
+![Live Map 1](frontend/public/images/web_ss/map1.jpeg)
+Live Map View 1: Detailed geospatial visualizations of civic nodes, assembly constituencies, and Lok Sabha boundary polygons.
+
+![Live Map 2](frontend/public/images/web_ss/map2.jpeg)
+Live Map View 2: Detailed assembly-constituency level mappings and civic node marker listings.
+
+![Civic Timeline](frontend/public/images/web_ss/civic_P.png)
+Civic Timeline: Chronological resolution feed displaying detailed activity history and before/after evidence side-by-side.
+
+---
+
+## 🔭 Future Phase Roadmap
+
+### 📱 Mobile & Offline Support
+* **Flutter / Android App** — Native citizen app for offline issue logging and sync.
+* **SMS Gateway** — Basic SMS intake for no-internet rural areas.
+* **WhatsApp Business API** — Conversational complaint submission via Dialogflow.
+* **Offline Queue** — Local-first reporting with background sync on connectivity restore.
+
+### 🤖 AI & ML Expansion
+* **Gemini API / Vertex AI** — Fine-tuned grievance classification and priority scoring agents.
+* **Voice & Dialect** — Cloud Speech-to-Text + Translation API for 20+ Indian regional languages.
+* **Multimodal Vision** — Gemini Vision / Vertex AI Vision to auto-classify citizen-uploaded photos (potholes, smoke, flood damage).
+* **Duplicate Detection** — Vector similarity search to group redundant reports into single resolved actions.
+
+### 🗺️ Geospatial & Public Data
+* **Google Maps Platform** — Live hotspot heatmaps for infrastructure issue clustering.
+* **Google Earth Engine** — Satellite imagery overlays for flood/crop damage in rural tracks.
+* **Public Datasets** — Integrate `data.gov.in`, Census/NFHS, CPCB air quality, and IMD weather data for smarter governance scores.
+
+### 🔥 Backend & Real-Time
+* **Firebase** — Real-time push notifications for citizens on issue status changes.
+* **Cloud Functions** — Event-driven automation for officer dispatch on new critical tickets.
+* **MediaPipe** — On-device photo classification for low-bandwidth environments.
+
+### 🔒 Scale & Security
+* **Sovereign Cloud** — Deployable on NIC or state government private cloud for data compliance.
+* **Federated Identity** — DigiLocker / Aadhaar-linked citizen authentication.

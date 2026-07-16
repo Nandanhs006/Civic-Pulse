@@ -18,6 +18,7 @@ from app.api.v1 import (
     civic,
     airquality,
     mplads,
+    dialogflow,
 )
 from app.db.session import engine, SessionLocal
 from app.db.base import Base
@@ -108,6 +109,12 @@ app.include_router(
     mplads.router,
     prefix=f"{settings.API_V1_STR}/mplads",
     tags=["MPLADS"],
+)
+# Dialogflow CX Webhook (conversational AI intake — pitch-ready, always active)
+app.include_router(
+    dialogflow.router,
+    prefix=f"{settings.API_V1_STR}/dialogflow",
+    tags=["Dialogflow"],
 )
 
 import asyncio

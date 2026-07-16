@@ -77,9 +77,16 @@ class SuggestionOut(BaseModel):
     assembly_constituency_id: Optional[int] = None
     assigned_officer_id: Optional[int] = None
     dispatch_status: Optional[str] = "Unassigned"
+    # AI Enhancement Fields
+    ai_confidence: Optional[float] = None
+    ai_reasoning: Optional[str] = None
+    image_analysis: Optional[str] = None   # JSON string of vision output
+    is_duplicate: bool = False
+    duplicate_of_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 
 # Public map issue (no citizen phone / PII)
