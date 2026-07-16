@@ -250,15 +250,57 @@ class SosRequest(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     note: Optional[str] = None
+    share_precise: bool = False  # share exact location with responders who ack
 
 
 class SosResponse(BaseModel):
     incident_id: Optional[int] = None
     logged: bool = True  # False when outside the Bengaluru service area
     emergency_number: str = "112"  # India ERSS / national emergency number
+    resolve_token: Optional[str] = None  # secret for the creator to mark-safe
+    share_precise: bool = False
+    credibility_score: Optional[int] = None   # advisory triage — never suppresses
+    credibility_level: Optional[str] = None
+    credibility_note: Optional[str] = None
     constituency: Optional[ConstituencyOut] = None
     mp: Optional[MPOut] = None
     message: str
+
+
+class MessageRequest(BaseModel):
+    responder_id: str
+    text: str
+    is_owner: bool = False
+
+
+class MessageOut(BaseModel):
+    id: int
+    responder_id: str
+    is_owner: bool = False
+    text: str
+    created_at: Optional[datetime] = None
+
+
+class AckRequest(BaseModel):
+    responder_id: str          # anonymous browser token (localStorage)
+    responding: bool = False   # True = "I'm heading over"
+
+
+class ResolveRequest(BaseModel):
+    resolve_token: str
+
+
+class ShareRequest(BaseModel):
+    resolve_token: str
+    share_precise: bool
+
+
+class IncidentStatus(BaseModel):
+    incident_id: int
+    status: str
+    aware_count: int = 0
+    responding_count: int = 0
+    share_precise: bool = False
 
 
 class SafetyIncidentPoint(BaseModel):

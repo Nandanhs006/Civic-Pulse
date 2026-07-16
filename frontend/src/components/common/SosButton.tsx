@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ShieldAlert, Phone, X, Bell, BellRing, MapPin, Loader2, Users } from 'lucide-react';
+import { ShieldAlert, Phone, X, Bell, BellRing, MapPin, Loader2, Users, Navigation, Eye, CheckCircle2, MessageCircle, Send, Camera } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { MP } from '../../types';
 import { useLang } from '../../context/LanguageContext';
@@ -16,7 +16,61 @@ import { useLang } from '../../context/LanguageContext';
  */
 
 const OPTIN_KEY = 'sos_nearby_optin';
+const RESPONDER_KEY = 'sos_responder_id';
+const INCIDENT_KEY = 'sos_active_incident';
 const POLL_MS = 30000;
+const STATUS_POLL_MS = 12000;
+
+interface NearbyAlert {
+  id: number;
+  distance_km: number;
+  minutes_ago: number;
+  constituency: string | null;
+  latitude: number;
+  longitude: number;
+  precise: boolean;
+  aware_count: number;
+  responding_count: number;
+  photo_url: string | null;
+  note: string | null;
+  credibility_score: number | null;
+  credibility_level: string | null;
+  credibility_note: string | null;
+  message_count: number;
+}
+
+interface SafetyMessage { id: number; responder_id: string; is_owner: boolean; text: string; }
+interface MyIncident { id: number; token: string; share: boolean; }
+
+const CRED_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
+  corroborated: { bg: '#dcfce7', fg: '#15803d', label: 'Corroborated' },
+  'some-signals': { bg: '#fef9c3', fg: '#a16207', label: 'Some signals' },
+  unverified: { bg: '#f1f5f9', fg: '#475569', label: 'Unverified' },
+};
+
+/** Advisory AI credibility chip — NEVER implies an alert is fake. */
+const CredibilityBadge: React.FC<{ level: string | null; score: number | null; note?: string | null }> = ({ level, score, note }) => {
+  if (!level) return null;
+  const s = CRED_STYLE[level] || CRED_STYLE.unverified;
+  return (
+    <span title={note || ''} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: s.bg, color: s.fg, borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 700 }}>
+      🛡 {s.label}{score != null ? ` · ${score}` : ''}
+    </span>
+  );
+};
+
+/** Stable anonymous responder id (localStorage) — never a name/phone. */
+function getResponderId(): string {
+  let id = localStorage.getItem(RESPONDER_KEY);
+  if (!id) {
+    id = 'r_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem(RESPONDER_KEY, id);
+  }
+  return id;
+}
+
+const dirUrl = (lat: number, lng: number) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
 // The SOS feature is Bengaluru-only; disable the button outside the city.
 const BLR_BBOX = { minLng: 77.30, minLat: 12.70, maxLng: 77.90, maxLat: 13.25 };
@@ -89,13 +143,6 @@ const SlideToConfirm: React.FC<{ onConfirm: () => void; label: string; busy: boo
   );
 };
 
-interface NearbyAlert {
-  id: number;
-  distance_km: number;
-  minutes_ago: number;
-  constituency: string | null;
-}
-
 const SosButton: React.FC = () => {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
@@ -106,10 +153,24 @@ const SosButton: React.FC = () => {
   const [mp, setMp] = useState<MP | null>(null);
   const [flagged, setFlagged] = useState(false);
   const [logged, setLogged] = useState(true);
-  const [toast, setToast] = useState<string | null>(null);
+  const [share, setShare] = useState(false);
+  // Incoming nearby alert (for the responder toast + card) and the one being responded to.
+  const [toastAlert, setToastAlert] = useState<NearbyAlert | null>(null);
+  const [respondTo, setRespondTo] = useState<NearbyAlert | null>(null);
+  // The user's OWN active SOS + its live status (the victim loop).
+  const [myIncident, setMyIncident] = useState<MyIncident | null>(null);
+  const [myStatus, setMyStatus] = useState<{ status: string; aware_count: number; responding_count: number } | null>(null);
   // null = unknown (location not yet resolved / denied), true/false = in/out of Bengaluru.
   const [userInBlr, setUserInBlr] = useState<boolean | null>(null);
+  // Response thread + composer for the alert being responded to.
+  const [messages, setMessages] = useState<SafetyMessage[]>([]);
+  const [replyText, setReplyText] = useState('');
+  // The community feed (all active nearby alerts) + photo-upload state.
+  const [feed, setFeed] = useState<NearbyAlert[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [myPhoto, setMyPhoto] = useState<string | null>(null);
   const seen = useRef<Set<number>>(new Set());
+  const responderId = useRef<string>(getResponderId());
 
   // Resolve the user's location once to gate the SOS button (Bengaluru-only).
   useEffect(() => {
@@ -128,6 +189,22 @@ const SosButton: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(OPTIN_KEY, optIn ? '1' : '0');
   }, [optIn]);
+
+  // Restore an in-progress SOS so it survives closing the modal / a refresh.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(INCIDENT_KEY);
+      if (raw) {
+        const inc = JSON.parse(raw);
+        if (inc?.id && inc?.token) {
+          setMyIncident(inc);
+          setMyStatus({ status: 'active', aware_count: 0, responding_count: 0 });
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Background watcher: notify opted-in users about nearby SOS pings.
   useEffect(() => {
@@ -158,9 +235,9 @@ const SosButton: React.FC = () => {
                 if ('Notification' in window && Notification.permission === 'granted') {
                   new Notification(t('sos.nearbyTitle'), { body });
                 }
-                // ...plus an always-visible in-app toast.
-                setToast(body);
-                window.setTimeout(() => setToast(null), 8000);
+                // ...plus an always-visible, actionable in-app toast.
+                setToastAlert(a);
+                window.setTimeout(() => setToastAlert((cur) => (cur && cur.id === a.id ? null : cur)), 15000);
               });
               primed = true;
             })
@@ -175,10 +252,20 @@ const SosButton: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [optIn, t]);
 
-  // When the panel opens, grab location ONLY (do not broadcast — that requires
-  // an explicit slide-to-confirm, to avoid accidental / false-positive alerts).
+  // When the panel opens, grab location — but KEEP an active SOS visible instead
+  // of resetting to a fresh slider (broadcast requires an explicit slide anyway).
   useEffect(() => {
     if (!open) return;
+    // A previously-resolved SOS is cleared so a new one can be raised.
+    if (myIncident && myStatus?.status === 'resolved') {
+      setMyIncident(null);
+      setMyStatus(null);
+      localStorage.removeItem(INCIDENT_KEY);
+    } else if (myIncident) {
+      // Still have an active SOS -> keep showing its loop, don't reset.
+      setLocating(false);
+      return;
+    }
     setFlagged(false);
     setMp(null);
     setLogged(true);
@@ -192,25 +279,124 @@ const SosButton: React.FC = () => {
       () => setLocating(false),
       { enableHighAccuracy: true, timeout: 8000 }
     );
+    // eslint-disable-next-line
   }, [open]);
 
   // Broadcast the anonymized SOS — only ever called from the slide-to-confirm.
   const broadcast = () => {
     setFlagging(true);
     apiClient
-      .post<{ mp: MP | null; logged: boolean }>('/api/v1/safety/sos', {
-        latitude: coords?.lat ?? null,
-        longitude: coords?.lng ?? null,
-      })
+      .post<{ mp: MP | null; logged: boolean; incident_id: number | null; resolve_token: string | null; share_precise: boolean }>(
+        '/api/v1/safety/sos',
+        { latitude: coords?.lat ?? null, longitude: coords?.lng ?? null, share_precise: share }
+      )
       .then((r) => {
         setMp(r.data.mp);
         setLogged(r.data.logged);
         setFlagged(true);
         if (r.data.logged && !optIn) setOptIn(true);
+        if (r.data.logged && r.data.incident_id && r.data.resolve_token) {
+          const inc = { id: r.data.incident_id, token: r.data.resolve_token, share: r.data.share_precise };
+          setMyIncident(inc);
+          setMyStatus({ status: 'active', aware_count: 0, responding_count: 0 });
+          localStorage.setItem(INCIDENT_KEY, JSON.stringify(inc));
+        }
       })
       .catch((e) => console.error('SOS broadcast failed', e))
       .finally(() => setFlagging(false));
   };
+
+  // Victim loop: poll my own incident's status (how many are aware / responding).
+  useEffect(() => {
+    if (!myIncident || myStatus?.status === 'resolved') return;
+    const poll = () => {
+      apiClient
+        .get<{ status: string; aware_count: number; responding_count: number }>(`/api/v1/safety/incidents/${myIncident.id}/status`)
+        .then((r) => setMyStatus(r.data))
+        .catch(() => {});
+    };
+    poll();
+    const timer = window.setInterval(poll, STATUS_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [myIncident, myStatus?.status]);
+
+  const markSafe = () => {
+    if (!myIncident) return;
+    apiClient
+      .post(`/api/v1/safety/incidents/${myIncident.id}/resolve`, { resolve_token: myIncident.token })
+      .then(() => {
+        setMyStatus((s) => (s ? { ...s, status: 'resolved' } : s));
+        localStorage.removeItem(INCIDENT_KEY);
+      })
+      .catch((e) => console.error('resolve failed', e));
+  };
+
+  const toggleShare = () => {
+    if (!myIncident) return;
+    const next = !myIncident.share;
+    apiClient
+      .post(`/api/v1/safety/incidents/${myIncident.id}/share`, { resolve_token: myIncident.token, share_precise: next })
+      .then(() => setMyIncident((m) => (m ? { ...m, share: next } : m)))
+      .catch((e) => console.error('share toggle failed', e));
+  };
+
+  // Responder actions on a nearby alert.
+  const ackAlert = (alert: NearbyAlert, responding: boolean) => {
+    apiClient
+      .post<{ aware_count: number; responding_count: number }>(`/api/v1/safety/incidents/${alert.id}/ack`, {
+        responder_id: responderId.current, responding,
+      })
+      .then((r) => {
+        const upd = { ...alert, aware_count: r.data.aware_count, responding_count: r.data.responding_count };
+        setRespondTo(upd);
+        setToastAlert((cur) => (cur && cur.id === alert.id ? upd : cur));
+      })
+      .catch((e) => console.error('ack failed', e));
+  };
+
+  // Load the response thread when a responder card opens.
+  useEffect(() => {
+    if (!respondTo) { setMessages([]); return; }
+    apiClient
+      .get<SafetyMessage[]>(`/api/v1/safety/incidents/${respondTo.id}/messages`)
+      .then((r) => setMessages(r.data))
+      .catch(() => setMessages([]));
+  }, [respondTo?.id]);
+
+  const sendReply = () => {
+    const text = replyText.trim();
+    if (!text || !respondTo) return;
+    setReplyText('');
+    apiClient
+      .post<SafetyMessage>(`/api/v1/safety/incidents/${respondTo.id}/messages`, {
+        responder_id: responderId.current, text, is_owner: myIncident?.id === respondTo.id,
+      })
+      .then((r) => setMessages((m) => [...m, r.data]))
+      .catch((e) => console.error('message failed', e));
+  };
+
+  // Victim attaches a photo to their SOS.
+  const uploadPhoto = (file: File) => {
+    if (!myIncident) return;
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('resolve_token', myIncident.token);
+    fd.append('file', file);
+    apiClient
+      .post(`/api/v1/safety/incidents/${myIncident.id}/photo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      .then((r) => setMyPhoto((r.data as { photo_url: string }).photo_url))
+      .catch((e) => console.error('photo upload failed', e))
+      .finally(() => setUploading(false));
+  };
+
+  // Load the community feed (all active nearby alerts) when the panel opens.
+  useEffect(() => {
+    if (!open || !coords) return;
+    apiClient
+      .get<NearbyAlert[]>('/api/v1/safety/nearby-alerts', { params: { lat: coords.lat, lng: coords.lng, radius_km: 8, minutes: 120 } })
+      .then((r) => setFeed(r.data))
+      .catch(() => setFeed([]));
+  }, [open, coords]);
 
   const overlay: React.CSSProperties = {
     position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 4000,
@@ -289,8 +475,12 @@ const SosButton: React.FC = () => {
             </div>
 
             {/* Secondary action: slide to broadcast the anonymized alert */}
-            {!flagged ? (
+            {!myIncident && !flagged ? (
               <>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 10px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} />
+                  {t('sos.sharePrecise')}
+                </label>
                 <SlideToConfirm onConfirm={broadcast} label={t('sos.slideToAlert')} busy={flagging} />
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', margin: '8px 0 6px' }}>
                   {t('sos.slideHint')}
@@ -325,6 +515,40 @@ const SosButton: React.FC = () => {
               ) : null}
             </div>
 
+            {/* Victim loop: live 'N aware / responding' + share + I'm safe */}
+            {myIncident && myStatus && (
+              myStatus.status === 'resolved' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px', borderRadius: 10, background: 'rgba(22,163,74,0.1)', color: '#16a34a', fontWeight: 700, fontSize: 14, marginBottom: 12 }}>
+                  <CheckCircle2 size={18} /> {t('sos.markedSafe')}
+                </div>
+              ) : (
+                <div style={{ padding: '12px', borderRadius: 10, background: 'var(--bg-subtle, rgba(220,38,38,.06))', border: '1px solid rgba(220,38,38,0.2)', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+                    <Eye size={16} color="#dc2626" />
+                    <b style={{ color: '#dc2626' }}>{myStatus.aware_count}</b> {t('sos.aware')}
+                    {myStatus.responding_count > 0 && <>· <b style={{ color: '#dc2626' }}>{myStatus.responding_count}</b> {t('sos.responding')}</>}
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={myIncident.share} onChange={toggleShare} />
+                    {t('sos.sharePrecise')}
+                  </label>
+                  {/* Attach a photo so responders/MP can see the situation */}
+                  {myPhoto ? (
+                    <img src={myPhoto} alt="attached" style={{ width: '100%', maxHeight: 140, objectFit: 'cover', borderRadius: 8 }} />
+                  ) : (
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', borderRadius: 8, border: '1px dashed var(--border-card, #ccc)', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-main)' }}>
+                      {uploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} {t('sos.addPhoto')}
+                      <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadPhoto(f); }} />
+                    </label>
+                  )}
+                  <button onClick={markSafe} style={{ padding: '10px', borderRadius: 10, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <CheckCircle2 size={17} /> {t('sos.imSafe')}
+                  </button>
+                </div>
+              )
+            )}
+
             {/* Nearby-alerts opt-in */}
             <button
               onClick={() => setOptIn((v) => !v)}
@@ -353,6 +577,33 @@ const SosButton: React.FC = () => {
               </span>
             </button>
 
+            {/* Community feed: active SOS alerts nearby (broadcast to everyone) */}
+            {feed.filter((a) => a.id !== myIncident?.id).length > 0 && (
+              <div style={{ marginTop: 14, borderTop: '1px solid var(--border-subtle, rgba(128,128,128,.15))', paddingTop: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  {t('sos.feedTitle')}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {feed.filter((a) => a.id !== myIncident?.id).map((a) => (
+                    <button key={a.id} onClick={() => { setRespondTo(a); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, borderRadius: 10, border: '1px solid var(--border-card, rgba(128,128,128,.2))', background: 'transparent', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                      {a.photo_url
+                        ? <img src={a.photo_url} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                        : <span style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(220,38,38,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><ShieldAlert size={18} color="#dc2626" /></span>}
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
+                          {a.constituency || t('sos.nearbyYourArea')}
+                          <CredibilityBadge level={a.credibility_level} score={a.credibility_score} note={a.credibility_note} />
+                        </span>
+                        <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>
+                          {a.distance_km < 1 ? `${Math.round(a.distance_km * 1000)} m` : `${a.distance_km} km`} · {a.aware_count} {t('sos.aware')} · 💬 {a.message_count}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 14, lineHeight: 1.4 }}>
               {t('sos.disclaimer')}
             </div>
@@ -360,21 +611,125 @@ const SosButton: React.FC = () => {
         </div>
       )}
 
-      {/* In-app nearby-alert toast (works regardless of OS notification permission) */}
-      {toast && (
+      {/* In-app nearby-alert toast — actionable (opens the responder card) */}
+      {toastAlert && !respondTo && (
         <div
           className="glass-panel animate-fade-in"
-          onClick={() => setToast(null)}
           style={{
             position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5000,
-            maxWidth: 'min(92vw, 420px)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
-            borderLeft: '4px solid #dc2626', cursor: 'pointer',
+            maxWidth: 'min(94vw, 440px)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
+            borderLeft: '4px solid #dc2626',
           }}
         >
-          <BellRing size={18} color="#dc2626" />
-          <div>
+          <BellRing size={20} color="#dc2626" />
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 13 }}>{t('sos.nearbyTitle')}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{toast}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {t('sos.nearbyBody', {
+                dist: toastAlert.distance_km < 1 ? `${Math.round(toastAlert.distance_km * 1000)} m` : `${toastAlert.distance_km} km`,
+                area: toastAlert.constituency || t('sos.nearbyYourArea'),
+              })}
+            </div>
+          </div>
+          <button onClick={() => { setRespondTo(toastAlert); setToastAlert(null); }} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            {t('sos.respond')}
+          </button>
+          <button onClick={() => setToastAlert(null)} aria-label={t('sos.close')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={16} /></button>
+        </div>
+      )}
+
+      {/* Responder card — what a notified nearby user can DO */}
+      {respondTo && (
+        <div style={overlay} onClick={() => setRespondTo(null)}>
+          <div className="glass-panel" onClick={(e) => e.stopPropagation()} style={{ width: 380, maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 20, borderRadius: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <BellRing size={22} color="#dc2626" />
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 16 }}>{t('sos.nearbyTitle')}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {respondTo.constituency || t('sos.nearbyYourArea')} · {respondTo.distance_km < 1 ? `${Math.round(respondTo.distance_km * 1000)} m` : `${respondTo.distance_km} km`} · {respondTo.minutes_ago}m {t('sos.ago')}
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setRespondTo(null)} aria-label={t('sos.close')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+            </div>
+
+            {/* Advisory AI credibility */}
+            {respondTo.credibility_level && (
+              <div style={{ marginBottom: 10 }}>
+                <CredibilityBadge level={respondTo.credibility_level} score={respondTo.credibility_score} note={respondTo.credibility_note} />
+                {respondTo.credibility_note && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.4 }}>
+                    {respondTo.credibility_note} <i>{t('sos.credAdvisory')}</i>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Photo + note from the person */}
+            {respondTo.photo_url && (
+              <img src={respondTo.photo_url} alt="SOS" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 10, marginBottom: 8 }} />
+            )}
+            {respondTo.note && (
+              <div style={{ fontSize: 13, fontStyle: 'italic', color: 'var(--text-main)', marginBottom: 10 }}>"{respondTo.note}"</div>
+            )}
+
+            <div style={{ fontSize: 12.5, color: 'var(--text-main)', marginBottom: 12 }}>
+              <Eye size={14} style={{ verticalAlign: -2 }} /> <b>{respondTo.aware_count}</b> {t('sos.aware')}
+              {respondTo.responding_count > 0 && <> · <b>{respondTo.responding_count}</b> {t('sos.responding')}</>}
+            </div>
+
+            {/* Call 112 */}
+            <a href="tel:112" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#dc2626', color: '#fff', textDecoration: 'none', fontWeight: 800, fontSize: 16, padding: '12px', borderRadius: 12, marginBottom: 10 }}>
+              <Phone size={20} /> {t('sos.callPolice')}
+            </a>
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <button onClick={() => ackAlert(respondTo, false)} className="glass-input" style={{ flex: 1, padding: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                <Eye size={16} /> {t('sos.imAware')}
+              </button>
+              <button onClick={() => ackAlert(respondTo, true)} style={{ flex: 1, padding: '11px', borderRadius: 8, border: 'none', background: '#ea580c', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                <ShieldAlert size={16} /> {t('sos.imResponding')}
+              </button>
+            </div>
+
+            <a href={dirUrl(respondTo.latitude, respondTo.longitude)} target="_blank" rel="noreferrer" className="glass-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px', fontSize: 13, fontWeight: 700, textDecoration: 'none', color: 'var(--text-main)' }}>
+              <Navigation size={16} /> {respondTo.precise ? t('sos.navigatePrecise') : t('sos.navigateApprox')}
+            </a>
+
+            <div style={{ fontSize: 10.5, color: 'var(--text-muted)', margin: '12px 0', lineHeight: 1.4 }}>
+              {t('sos.responderCaveat')}
+            </div>
+
+            {/* Response thread (the 'chat') */}
+            <div style={{ borderTop: '1px solid var(--border-subtle, rgba(128,128,128,.15))', paddingTop: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <MessageCircle size={14} /> {t('sos.thread')} ({messages.length})
+              </div>
+              <div style={{ maxHeight: 140, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                {messages.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('sos.threadEmpty')}</div>}
+                {messages.map((m) => (
+                  <div key={m.id} style={{ fontSize: 12.5, padding: '6px 9px', borderRadius: 8, background: m.is_owner ? 'rgba(220,38,38,0.08)' : 'var(--bg-subtle, rgba(37,99,235,.06))' }}>
+                    <b style={{ fontSize: 10.5, color: m.is_owner ? '#dc2626' : 'var(--secondary)' }}>{m.is_owner ? t('sos.person') : t('sos.responder')}</b>
+                    <div>{m.text}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') sendReply(); }}
+                  placeholder={t('sos.replyPlaceholder')}
+                  className="glass-input"
+                  style={{ flex: 1, minWidth: 0, padding: '9px 11px', fontSize: 13 }}
+                />
+                <button onClick={sendReply} style={{ padding: '9px 12px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer' }}>
+                  <Send size={16} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

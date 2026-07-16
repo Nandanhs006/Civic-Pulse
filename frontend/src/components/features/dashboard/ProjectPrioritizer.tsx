@@ -98,7 +98,7 @@ const ProjectPrioritizer: React.FC<ProjectPrioritizerProps> = ({ projects, onRef
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              background: 'hsla(224, 25%, 10%, 0.4)'
+              background: 'var(--bg-card-hover)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>

@@ -10,3 +10,5 @@ from app.db.models.suggestion import Suggestion  # noqa
 from app.db.models.project import ProposedProject  # noqa
 from app.db.models.ward_officer import WardOfficer  # noqa
 from app.db.models.safety_incident import SafetyIncident  # noqa
+from app.db.models.safety_ack import SafetyAck  # noqa
+from app.db.models.safety_message import SafetyMessage  # noqa

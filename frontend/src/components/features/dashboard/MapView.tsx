@@ -23,13 +23,19 @@ interface MapViewProps {
   boundary?: any; // GeoJSON Feature of the constituency to highlight
 }
 
-// Fit the map to the constituency boundary when one is provided.
+// Fit the map to the constituency boundary and LOCK zoom-out at that level:
+// the constituency always fills the view and the user can only zoom in / pan
+// within it, never zoom out past the seat.
 const FitBoundary: React.FC<{ data: any }> = ({ data }) => {
   const map = useMap();
   useEffect(() => {
     try {
       const bounds = L.geoJSON(data).getBounds();
-      if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] });
+      if (!bounds.isValid()) return;
+      map.setMinZoom(0);                       // unlock before refitting (seat may change)
+      map.fitBounds(bounds, { padding: [24, 24] });
+      map.setMinZoom(map.getZoom());           // can't zoom out below the fitted level
+      map.setMaxBounds(bounds.pad(0.4));       // keep panning around the constituency
     } catch {
       /* ignore malformed geometry */
     }
@@ -88,9 +94,10 @@ const MapView: React.FC<MapViewProps> = ({
   return (
     <div style={{ height: '460px', width: '100%', position: 'relative', overflow: 'hidden', borderRadius: '12px', isolation: 'isolate' }}>
       <MapContainer
-        center={defaultCenter} 
-        zoom={zoomLevel} 
-        scrollWheelZoom={true} 
+        center={defaultCenter}
+        zoom={zoomLevel}
+        scrollWheelZoom={true}
+        maxBoundsViscosity={1.0}
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer

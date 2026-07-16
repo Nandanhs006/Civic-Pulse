@@ -183,7 +183,7 @@ def get_stations(force: bool = False) -> List[dict]:
 
     stations: List[dict] = []
     try:
-        with httpx.Client(timeout=12) as c:
+        with httpx.Client(timeout=5) as c:
             r = c.get(_URL, params={
                 "api-key": settings.DATA_GOV_API_KEY,
                 "format": "json",
