@@ -55,6 +55,24 @@ const TopBar: React.FC = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const isCitizen = user?.role === 'citizen';
+  // Citizens never have a real email (synthetic <phone>@phone.civicpulse), so
+  // show their name or phone — and their role label is "Verified Citizen", not MP.
+  const displayName = !user
+    ? ''
+    : isCitizen
+      ? (user.full_name && !user.full_name.includes('@') ? user.full_name : (user.phone || t('role.citizen')))
+      : (user.full_name || user.email);
+  const roleLabel = !user
+    ? ''
+    : user.role === 'pmo'
+      ? t('role.pmo')
+      : user.role === 'mla'
+        ? 'MLA'
+        : isCitizen
+          ? t('role.citizen')
+          : t('role.mp');
   const headerRef = useRef<HTMLElement>(null);
 
   // Publish the top bar's height so the sticky breadcrumb can offset below it.
@@ -164,10 +182,10 @@ const TopBar: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '4px', flexShrink: 0 }}>
                 <div style={{ textAlign: 'right', lineHeight: 1.2 }}>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
-                    {user.full_name || user.email}
+                    {displayName}
                   </div>
-                  <span className="chip" style={{ fontSize: '10px', padding: '1px 8px' }}>
-                    {user.role === 'pmo' ? t('role.pmo') : t('role.mp')}
+                  <span className="chip" style={{ fontSize: '10px', padding: '1px 8px', ...(isCitizen ? { background: 'rgba(34,197,94,0.15)', color: 'var(--success)', borderColor: 'rgba(34,197,94,0.35)' } : {}) }}>
+                    {roleLabel}
                   </span>
                 </div>
                 <button
@@ -244,10 +262,10 @@ const TopBar: React.FC = () => {
               <>
                 <div style={{ padding: '6px 14px' }}>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>
-                    {user.full_name || user.email}
+                    {displayName}
                   </div>
-                  <span className="chip" style={{ fontSize: '10px', padding: '1px 8px' }}>
-                    {user.role === 'pmo' ? t('role.pmo') : t('role.mp')}
+                  <span className="chip" style={{ fontSize: '10px', padding: '1px 8px', ...(isCitizen ? { background: 'rgba(34,197,94,0.15)', color: 'var(--success)', borderColor: 'rgba(34,197,94,0.35)' } : {}) }}>
+                    {roleLabel}
                   </span>
                 </div>
                 <button

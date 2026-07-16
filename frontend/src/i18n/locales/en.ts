@@ -17,6 +17,7 @@ const en = {
   'nav.darkMode': 'Dark mode',
   'role.pmo': 'PMO · Super Admin',
   'role.mp': 'Member of Parliament',
+  'role.citizen': 'Verified Citizen',
   'lang.label': 'Language',
 
   // Common / picker
@@ -321,9 +322,12 @@ const en = {
   'sos.credAdvisory': '(AI triage — advisory only, every alert is treated as real)',
   'sos.thread': 'Community responses',
   'sos.threadEmpty': 'No responses yet — be the first to help coordinate.',
+  'sos.threadEmptyOwner': 'No responses yet — nearby verified helpers will reply here.',
   'sos.person': 'Person in need',
   'sos.responder': 'Responder',
   'sos.replyPlaceholder': 'Reply to coordinate…',
+  'sos.verifyToRespond': 'Verify to respond',
+  'sos.verifyReason': 'To help and chat on a safety alert, verify your mobile with a one-time code. This keeps responders accountable.',
   'sos.feedTitle': 'Active SOS alerts nearby',
   'sos.disclaimer':
     'This broadcasts an anonymized alert to nearby CivicPulse users and flags the area for your MP to improve safety. It does not replace calling 112.',

@@ -12,8 +12,12 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active: Any = Column(Boolean(), default=True)
     is_admin: Any = Column(Boolean(), default=True)
-    # "pmo" = super-admin monitoring all constituencies; "mp" = scoped to one
+    # "pmo" = super-admin monitoring all constituencies; "mp" = scoped to one;
+    # "citizen" = phone-OTP-verified member of the public (Participate + reporting)
     role = Column(String(20), default="pmo", index=True)
+    # Phone-OTP identity (citizens). Verified via Firebase Phone Auth.
+    phone = Column(String(20), unique=True, index=True, nullable=True)
+    phone_verified: Any = Column(Boolean(), default=False)
     constituency_id = Column(
         Integer, ForeignKey("constituencies.id"), nullable=True, index=True
     )

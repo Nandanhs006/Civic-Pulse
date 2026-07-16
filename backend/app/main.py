@@ -34,6 +34,86 @@ from app.middleware.timeout import TimeoutMiddleware
 # Create database tables directly if running without Alembic
 Base.metadata.create_all(bind=engine)
 
+
+def _run_lightweight_migrations() -> None:
+    """Add columns that post-date the original tables.
+
+    ``create_all`` only CREATES missing tables — it never ALTERs an existing
+    one. On a persistent DB (e.g. Render Postgres) a table created by an older
+    deploy is missing newer columns, so every ``SELECT *`` over that model 500s.
+    These idempotent ALTERs make each boot self-healing. Postgres supports
+    ``ADD COLUMN IF NOT EXISTS``; on SQLite it raises and is safely skipped
+    (fresh SQLite already has the column via create_all).
+    """
+    from sqlalchemy import text
+
+    alters = [
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS department VARCHAR(80)",
+        # Defensive: columns added after the original suggestions table. Harmless
+        # if already present (IF NOT EXISTS) — keeps SELECT * over the model working
+        # on any age of persisted DB.
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS ai_confidence DOUBLE PRECISION",
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS ai_reasoning VARCHAR(500)",
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS image_analysis TEXT",
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS is_duplicate BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS duplicate_of_id VARCHAR(36)",
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS embedding_text TEXT",
+        # Firebase phone-OTP citizen verification.
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS citizen_verified BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT FALSE",
+    ]
+    for sql in alters:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(sql))
+        except Exception as exc:  # noqa: BLE001 — never block boot on a migration
+            print(f"[migrate] skipped: {exc.__class__.__name__}")
+
+
+def _backfill_issue_images() -> None:
+    """Give every demo issue a category-relevant, same-origin photo.
+
+    Runs INDEPENDENTLY of the full seed pipeline (ingest_mps → ingest_mlas →
+    seed_demo_issues), because on an already-populated deploy DB that pipeline can
+    error at an ingest step and never reach the image backfill — leaving the live
+    map imageless. Idempotent: skips issues that already point at /issue-images/.
+    """
+    try:
+        from app.db.models.suggestion import Suggestion
+        from app.scripts.seed_demo_issues import (
+            _category_image,
+            DEMO_MARKER,
+            LOCAL_CATEGORY_IMAGES,
+        )
+
+        db = SessionLocal()
+        try:
+            rows = (
+                db.query(Suggestion)
+                .filter(Suggestion.content.like(f"{DEMO_MARKER}%"))
+                .all()
+            )
+            fixed = 0
+            for s in rows:
+                if s.image_url and s.image_url.startswith("/issue-images/"):
+                    continue
+                cat = s.category or "Roads"
+                if cat in LOCAL_CATEGORY_IMAGES:
+                    s.image_url = _category_image(cat)
+                    fixed += 1
+            if fixed:
+                db.commit()
+            print(f"[images] backfilled {fixed} demo issue images")
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001 — never block boot on the backfill
+        print(f"[images] backfill skipped: {exc}")
+
+
+_run_lightweight_migrations()
+_backfill_issue_images()
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="AI-powered constituency mapping and citizen preference prioritization engine.",
@@ -376,6 +456,19 @@ async def startup_event():
 @app.get("/health", tags=["Debug"])
 def health_check():
     return {"status": "healthy"}
+
+
+@app.get(f"{settings.API_V1_STR}/ai/status", tags=["Debug"])
+def ai_status():
+    """Gemini key-pool health (no keys exposed).
+
+    Shows how many API keys are loaded, how many are currently cooling down after
+    a rate-limit, the model fallback chain, and the last error — so you can tell
+    at a glance whether to add more keys.
+    """
+    from app.services.gemini_client import gemini
+
+    return gemini.status()
 
 
 # Serve the built frontend (single-service deploys, e.g. Render/Cloud Run) when a

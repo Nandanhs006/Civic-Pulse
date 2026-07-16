@@ -124,12 +124,22 @@ def test_sos_message_thread(client):
     iid = client.post(
         "/api/v1/safety/sos", json={"latitude": 12.9716, "longitude": 77.5946}
     ).json()["incident_id"]
-    client.post(f"/api/v1/safety/incidents/{iid}/messages", json={"responder_id": "A", "text": "on my way"})
-    client.post(f"/api/v1/safety/incidents/{iid}/messages", json={"responder_id": "B", "text": "police called", "is_owner": False})
+    # The person in distress (owner) can reply on their own alert without verification.
+    client.post(f"/api/v1/safety/incidents/{iid}/messages", json={"responder_id": "A", "text": "on my way", "is_owner": True})
+    # A responder must be a phone-OTP-verified citizen — unauthenticated is rejected.
+    unauth = client.post(f"/api/v1/safety/incidents/{iid}/messages", json={"responder_id": "B", "text": "police called", "is_owner": False})
+    assert unauth.status_code == 403
+    # Verified citizen (mock OTP in tests) can respond.
+    tok = client.post("/api/v1/auth/phone/login", json={"id_token": "mock:+919876500000"}).json()["access_token"]
+    client.post(
+        f"/api/v1/safety/incidents/{iid}/messages",
+        json={"responder_id": "B", "text": "police called", "is_owner": False},
+        headers={"Authorization": f"Bearer {tok}"},
+    )
     msgs = client.get(f"/api/v1/safety/incidents/{iid}/messages").json()
     assert len(msgs) == 2 and msgs[0]["text"] == "on my way"
-    # Empty message rejected.
-    assert client.post(f"/api/v1/safety/incidents/{iid}/messages", json={"responder_id": "A", "text": "  "}).status_code == 400
+    # Empty message rejected (owner path so it reaches the empty-text check).
+    assert client.post(f"/api/v1/safety/incidents/{iid}/messages", json={"responder_id": "A", "text": "  ", "is_owner": True}).status_code == 400
 
 
 def test_police_stations_bundled(client):

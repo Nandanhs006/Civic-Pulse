@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:firebase": "tsc && VITE_API_URL=https://civic-pulse-j8nk.onrender.com vite build",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -14,6 +15,7 @@
   "dependencies": {
     "axios": "^1.7.2",
     "chart.js": "^4.4.3",
+    "firebase": "^12.16.0",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
     "lucide-react": "^0.379.0",

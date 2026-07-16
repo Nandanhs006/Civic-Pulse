@@ -4,10 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/apiClient';
 import { MapContainer, TileLayer, Popup, Marker, CircleMarker, useMapEvents, useMap } from 'react-leaflet';
 import L, { LatLngExpression } from 'leaflet';
-import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X, Image as ImageIcon, Mic, MicOff, Loader2, LocateFixed } from 'lucide-react';
+import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X, Image as ImageIcon, Mic, MicOff, Loader2, LocateFixed, ShieldCheck } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import PhoneAuthModal from '../components/common/PhoneAuthModal';
+import { resolveMediaUrl } from '../services/media';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet default marker icon path issue in Vite
@@ -267,7 +269,10 @@ interface ParticipateProps {
 
 const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const navigate = useNavigate();
-  useAuth();
+  const { user } = useAuth();
+  const [showPhoneAuth, setShowPhoneAuth] = useState(false);
+  // Citizens must be phone-OTP verified to use a Participate tool (not the hub).
+  const needsAuth = activeApp !== 'hub' && !user;
   const isMobile = useIsMobile();
   const { theme } = useTheme();
   const tileUrl = `https://{s}.basemaps.cartocdn.com/${theme === 'light' ? 'light_all' : 'dark_all'}/{z}/{x}/{y}{r}.png`;
@@ -288,7 +293,6 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   // StreetMapper Audio recorder
   const { isRecording, audioBlob, duration, startRecording, stopRecording, deleteRecording } = useAudioRecorder();
   const [fmsTranscribing, setFmsTranscribing] = useState(false);
-  // const [fmsTranscription, setFmsTranscription] = useState<string | null>(null);
   const [fmsAudioUrl, setFmsAudioUrl] = useState<string>('');
 
   useEffect(() => {
@@ -305,11 +309,15 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const [mpClassifying, setMpClassifying] = useState<boolean>(false);
   const [mpClassResult, setMpClassResult] = useState<string | null>(null);
 
-  // OTP State
+  // OTP State — a citizen who already verified their phone at login is trusted
+  // here too, so we don't ask them to OTP again inside StreetMapper.
   const [otpSent, setOtpSent] = useState<boolean>(false);
   const [otpCode, setOtpCode] = useState<string>('');
   const [otpInput, setOtpInput] = useState<string>('');
-  const [otpVerified, setOtpVerified] = useState<boolean>(false);
+  const [otpVerified, setOtpVerified] = useState<boolean>(!!user?.phone_verified);
+  useEffect(() => {
+    if (user?.phone_verified) setOtpVerified(true);
+  }, [user]);
 
   // Status Stepper & Tracking State
   const [myFmsReports, setMyFmsReports] = useState<any[]>([]);
@@ -1055,8 +1063,38 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
     setTimeout(() => setSyncMsg(''), 3000);
   };
 
+  // ── Citizen verification gate for the participatory tools ────────────────
+  if (needsAuth) {
+    return (
+      <>
+        <div style={{ maxWidth: '460px', margin: '40px auto', textAlign: 'center' }}>
+          <div className="glass-panel" style={{ padding: '32px 26px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShieldCheck size={30} color="var(--success)" />
+            </div>
+            <h2 style={{ margin: 0, fontSize: '20px' }}>Verify to participate</h2>
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              This civic tool is for verified citizens. A quick one-time SMS code confirms
+              you're real — then your reports carry a <strong>Verified</strong> badge your MP can act on.
+            </p>
+            <button className="btn-primary" onClick={() => setShowPhoneAuth(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              <ShieldCheck size={16} /> Verify with OTP
+            </button>
+            <button onClick={() => navigate('/participate')}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>
+              ← Back to hub
+            </button>
+          </div>
+        </div>
+        <PhoneAuthModal open={showPhoneAuth} onClose={() => setShowPhoneAuth(false)} />
+      </>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <PhoneAuthModal open={showPhoneAuth} onClose={() => setShowPhoneAuth(false)} />
 
       {/* Dynamic Sync Banner */}
       {syncMsg && (
@@ -1064,6 +1102,20 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
           {syncMsg}
         </div>
       )}
+
+      {/* Citizen verification status / sign-in */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        {user ? (
+          <span className="badge" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)', padding: '6px 12px' }}>
+            <ShieldCheck size={13} /> Verified{user.phone ? ` · ${user.phone}` : (user.full_name ? ` · ${user.full_name}` : '')}
+          </span>
+        ) : (
+          <button className="btn-secondary" onClick={() => setShowPhoneAuth(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', fontSize: 13 }}>
+            <ShieldCheck size={15} /> Verify with OTP
+          </button>
+        )}
+      </div>
 
       {/* ========================================================= */}
       {/* GLOBAL CIVIC TECH HUB MAIN PAGE */}
@@ -1317,14 +1369,14 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                     value={fmsContent}
                     onChange={(e) => setFmsContent(e.target.value)}
                     placeholder="E.g., Pothole near Central Market main gate..."
-                    style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '70px', fontSize: '13px', resize: 'none' }}
+                    style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', height: '70px', fontSize: '13px', resize: 'none' }}
                   />
                 </div>
 
                 {/* SPEAK Grievance (Optional) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>SPEAK GRIEVANCE (OPTIONAL)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', padding: '8px', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', padding: '8px', borderRadius: '10px' }}>
                     <button
                       type="button"
                       onClick={isRecording ? stopRecording : startRecording}
@@ -1379,7 +1431,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   {fmsImagePreviews.length > 0 && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '6px', marginTop: '6px' }}>
                       {fmsImagePreviews.map((url, idx) => (
-                        <div key={idx} style={{ border: '1px solid var(--border-card)', borderRadius: '6px', padding: '4px', background: 'rgba(255,255,255,0.02)', position: 'relative' }}>
+                        <div key={idx} style={{ border: '1px solid var(--border-card)', borderRadius: '6px', padding: '4px', background: 'var(--overlay-faint)', position: 'relative' }}>
                           <img src={url} alt={`Preview ${idx}`} style={{ height: '60px', width: '100%', objectFit: 'cover', borderRadius: '4px' }} />
                         </div>
                       ))}
@@ -1428,7 +1480,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                         value={otpInput}
                         onChange={(e) => setOtpInput(e.target.value)}
                         placeholder="Enter 4-digit code"
-                        style={{ flex: 1, background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
+                        style={{ flex: 1, background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
                       />
                       <button
                         type="button"
@@ -1469,7 +1521,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 value={fmsSearchQuery}
                 onChange={(e) => setFmsSearchQuery(e.target.value)}
                 placeholder="Search by 8-character Complaint ID (e.g. A5DBC4E1)"
-                style={{ flex: 1, background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
+                style={{ flex: 1, background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '13px' }}
               />
               <button onClick={handleSearchStatus} className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }} disabled={searchLoading}>
                 {searchLoading ? 'Searching...' : 'Track'}
@@ -1477,7 +1529,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             </div>
 
             {fmsSearchResult && (
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', padding: '16px', borderRadius: '10px', marginBottom: '20px' }}>
+              <div style={{ background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', padding: '16px', borderRadius: '10px', marginBottom: '20px' }}>
                 {fmsSearchResult.error ? (
                   <p style={{ color: 'var(--danger)', fontSize: '13px', margin: 0 }}>{fmsSearchResult.error}</p>
                 ) : (
@@ -1527,7 +1579,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {myFmsReports.map((report) => (
-                  <div key={report.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-card)', padding: '10px 14px', borderRadius: '8px' }}>
+                  <div key={report.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', padding: '10px 14px', borderRadius: '8px' }}>
                     <div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <span style={{ fontWeight: 700, fontSize: '13px' }}>ID: {report.id.slice(0, 8).toUpperCase()}</span>
@@ -1616,7 +1668,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
               {/* Ingestion proposal form */}
               {showProposalForm && (
-                <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.02)' }}>
+                <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--overlay-faint)' }}>
                   <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Create New CivicFund Proposal</h3>
                   <form onSubmit={handleProposalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr', gap: '12px' }}>
@@ -1730,7 +1782,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                           {meetsThreshold && <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>Meets Threshold</span>}
                           {isGoodToMove && <span className="badge" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', fontWeight: 700 }}>👍 Good To Move</span>}
                           {isLowPriority && <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}> Do Not Prioritize</span>}
-                          {!isGoodToMove && !isLowPriority && <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>Under Review</span>}
+                          {!isGoodToMove && !isLowPriority && <span className="badge" style={{ background: 'var(--overlay-med)', color: 'var(--text-muted)' }}>Under Review</span>}
                         </div>
                       </div>
 
@@ -1891,7 +1943,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                           <tr key={p.id} style={{ borderBottom: '1px solid var(--overlay-faint)' }}>
                             <td style={{ padding: '12px 10px', fontWeight: 600 }}>{p.title}</td>
                             <td style={{ padding: '12px 10px' }}>
-                              <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)' }}>{p.category}</span>
+                              <span className="badge" style={{ background: 'var(--overlay-med)', color: 'var(--text-main)' }}>{p.category}</span>
                             </td>
                             <td style={{ padding: '12px 10px', fontWeight: 700 }}>₹{p.estimated_cost.toLocaleString()}</td>
                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
@@ -1936,7 +1988,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '360px 1fr', gap: '20px', alignItems: 'start' }}>
                 {/* Survey Intake Form */}
-                <div className="glass-panel" style={{ padding: '20px', background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div className="glass-panel" style={{ padding: '20px', background: 'var(--overlay-faint)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>Intake Survey Form</h3>
                   <form onSubmit={handleSurveySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     
@@ -2233,7 +2285,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                         padding: '18px',
                         cursor: 'pointer',
                         border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-card)',
-                        background: isSelected ? 'rgba(59,130,246,0.03)' : 'var(--overlay-faint)'
+                        background: isSelected ? 'rgba(59,130,246,0.12)' : 'var(--bg-card)'
                       }}
                     >
 
@@ -2369,7 +2421,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
                     {/* Before & After evidence block */}
                     {(() => {
-                      const beforeImage = issue.image_url;
+                      const beforeImage = resolveMediaUrl(issue.image_url);
 
                       const categoryMockAfters: Record<string, string> = {
                         'Water': 'https://images.unsplash.com/photo-1542013936693-8848e574047a?w=400',

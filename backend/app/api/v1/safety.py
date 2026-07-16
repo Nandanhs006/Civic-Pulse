@@ -345,9 +345,25 @@ def upload_photo(
 
 
 @router.post("/incidents/{incident_id}/messages", response_model=MessageOut)
-def post_message(incident_id: int, payload: MessageRequest, db: Session = Depends(deps.get_db)) -> Any:
-    """Add a community response message (the 'chat' thread)."""
+def post_message(
+    incident_id: int,
+    payload: MessageRequest,
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_user_optional),
+) -> Any:
+    """Add a community response message (the 'chat' thread).
+
+    Responders must be phone-OTP-verified citizens to chat/help; the person in
+    distress (is_owner) can always reply on their own alert.
+    """
     _get_incident(db, incident_id)
+    if not payload.is_owner and not (
+        current_user is not None and getattr(current_user, "phone_verified", False)
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Verify your phone to respond to a safety alert.",
+        )
     text = (payload.text or "").strip()[:500]
     if not text:
         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Empty message")

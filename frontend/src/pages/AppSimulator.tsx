@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import { useTheme } from '../context/ThemeContext';
 import { MapContainer, TileLayer, Marker, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -35,6 +36,7 @@ import {
   Mic,
   MicOff,
   Image as ImageIcon,
+  MapPin,
   Send,
   RefreshCw,
   MessageSquare,
@@ -42,7 +44,6 @@ import {
   CheckCircle2,
   Loader2,
   Brain,
-  MapPin,
   LocateFixed
 } from 'lucide-react';
 import ConstituencyPicker from '../components/common/ConstituencyPicker';
@@ -60,6 +61,7 @@ interface OfflineReport {
 }
 
 const AppSimulator: React.FC = () => {
+  const { theme } = useTheme();
   // Simulated Mobile App State
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [phone, setPhone] = useState<string>('9988776655');
@@ -713,7 +715,11 @@ const AppSimulator: React.FC = () => {
               {/* Internal Mobile Top Card */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '10px 12px', borderRadius: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Smartphone size={16} color="var(--secondary)" />
+                  <img
+                    src={theme === 'light' ? '/logo/logo.png' : '/logo/logo_dark.png'}
+                    alt="Civic Pulse"
+                    style={{ height: '20px', width: '20px', objectFit: 'contain' }}
+                  />
                   <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-main)' }}>CivicPulse Native</span>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
@@ -771,7 +777,7 @@ const AppSimulator: React.FC = () => {
                     {/* 2. Microphone Recorder */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>2. SPEAK Grievance (Optional)</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#1c1f2b', padding: '8px', borderRadius: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--input-bg)', padding: '8px', borderRadius: '10px' }}>
                         <button
                           type="button"
                           onClick={isRecording ? stopRecording : startRecording}
@@ -823,8 +829,8 @@ const AppSimulator: React.FC = () => {
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
                         style={{
-                          background: '#1c1f2b', border: '1px solid var(--border-card)',
-                          borderRadius: '8px', padding: '8px', color: 'white', fontSize: '12px', resize: 'none'
+                          background: 'var(--input-bg)', border: '1px solid var(--border-card)',
+                          borderRadius: '8px', padding: '8px', color: 'var(--text-main)', fontSize: '12px', resize: 'none'
                         }}
                       />
                     </div>
@@ -838,8 +844,8 @@ const AppSimulator: React.FC = () => {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         style={{
-                          background: '#1c1f2b', border: '1px solid var(--border-card)',
-                          borderRadius: '8px', padding: '8px', color: 'white', fontSize: '12px'
+                          background: 'var(--input-bg)', border: '1px solid var(--border-card)',
+                          borderRadius: '8px', padding: '8px', color: 'var(--text-main)', fontSize: '12px'
                         }}
                       />
                     </div>
@@ -851,7 +857,7 @@ const AppSimulator: React.FC = () => {
                       <label
                         htmlFor="mob-image-upload"
                         style={{
-                          background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '8px',
+                          background: 'var(--input-bg)', border: '1px solid var(--border-card)', borderRadius: '8px',
                           padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                           gap: '8px', fontSize: '11px', color: 'var(--text-main)', cursor: 'pointer'
                         }}
@@ -906,7 +912,7 @@ const AppSimulator: React.FC = () => {
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70px', overflowY: 'auto' }}>
                         {offlineQueue.map((item, idx) => (
-                          <div key={idx} style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', background: '#15171e', padding: '4px 6px', borderRadius: '4px' }}>
+                          <div key={idx} style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', background: 'var(--input-bg)', padding: '4px 6px', borderRadius: '4px' }}>
                             <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '170px' }}>{item.content}</span>
                             <span>{item.timestamp}</span>
                           </div>
@@ -978,7 +984,9 @@ const AppSimulator: React.FC = () => {
                       <LocateFixed size={13} />
                     </button>
 
-                    <div style={{ position: 'absolute', bottom: '4px', left: '4px', background: 'rgba(14,17,24,0.85)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', zIndex: 100, border: '1px solid var(--border-card)' }}>
+                    {/* Dark chip sits on the dark map tiles, so its text is fixed light
+                        (theme-independent) — otherwise it vanishes in light mode. */}
+                    <div style={{ position: 'absolute', bottom: '4px', left: '4px', background: 'rgba(14,17,24,0.85)', color: '#e8eaed', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', zIndex: 100, border: '1px solid var(--border-card)' }}>
                       📍 {mobFmsCoords[0].toFixed(4)}, {mobFmsCoords[1].toFixed(4)}
                     </div>
                   </div>
@@ -994,14 +1002,14 @@ const AppSimulator: React.FC = () => {
                         placeholder="E.g., Pothole on Sector 4 main street..."
                         value={mobFmsContent}
                         onChange={(e) => setMobFmsContent(e.target.value)}
-                        style={{ background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px 8px', color: 'white', fontSize: '11px', resize: 'none' }}
+                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px 8px', color: 'var(--text-main)', fontSize: '11px', resize: 'none' }}
                       />
                     </div>
 
                     {/* SPEAK Grievance (Optional) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600 }}>SPEAK (OPTIONAL)</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#1c1f2b', border: '1px solid var(--border-card)', padding: '6px', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--input-bg)', border: '1px solid var(--border-card)', padding: '6px', borderRadius: '8px' }}>
                         <button
                           type="button"
                           onClick={mobFmsIsRecording ? mobFmsStopRecording : mobFmsStartRecording}
@@ -1040,7 +1048,7 @@ const AppSimulator: React.FC = () => {
                       <input type="file" multiple accept="image/*" onChange={handleMobFmsImageChange} style={{ display: 'none' }} id="mob-fms-image" />
                       <label
                         htmlFor="mob-fms-image"
-                        style={{ background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-main)', cursor: 'pointer' }}
+                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-main)', cursor: 'pointer' }}
                       >
                         <ImageIcon size={12} /> {mobFmsImages.length > 0 ? `Selected ${mobFmsImages.length} Photo(s)` : 'Take Issue Photo(s)'}
                       </label>
@@ -1086,7 +1094,7 @@ const AppSimulator: React.FC = () => {
                             value={mobOtpInput}
                             onChange={(e) => setMobOtpInput(e.target.value)}
                             placeholder="4-digit code"
-                            style={{ flex: 1, background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px 8px', color: 'white', fontSize: '11px' }}
+                            style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px 8px', color: 'var(--text-main)', fontSize: '11px' }}
                           />
                           <button type="button" onClick={handleMobVerifyOtp} className="btn-primary" style={{ padding: '4px 8px', fontSize: '9px', borderRadius: '8px' }}>
                             Verify
@@ -1116,7 +1124,7 @@ const AppSimulator: React.FC = () => {
                         value={mobSearchQuery}
                         onChange={(e) => setMobSearchQuery(e.target.value)}
                         placeholder="Enter 8-char ID"
-                        style={{ flex: 1, background: '#1c1f2b', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px 8px', color: 'white', fontSize: '11px' }}
+                        style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '6px 8px', color: 'var(--text-main)', fontSize: '11px' }}
                       />
                       <button onClick={handleMobSearchStatus} className="btn-primary" style={{ padding: '6px 10px', fontSize: '10px', borderRadius: '8px' }} disabled={mobSearchLoading}>
                         Track
@@ -1124,7 +1132,7 @@ const AppSimulator: React.FC = () => {
                     </div>
 
                     {mobSearchResult && (
-                      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', padding: '8px', borderRadius: '6px', marginBottom: '8px', fontSize: '11px' }}>
+                      <div style={{ background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', padding: '8px', borderRadius: '6px', marginBottom: '8px', fontSize: '11px' }}>
                         {mobSearchResult.error ? (
                           <span style={{ color: 'var(--danger)' }}>Not found.</span>
                         ) : (
@@ -1162,7 +1170,7 @@ const AppSimulator: React.FC = () => {
                     {mobMyReports.length > 0 && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '72px', overflowY: 'auto' }}>
                         {mobMyReports.map((r) => (
-                          <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', background: '#1c1f2b', padding: '4px 6px', borderRadius: '4px', alignItems: 'center' }}>
+                          <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', background: 'var(--input-bg)', padding: '4px 6px', borderRadius: '4px', alignItems: 'center' }}>
                             <span style={{ fontWeight: 700 }}>ID: {r.id.slice(0, 8).toUpperCase()}</span>
                             <span style={{ color: r.status === 'Resolved' ? '#22c55e' : 'var(--saffron)' }}>{r.status}</span>
                             <button onClick={() => { setMobSearchQuery(r.id.slice(0,8)); setMobSearchResult(r); }} style={{ border: 'none', background: 'var(--primary)', color: 'white', fontSize: '8px', padding: '1px 4px', borderRadius: '2px', cursor: 'pointer' }}>
@@ -1182,7 +1190,7 @@ const AppSimulator: React.FC = () => {
             <div
               style={{
                 height: '52px',
-                background: '#1c1f2b',
+                background: 'var(--input-bg)',
                 borderTop: '1px solid #2d313f',
                 display: 'flex',
                 alignItems: 'center',
