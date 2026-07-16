@@ -7,9 +7,20 @@ from app.api import deps
 from app.core import security
 from app.db.models.user import User
 from app.schemas import Token, UserOut, UserCreate, PhoneLoginRequest
-from app.services.firebase_auth import verify_phone_token
+from app.services.firebase_auth import verify_phone_token, diagnostics as fb_diagnostics
 
 router = APIRouter()
+
+
+@router.get("/phone/status")
+def phone_auth_status() -> Any:
+    """Non-secret diagnostics for the Firebase phone-OTP chain.
+
+    Helps pinpoint OTP failures without server logs: whether the service account
+    is configured, whether the Admin SDK initialised, the project IDs (should
+    match the web config), and the last init / verify error (no keys exposed).
+    """
+    return fb_diagnostics()
 
 
 @router.post("/phone/login", response_model=Token)
