@@ -117,8 +117,11 @@ LOCAL_CATEGORY_IMAGES = {
     "Electricity": ["electricity_1.jpg"],
     "Health": ["health_1.jpg", "health_2.jpg", "health_3.jpg", "health_4.jpg"],
     "Education": ["education_1.jpg", "education_2.jpg", "education_3.jpg", "education_4.jpg"],
+    "Water": ["water_1.jpg", "water_2.jpg", "water_3.jpg", "water_4.jpg",
+              "water_5.jpg", "water_6.jpg", "water_7.jpg"],
+    "Safety": ["safety_1.jpg", "safety_2.jpg", "safety_3.jpg", "safety_4.jpg"],
     # Still using the Wikimedia fallback until local files are added:
-    # Water / Sanitation / Public Spaces / Safety.
+    # Sanitation / Public Spaces.
 }
 
 
