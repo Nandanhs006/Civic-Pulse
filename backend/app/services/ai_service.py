@@ -43,16 +43,17 @@ class AIService:
 
     def __init__(self):
         self.api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY")
+        self.api_keys = [k.strip() for k in self.api_key.split(",") if k.strip()] if self.api_key else []
         self.use_gemini = False
         self.model = None
 
         # ── Gemini (primary AI — GEMINI_API_KEY) ──────────────────────────────
-        if self.api_key and not settings.MOCK_AI_PIPELINE:
+        if self.api_keys and not settings.MOCK_AI_PIPELINE:
             try:
-                genai.configure(api_key=self.api_key)
+                genai.configure(api_key=self.api_keys[0])
                 self.model = genai.GenerativeModel("gemini-flash-latest")
                 self.use_gemini = True
-                logger.info("[AI] Gemini Flash configured successfully.")
+                logger.info(f"[AI] Gemini Flash configured successfully with {len(self.api_keys)} key(s).")
             except Exception as e:
                 logger.warning(
                     f"[AI] Failed to configure Gemini client: {e}. Falling back to mock NLP."
@@ -85,6 +86,25 @@ class AIService:
                 "[AI] Vertex AI agent in standby — VERTEX_PROJECT_ID or "
                 "GOOGLE_APPLICATION_CREDENTIALS not set. Will activate when GCP is available."
             )
+
+
+    def _generate_content_with_rotation(self, *args, **kwargs):
+        """Runs generate_content across the list of api_keys, rotating key if failed."""
+        if not self.api_keys:
+            raise ValueError("[AI] No Gemini API keys configured.")
+
+        last_err = None
+        for idx, key in enumerate(self.api_keys):
+            try:
+                genai.configure(api_key=key)
+                self.model = genai.GenerativeModel("gemini-flash-latest")
+                return self.model.generate_content(*args, **kwargs)
+            except Exception as e:
+                logger.warning(
+                    f"[AI] generate_content failed using key index {idx}: {e}. Trying next key..."
+                )
+                last_err = e
+        raise last_err
 
 
     def transcribe_audio(self, file_path: str) -> Dict[str, Any]:
@@ -134,7 +154,7 @@ class AIService:
                         "Output strictly a JSON block with keys: 'raw_text', 'language_code', 'english_translation', 'category', 'sentiment', 'priority_score'."
                     )
 
-                    response = self.model.generate_content(
+                    response = self._generate_content_with_rotation(
                         [{"mime_type": mime_type, "data": audio_bytes}, prompt],
                         request_options={"timeout": 5.0}
                     )
@@ -269,7 +289,7 @@ class AIService:
                 "Output ONLY the JSON block, no markdown."
             )
 
-            response = self.model.generate_content(
+            response = self._generate_content_with_rotation(
                 [{"mime_type": mime_type, "data": image_bytes}, prompt],
                 request_options={"timeout": 5.0}
             )
@@ -381,7 +401,7 @@ class AIService:
                     f"4. Urgency priority score (1-100 based on danger, public impact, safety risks). "
                     f"Output strictly a JSON block with keys: 'english_translation', 'category', 'sentiment', 'priority_score'."
                 )
-                response = self.model.generate_content(
+                response = self._generate_content_with_rotation(
                     prompt,
                     request_options={"timeout": 5.0}
                 )
