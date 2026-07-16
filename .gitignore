@@ -44,3 +44,7 @@ uploads/
 
 # Production releases and deployment packages
 deploy-bundle/
+
+# Firebase CLI
+.firebase/
+firebase-debug.log

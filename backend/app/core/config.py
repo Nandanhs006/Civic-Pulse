@@ -27,10 +27,15 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Civic Pulse - People's Priorities"
 
-    # CORS Origins configuration
+    # CORS Origins configuration. Same-origin deploys (Render single service) don't
+    # need these, but a split Firebase-Hosting-frontend + Render-backend setup does:
+    # the SPA calls the backend cross-origin, so the Hosting domains must be allowed.
+    # Override via the BACKEND_CORS_ORIGINS env var (comma-separated) for other hosts.
     BACKEND_CORS_ORIGINS: Annotated[List[str], BeforeValidator(parse_cors)] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "https://civic-pulse-7af0f.web.app",
+        "https://civic-pulse-7af0f.firebaseapp.com",
     ]
 
     # Security configuration
