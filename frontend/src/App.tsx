@@ -11,6 +11,7 @@ import PmoAnalytics from './pages/PmoAnalytics';
 import PmoLeaderboard from './pages/PmoLeaderboard';
 import LiveMap from './pages/LiveMap';
 import Participate from './pages/Participate';
+import AppSimulator from './pages/AppSimulator';
 import RequireRole from './components/common/RequireRole';
 import { useIsMobile } from './hooks/useIsMobile';
 
@@ -45,6 +46,7 @@ const MapLayout: React.FC = () => (
 const App: React.FC = () => (
   <Routes>
     <Route path="/" element={<Layout><Portal /></Layout>} />
+    <Route path="/simulator" element={<Layout><AppSimulator /></Layout>} />
     <Route path="/login" element={<Layout><Login /></Layout>} />
     <Route
       path="/mp"

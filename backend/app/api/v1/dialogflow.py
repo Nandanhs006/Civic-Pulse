@@ -134,17 +134,27 @@ async def dialogflow_webhook(request: Request) -> JSONResponse:
             "What would you like to do today?"
         ))
 
+
     # 2. Start complaint
     if "complaint" in intent_name and "start" in intent_name:
         return JSONResponse(content=dialogflow_response(
-            "Please describe the issue in your area. "
-            "You can write in Hindi, Tamil, Telugu, Bengali, or English.\n\n"
-            "Example: 'There is no water supply in our street for 3 days.'"
+            "Please describe the issue in your area:"
         ))
 
     # 3. Collect complaint detail → auto-classify
     if "complaint" in intent_name and "detail" in intent_name:
         description = session_params.get("complaint_text", user_text or "civic issue reported")
+        
+        # Check if the user is asking to upload a photo/image
+        desc_lower = description.lower()
+        if any(w in desc_lower for w in ["photo", "image", "picture", "upload"]):
+            return JSONResponse(content=dialogflow_response(
+                "📸 To attach a photo, please click the '+' or paperclip icon in WhatsApp and send your photo directly. "
+                "I will automatically analyze the image using Gemini Vision and link it to your complaint!\n\n"
+                "Would you like me to submit your current text complaint now? Reply 'yes' to submit.",
+                session_params=session_params
+            ))
+
         category = detect_category_from_text(description)
         return JSONResponse(content=dialogflow_response(
             f"Got it! I've classified your issue as: *{category}*\n\n"
@@ -152,6 +162,7 @@ async def dialogflow_webhook(request: Request) -> JSONResponse:
             "Shall I submit this? Reply 'yes' to confirm or 'edit' to change.",
             session_params={"detected_category": category, "complaint_text": description}
         ))
+
 
     # 4. Submit complaint via internal service
     if "submit" in intent_name or ("complaint" in intent_name and "confirm" in intent_name):

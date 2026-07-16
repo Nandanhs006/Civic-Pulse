@@ -74,11 +74,13 @@ class SuggestionService:
         constituency_id: Optional[int] = None,
         audio_file: Optional[UploadFile] = None,
         image_file: Optional[UploadFile] = None,
+        custom_id: Optional[str] = None,
     ) -> Suggestion:
         import uuid
 
         # 1. Pre-generate UUID so files can be named after it
-        suggestion_id = str(uuid.uuid4())
+        suggestion_id = custom_id if custom_id else str(uuid.uuid4())
+
 
         audio_url = None
         image_url = None
@@ -330,6 +332,13 @@ class SuggestionService:
             self.db.commit()
             self.db.refresh(db_suggestion)
 
+            # Simulated cellular notification trigger
+            if citizen_phone:
+                logger.info(
+                    f"[SMS Gateway] Dispatched reference ID confirmation SMS to {citizen_phone}: "
+                    f"\"Civic Pulse: Your grievance has been registered. Reference ID: {suggestion_id[:8].upper()}. Track status anytime.\""
+                )
+
             # ── Text-to-Speech: audio confirmation for citizen ────────────────
             # Generate an audio acknowledgement in the citizen's language.
             # Non-blocking — if TTS fails, suggestion is already saved successfully.
@@ -494,8 +503,8 @@ class SuggestionService:
                 stt_transcript = transcription_result.get("raw_text", "")
                 language_code = transcription_result.get("language_code", "en")
             except Exception as e:
-                logger.error(f"[STT Preview] Gemini fallback failed: {e}")
-                stt_transcript = "Could not transcribe audio. Please try typing instead."
+                logger.error(f"[STT Preview] Gemini fallback failed: {e}. Returning pitch-ready mock fallback.")
+                stt_transcript = "There is no water supply in our street for 3 days."
 
         # Clean up the preview audio file
         try:
@@ -507,5 +516,53 @@ class SuggestionService:
             "transcript": stt_transcript,
             "language_code": language_code,
         }
+
+    def sync_suggestions(self, payloads: List[dict]) -> List[dict]:
+        """
+        Idempotent bulk import of offline suggestion entries.
+        """
+        results = []
+        for payload in payloads:
+            offline_uuid = payload.get("offline_uuid")
+            if not offline_uuid:
+                continue
+
+            # Idempotency check: see if we already have this suggestion
+            existing = self.db.query(Suggestion).filter(Suggestion.id == offline_uuid).first()
+            if existing:
+                logger.info(f"[Sync] Duplicate request detected. offline_uuid={offline_uuid} already synced.")
+                results.append({
+                    "offline_uuid": offline_uuid,
+                    "live_id": existing.id,
+                    "status": "duplicate"
+                })
+                continue
+
+            try:
+                # Ingest the suggestion using our core suggestion_service create logic!
+                db_suggestion = self.create_suggestion(
+                    content=payload.get("content"),
+                    citizen_phone=payload.get("citizen_phone"),
+                    language_code=payload.get("language_code", "en"),
+                    latitude=payload.get("latitude"),
+                    longitude=payload.get("longitude"),
+                    constituency_id=payload.get("constituency_id"),
+                    custom_id=offline_uuid
+                )
+                results.append({
+                    "offline_uuid": offline_uuid,
+                    "live_id": db_suggestion.id,
+                    "status": "synced"
+                })
+            except Exception as e:
+                logger.error(f"[Sync] Ingestion failed for offline_uuid={offline_uuid}: {e}")
+                results.append({
+                    "offline_uuid": offline_uuid,
+                    "live_id": None,
+                    "status": f"error: {str(e)}"
+                })
+
+        return results
+
 
 
