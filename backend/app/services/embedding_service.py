@@ -63,24 +63,24 @@ class EmbeddingService:
     EMBEDDING_MODEL = "models/text-embedding-004"
 
     def __init__(self) -> None:
-        self.api_key = os.environ.get("GEMINI_API_KEY", "")
-        self.api_keys = [k.strip() for k in self.api_key.split(",") if k.strip()] if self.api_key else []
-        self.enabled = False
+        # Keys/models come from the shared pool (GEMINI_API_KEYS + GEMINI_API_KEY),
+        # which rotates on rate limits instead of failing the call.
+        from app.services.gemini_client import gemini
 
+        self._pool = gemini
         if not _GENAI_AVAILABLE:
             logger.info("[Embedding] SDK unavailable. Duplicate detection in standby.")
-            return
+        elif not self._pool.enabled:
+            logger.info("[Embedding] No Gemini keys set. Duplicate detection in standby.")
+        else:
+            logger.info(
+                "[Embedding] text-embedding-004 active over %d key(s).",
+                len(self._pool.keys),
+            )
 
-        if not self.api_keys:
-            logger.info("[Embedding] GEMINI_API_KEY not set. Duplicate detection in standby.")
-            return
-
-        try:
-            genai.configure(api_key=self.api_keys[0])
-            self.enabled = True
-            logger.info(f"[Embedding] Gemini text-embedding-004 configured with {len(self.api_keys)} key(s). Duplicate detection active.")
-        except Exception as e:
-            logger.warning(f"[Embedding] Failed to configure Gemini for embeddings: {e}")
+    @property
+    def enabled(self) -> bool:
+        return _GENAI_AVAILABLE and self._pool.enabled
 
     def is_available(self) -> bool:
         return self.enabled
@@ -98,25 +98,16 @@ class EmbeddingService:
         if not self.enabled or not text or not text.strip():
             return None
 
-        last_err = None
-        for idx, key in enumerate(self.api_keys):
-            try:
-                genai.configure(api_key=key)
-                result = genai.embed_content(
-                    model=self.EMBEDDING_MODEL,
-                    content=text.strip(),
-                    task_type="SEMANTIC_SIMILARITY",
-                    request_options={"timeout": 5.0}
-                )
-                return result["embedding"]
-            except Exception as e:
-                logger.warning(
-                    f"[Embedding] embed_content failed using key index {idx}: {e}. Trying next key..."
-                )
-                last_err = e
-        
-        logger.error(f"[Embedding] All keys failed to generate embedding. Last error: {last_err}")
-        return None
+        try:
+            return self._pool.embed(
+                text.strip(),
+                model=self.EMBEDDING_MODEL,
+                task_type="SEMANTIC_SIMILARITY",
+                request_options={"timeout": 5.0},
+            )
+        except Exception as e:  # noqa: BLE001 — duplicate detection is best-effort
+            logger.error(f"[Embedding] All keys failed to generate embedding: {e}")
+            return None
 
     def serialize_embedding(self, embedding: List[float]) -> str:
         """Serialize embedding list to compact JSON string for DB storage."""

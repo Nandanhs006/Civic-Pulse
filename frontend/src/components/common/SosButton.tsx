@@ -1,8 +1,91 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ShieldAlert, Phone, X, Bell, BellRing, MapPin, Loader2, Users, Navigation, Eye, CheckCircle2, MessageCircle, Send, Camera } from 'lucide-react';
+import { ShieldAlert, Phone, X, Bell, BellRing, MapPin, Loader2, Users, Navigation, Eye, CheckCircle2, MessageCircle, Send, Camera, ShieldCheck } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { MP } from '../../types';
 import { useLang } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import PhoneAuthModal from './PhoneAuthModal';
+
+interface SafetyMessage { id: number; responder_id: string; is_owner: boolean; text: string; }
+
+/**
+ * Live SOS chat thread for one incident. Polls so both the person in distress
+ * (owner) and responders see new messages. Only VERIFIED citizens may respond —
+ * the owner can always chat (it's their own SOS).
+ */
+const IncidentChat: React.FC<{
+  incidentId: number;
+  isOwner: boolean;
+  responderId: string;
+  verified: boolean;
+  onVerify: () => void;
+}> = ({ incidentId, isOwner, responderId, verified, onVerify }) => {
+  const { t } = useLang();
+  const [messages, setMessages] = useState<SafetyMessage[]>([]);
+  const [replyText, setReplyText] = useState('');
+  const canSend = isOwner || verified; // responders must be verified to help
+
+  useEffect(() => {
+    let stopped = false;
+    const load = () =>
+      apiClient
+        .get<SafetyMessage[]>(`/api/v1/safety/incidents/${incidentId}/messages`)
+        .then((r) => { if (!stopped) setMessages(r.data); })
+        .catch(() => {});
+    load();
+    const timer = window.setInterval(load, 4000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [incidentId]);
+
+  const send = () => {
+    const text = replyText.trim();
+    if (!text || !canSend) return;
+    setReplyText('');
+    apiClient
+      .post<SafetyMessage>(`/api/v1/safety/incidents/${incidentId}/messages`, {
+        responder_id: responderId, text, is_owner: isOwner,
+      })
+      .then((r) => setMessages((m) => [...m, r.data]))
+      .catch((e) => console.error('message failed', e));
+  };
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border-subtle, rgba(128,128,128,.15))', paddingTop: 10 }}>
+      <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <MessageCircle size={14} /> {t('sos.thread')} ({messages.length})
+      </div>
+      <div style={{ maxHeight: 140, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+        {messages.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t(isOwner ? 'sos.threadEmptyOwner' : 'sos.threadEmpty')}</div>}
+        {messages.map((m) => (
+          <div key={m.id} style={{ fontSize: 12.5, padding: '6px 9px', borderRadius: 8, background: m.is_owner ? 'rgba(220,38,38,0.08)' : 'var(--bg-subtle, rgba(37,99,235,.06))' }}>
+            <b style={{ fontSize: 10.5, color: m.is_owner ? '#dc2626' : 'var(--secondary)' }}>{m.is_owner ? t('sos.person') : t('sos.responder')}</b>
+            <div>{m.text}</div>
+          </div>
+        ))}
+      </div>
+      {canSend ? (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
+            placeholder={t('sos.replyPlaceholder')}
+            className="glass-input"
+            style={{ flex: 1, minWidth: 0, padding: '9px 11px', fontSize: 13 }}
+          />
+          <button onClick={send} style={{ padding: '9px 12px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer' }}>
+            <Send size={16} />
+          </button>
+        </div>
+      ) : (
+        <button onClick={onVerify} className="btn-secondary"
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px', fontSize: 12.5 }}>
+          <ShieldCheck size={15} /> {t('sos.verifyToRespond')}
+        </button>
+      )}
+    </div>
+  );
+};
 
 /**
  * Women-safety SOS — "amplify + inform" with community broadcast.
@@ -145,6 +228,9 @@ const SlideToConfirm: React.FC<{ onConfirm: () => void; label: string; busy: boo
 
 const SosButton: React.FC = () => {
   const { t } = useLang();
+  const { user } = useAuth();
+  const verified = !!user?.phone_verified;
+  const [showPhoneAuth, setShowPhoneAuth] = useState(false);
   const [open, setOpen] = useState(false);
   const [optIn, setOptIn] = useState<boolean>(() => localStorage.getItem(OPTIN_KEY) === '1');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -162,9 +248,6 @@ const SosButton: React.FC = () => {
   const [myStatus, setMyStatus] = useState<{ status: string; aware_count: number; responding_count: number } | null>(null);
   // null = unknown (location not yet resolved / denied), true/false = in/out of Bengaluru.
   const [userInBlr, setUserInBlr] = useState<boolean | null>(null);
-  // Response thread + composer for the alert being responded to.
-  const [messages, setMessages] = useState<SafetyMessage[]>([]);
-  const [replyText, setReplyText] = useState('');
   // The community feed (all active nearby alerts) + photo-upload state.
   const [feed, setFeed] = useState<NearbyAlert[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -197,6 +280,7 @@ const SosButton: React.FC = () => {
       if (raw) {
         const inc = JSON.parse(raw);
         if (inc?.id && inc?.token) {
+          seen.current.add(inc.id); // never toast/respond to our own SOS
           setMyIncident(inc);
           setMyStatus({ status: 'active', aware_count: 0, responding_count: 0 });
         }
@@ -297,6 +381,7 @@ const SosButton: React.FC = () => {
         if (r.data.logged && !optIn) setOptIn(true);
         if (r.data.logged && r.data.incident_id && r.data.resolve_token) {
           const inc = { id: r.data.incident_id, token: r.data.resolve_token, share: r.data.share_precise };
+          seen.current.add(inc.id); // never toast/respond to our own SOS
           setMyIncident(inc);
           setMyStatus({ status: 'active', aware_count: 0, responding_count: 0 });
           localStorage.setItem(INCIDENT_KEY, JSON.stringify(inc));
@@ -352,27 +437,6 @@ const SosButton: React.FC = () => {
         setToastAlert((cur) => (cur && cur.id === alert.id ? upd : cur));
       })
       .catch((e) => console.error('ack failed', e));
-  };
-
-  // Load the response thread when a responder card opens.
-  useEffect(() => {
-    if (!respondTo) { setMessages([]); return; }
-    apiClient
-      .get<SafetyMessage[]>(`/api/v1/safety/incidents/${respondTo.id}/messages`)
-      .then((r) => setMessages(r.data))
-      .catch(() => setMessages([]));
-  }, [respondTo?.id]);
-
-  const sendReply = () => {
-    const text = replyText.trim();
-    if (!text || !respondTo) return;
-    setReplyText('');
-    apiClient
-      .post<SafetyMessage>(`/api/v1/safety/incidents/${respondTo.id}/messages`, {
-        responder_id: responderId.current, text, is_owner: myIncident?.id === respondTo.id,
-      })
-      .then((r) => setMessages((m) => [...m, r.data]))
-      .catch((e) => console.error('message failed', e));
   };
 
   // Victim attaches a photo to their SOS.
@@ -545,6 +609,14 @@ const SosButton: React.FC = () => {
                   <button onClick={markSafe} style={{ padding: '10px', borderRadius: 10, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                     <CheckCircle2 size={17} /> {t('sos.imSafe')}
                   </button>
+                  {/* The person in distress sees & replies to responder messages here */}
+                  <IncidentChat
+                    incidentId={myIncident.id}
+                    isOwner
+                    responderId={responderId.current}
+                    verified={verified}
+                    onVerify={() => setShowPhoneAuth(true)}
+                  />
                 </div>
               )
             )}
@@ -612,7 +684,7 @@ const SosButton: React.FC = () => {
       )}
 
       {/* In-app nearby-alert toast — actionable (opens the responder card) */}
-      {toastAlert && !respondTo && (
+      {toastAlert && toastAlert.id !== myIncident?.id && !respondTo && (
         <div
           className="glass-panel animate-fade-in"
           style={{
@@ -702,37 +774,24 @@ const SosButton: React.FC = () => {
               {t('sos.responderCaveat')}
             </div>
 
-            {/* Response thread (the 'chat') */}
-            <div style={{ borderTop: '1px solid var(--border-subtle, rgba(128,128,128,.15))', paddingTop: 10 }}>
-              <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <MessageCircle size={14} /> {t('sos.thread')} ({messages.length})
-              </div>
-              <div style={{ maxHeight: 140, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-                {messages.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('sos.threadEmpty')}</div>}
-                {messages.map((m) => (
-                  <div key={m.id} style={{ fontSize: 12.5, padding: '6px 9px', borderRadius: 8, background: m.is_owner ? 'rgba(220,38,38,0.08)' : 'var(--bg-subtle, rgba(37,99,235,.06))' }}>
-                    <b style={{ fontSize: 10.5, color: m.is_owner ? '#dc2626' : 'var(--secondary)' }}>{m.is_owner ? t('sos.person') : t('sos.responder')}</b>
-                    <div>{m.text}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <input
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') sendReply(); }}
-                  placeholder={t('sos.replyPlaceholder')}
-                  className="glass-input"
-                  style={{ flex: 1, minWidth: 0, padding: '9px 11px', fontSize: 13 }}
-                />
-                <button onClick={sendReply} style={{ padding: '9px 12px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer' }}>
-                  <Send size={16} />
-                </button>
-              </div>
-            </div>
+            {/* Response thread — responders must be verified to help */}
+            <IncidentChat
+              incidentId={respondTo.id}
+              isOwner={myIncident?.id === respondTo.id}
+              responderId={responderId.current}
+              verified={verified}
+              onVerify={() => setShowPhoneAuth(true)}
+            />
           </div>
         </div>
       )}
+
+      <PhoneAuthModal
+        open={showPhoneAuth}
+        onClose={() => setShowPhoneAuth(false)}
+        title={t('sos.verifyToRespond')}
+        reason={t('sos.verifyReason')}
+      />
     </>
   );
 };

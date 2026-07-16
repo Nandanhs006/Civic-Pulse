@@ -106,7 +106,30 @@ CATEGORY_IMG_FILES = {
 }
 
 
+# Locally-bundled, category-relevant photos live in frontend/public/issue-images
+# and are served same-origin (/issue-images/<file>) by the SPA, so they always
+# load on the live map — no hotlink/CORS/rate-limit failures. Preferred over the
+# Wikimedia fallback whenever a category has local files. Add more by dropping
+# files named "<slug>_<n>.jpg" into that folder and listing them here.
+LOCAL_IMG_URL = "/issue-images/"
+LOCAL_CATEGORY_IMAGES = {
+    "Roads": ["roads_1.jpg", "roads_2.jpg", "roads_3.jpg"],
+    "Electricity": ["electricity_1.jpg"],
+    "Health": ["health_1.jpg", "health_2.jpg", "health_3.jpg", "health_4.jpg"],
+    "Education": ["education_1.jpg", "education_2.jpg", "education_3.jpg", "education_4.jpg"],
+    "Water": ["water_1.jpg", "water_2.jpg", "water_3.jpg", "water_4.jpg",
+              "water_5.jpg", "water_6.jpg", "water_7.jpg"],
+    "Safety": ["safety_1.jpg", "safety_2.jpg", "safety_3.jpg", "safety_4.jpg"],
+    "Sanitation": ["sanitation_1.jpg", "sanitation_2.jpg", "sanitation_3.jpg",
+                   "sanitation_4.jpg", "sanitation_5.jpg"],
+    "Public Spaces": ["publicspace_1.jpg", "publicspace_2.jpg", "publicspace_3.jpg"],
+}
+
+
 def _category_images(category: str) -> list:
+    local = LOCAL_CATEGORY_IMAGES.get(category)
+    if local:
+        return [LOCAL_IMG_URL + f for f in local]
     files = CATEGORY_IMG_FILES.get(category) or CATEGORY_IMG_FILES["Roads"]
     return [_COMMONS + _uparse.quote(f) + "?width=640" for f in files]
 
@@ -140,13 +163,24 @@ def main() -> None:
     now = datetime.now(timezone.utc)
     created = 0
     try:
-        existing_demo = (
+        existing = (
             db.query(Suggestion)
             .filter(Suggestion.content.like(f"{DEMO_MARKER}%"))
-            .count()
+            .all()
         )
-        if existing_demo:
-            print(f"[seed] {existing_demo} demo issues already present; skipping.")
+        if existing:
+            # Don't re-create, but backfill/refresh images so already-seeded demo
+            # issues (e.g. on a persistent deploy DB seeded before images existed)
+            # get a category-relevant, same-origin photo that actually renders.
+            fixed = 0
+            for s in existing:
+                want = _category_image(s.category or "Roads")
+                if s.image_url != want and (not s.image_url or "/issue-images/" in want):
+                    s.image_url = want
+                    fixed += 1
+            if fixed:
+                db.commit()
+            print(f"[seed] {len(existing)} demo issues present; backfilled {fixed} images.")
             return
         for _ in range(count):
             feat = random.choice(features)

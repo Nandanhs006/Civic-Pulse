@@ -27,20 +27,22 @@ _TEST_TOKENS = {
 
 
 def _llm_is_spam(text: str) -> Optional[bool]:
-    """Best-effort Gemini check; None unless a key is configured."""
-    if settings.MOCK_AI_PIPELINE or not settings.GEMINI_API_KEY:
+    """Best-effort Gemini check; None unless keys are configured.
+
+    Uses the shared key/model pool so a rate-limited key rotates instead of
+    failing the check.
+    """
+    from app.services.gemini_client import gemini
+
+    if not gemini.enabled:
         return None
     try:
-        import google.generativeai as genai  # type: ignore
-
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-flash-latest")
         prompt = (
             "Is the following a GENUINE civic/public grievance, or just a test / "
             "spam / gibberish with no real issue? Answer only REAL or SPAM.\n\n"
             + text[:400]
         )
-        out = (model.generate_content(prompt).text or "").strip().upper()
+        out = gemini.generate_text(prompt).upper()
         if "SPAM" in out:
             return True
         if "REAL" in out:

@@ -27,7 +27,16 @@ class UserOut(UserBase):
     id: int
     role: Optional[str] = None
     constituency_id: Optional[int] = None
+    phone: Optional[str] = None
+    phone_verified: Optional[bool] = False
     model_config = ConfigDict(from_attributes=True)
+
+
+class PhoneLoginRequest(BaseModel):
+    """Firebase Phone-Auth: the client sends the Firebase ID token it obtained
+    after the SMS OTP was confirmed (or a "mock:<phone>" token in demo mode)."""
+    id_token: str
+    full_name: Optional[str] = None
 
 
 # Ward Schemas
@@ -84,6 +93,7 @@ class SuggestionOut(BaseModel):
     image_analysis: Optional[str] = None   # JSON string of vision output
     is_duplicate: bool = False
     duplicate_of_id: Optional[str] = None
+    citizen_verified: Optional[bool] = False
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
@@ -107,6 +117,7 @@ class MapIssueOut(BaseModel):
     state: Optional[str] = None
     city: Optional[str] = None
     mp: Optional[str] = None
+    citizen_verified: Optional[bool] = False
     model_config = ConfigDict(from_attributes=True)
 
 

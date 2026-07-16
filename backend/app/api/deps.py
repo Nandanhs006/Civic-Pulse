@@ -12,6 +12,11 @@ from app.services.suggestion_service import SuggestionService
 from app.services.project_service import ProjectService
 
 reusable_oauth2 = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+# Same scheme, but does not 401/403 when no token is supplied — for endpoints
+# that work anonymously yet do something extra for an authenticated user.
+optional_oauth2 = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False
+)
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -39,6 +44,30 @@ def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return user
+
+
+def get_current_user_optional(
+    db: Session = Depends(get_db),
+    token: Optional[str] = Depends(optional_oauth2),
+) -> Optional[User]:
+    """Return the logged-in user if a valid token is present, else None.
+
+    Never raises — used by endpoints (e.g. citizen issue submission) that are
+    open to anonymous users but grant extra trust to authenticated ones.
+    """
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        sub = payload.get("sub")
+    except JWTError:
+        return None
+    if not sub:
+        return None
+    user = db.query(User).filter(User.email == sub).first()
+    if user and user.is_active:
+        return user
+    return None
 
 
 def get_pmo_user(current_user: User = Depends(get_current_user)) -> User:

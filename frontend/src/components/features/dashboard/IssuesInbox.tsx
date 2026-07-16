@@ -3,7 +3,7 @@ import apiClient from '../../../services/apiClient';
 import { Suggestion } from '../../../types';
 import { useLang } from '../../../context/LanguageContext';
 import { colorOf } from '../map/severity';
-import { Inbox, Building2, Check, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Inbox, Building2, Check, Loader2, Sparkles, CheckCircle2, BadgeCheck } from 'lucide-react';
 
 interface Props {
   suggestions: Suggestion[];
@@ -117,6 +117,12 @@ const IssuesInbox: React.FC<Props> = ({ suggestions, onChange }) => {
                   <span>{s.category ? t('category.' + s.category) : '—'}</span>
                   <span>· {t('status.' + s.status)}</span>
                   <span style={{ fontFamily: 'var(--font-mono, monospace)' }}>· {trackCode(s.id)}</span>
+                  {s.citizen_verified && (
+                    <span style={{ color: 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                      title={s.citizen_phone ? `Verified citizen · ${s.citizen_phone}` : 'Verified citizen'}>
+                      · <BadgeCheck size={12} /> Verified{s.citizen_phone ? ` · ${s.citizen_phone}` : ''}
+                    </span>
+                  )}
                   {s.department && !review && <span style={{ color: 'var(--india-green)' }}>· ✓ {s.department}</span>}
                   {review && suggested && <span style={{ color: 'var(--secondary)' }}>· {t('inbox.aiSuggests')}: {suggested}</span>}
                 </div>
