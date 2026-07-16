@@ -95,6 +95,8 @@ class MapIssueOut(BaseModel):
     english_translation: Optional[str] = None
     image_url: Optional[str] = None
     constituency_id: Optional[int] = None
+    assembly_constituency_id: Optional[int] = None
+    ward_id: Optional[int] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -106,6 +108,7 @@ class ProjectBase(BaseModel):
     category: str
     target_ward_id: Optional[int] = None
     constituency_id: Optional[int] = None
+    assembly_constituency_id: Optional[int] = None
     estimated_cost: float
     priority_score: int
     supporting_suggestions_count: int

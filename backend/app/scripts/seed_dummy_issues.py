@@ -3,6 +3,8 @@ from app.db.base import Base  # noqa: F401
 from app.db.session import SessionLocal
 from app.db.models.suggestion import Suggestion
 from app.db.models.ward import Ward
+from app.db.models.constituency import Constituency
+from app.db.models.assembly_constituency import AssemblyConstituency
 
 DUMMY_ISSUES = [
     {
@@ -87,14 +89,42 @@ DUMMY_ISSUES = [
 def main():
     db = SessionLocal()
     try:
-        # Check for a valid ward to assign
-        first_ward = db.query(Ward).first()
-        ward_id = first_ward.id if first_ward else 1
+        # Resolve Bangalore Central constituency (P. C. Mohan)
+        pc = db.query(Constituency).filter(Constituency.name.like("%Bangalore Central%")).first()
+        pc_id = pc.id if pc else 189
+
+        # Map AC names to IDs dynamically or use hardcoded IDs
+        ac_names_ids = [
+            ("Mahadevapura", 166),
+            ("Sarvagnanagar", 174),
+            ("Rajaji Nagar", 183),
+            ("Shanti Nagar", 185),
+            ("Chamrajpet", 187)
+        ]
+        ac_map = {}
+        for name, ac_id in ac_names_ids:
+            ac_obj = db.query(AssemblyConstituency).filter(AssemblyConstituency.name.like(f"%{name}%")).first()
+            ac_map[name] = ac_obj.id if ac_obj else ac_id
+
+        # Route specific dummy issues
+        issue_routing = {
+            "s_mock_1": {"ac": "Mahadevapura", "ward": 1},
+            "s_mock_2": {"ac": "Sarvagnanagar", "ward": 2},
+            "s_mock_3": {"ac": "Rajaji Nagar", "ward": 3},
+            "s_mock_4": {"ac": "Shanti Nagar", "ward": 4},
+            "s_mock_5": {"ac": "Chamrajpet", "ward": 2},
+            "s2":       {"ac": "Sarvagnanagar", "ward": 3},
+            "s_mock_6": {"ac": "Shanti Nagar", "ward": 1}
+        }
 
         added_count = 0
         updated_count = 0
 
         for data in DUMMY_ISSUES:
+            routing = issue_routing.get(data["id"], {"ac": "Sarvagnanagar", "ward": 1})
+            resolved_ac_id = ac_map.get(routing["ac"])
+            resolved_ward_id = routing["ward"]
+
             existing = db.query(Suggestion).filter(Suggestion.id == data["id"]).first()
             if existing:
                 # Update existing dummy issue
@@ -107,7 +137,9 @@ def main():
                 existing.latitude = data["latitude"]
                 existing.longitude = data["longitude"]
                 existing.image_url = data["image_url"]
-                existing.ward_id = ward_id
+                existing.ward_id = resolved_ward_id
+                existing.constituency_id = pc_id
+                existing.assembly_constituency_id = resolved_ac_id
                 updated_count += 1
             else:
                 # Create new dummy issue
@@ -124,7 +156,9 @@ def main():
                     latitude=data["latitude"],
                     longitude=data["longitude"],
                     image_url=data["image_url"],
-                    ward_id=ward_id
+                    ward_id=resolved_ward_id,
+                    constituency_id=pc_id,
+                    assembly_constituency_id=resolved_ac_id
                 )
                 db.add(issue)
                 added_count += 1

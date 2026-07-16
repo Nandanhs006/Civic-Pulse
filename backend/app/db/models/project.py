@@ -14,6 +14,9 @@ class ProposedProject(Base):
     constituency_id = Column(
         Integer, ForeignKey("constituencies.id"), nullable=True, index=True
     )
+    assembly_constituency_id = Column(
+        Integer, ForeignKey("assembly_constituencies.id"), nullable=True, index=True
+    )
     estimated_cost = Column(Numeric(12, 2), nullable=False)
     priority_score = Column(Integer, nullable=False)
     supporting_suggestions_count = Column(Integer, default=0)

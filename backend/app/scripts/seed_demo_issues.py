@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 from app.db.base import Base  # noqa: F401 (registers models)
 from app.db.session import engine, SessionLocal
 from app.db.models.suggestion import Suggestion
+from app.db.models.ward import Ward
 from app.core.config import settings
 from app.services.geo_service import GeoService, _norm
 
@@ -113,6 +114,7 @@ def main() -> None:
         if existing_demo:
             print(f"[seed] {existing_demo} demo issues already present; skipping.")
             return
+        wards = db.query(Ward).all()
         for _ in range(count):
             feat = random.choice(features)
             c = _centroid(feat["geometry"])
@@ -125,6 +127,19 @@ def main() -> None:
             cid = name_map.get(
                 _norm(props.get("st_name")) + "|" + _norm(props.get("pc_name"))
             ) or name_map.get(_norm(props.get("pc_name")))
+
+            # Resolve assembly constituency
+            assembly_constituency_id = None
+            if lat is not None and lng is not None:
+                assembly_constituency_id = geo.locate_assembly_constituency_id(
+                    float(lat), float(lng)
+                )
+
+            # Resolve ward
+            ward_id = None
+            if lat is not None and lng is not None and wards:
+                ward_index = int((abs(lat) + abs(lng)) * 100) % len(wards)
+                ward_id = wards[ward_index].id
 
             category = random.choice(CATEGORIES)
             status = random.choice(STATUSES)
@@ -140,6 +155,8 @@ def main() -> None:
                 priority_score=random.randint(15, 96),
                 status=status,
                 constituency_id=cid,
+                assembly_constituency_id=assembly_constituency_id,
+                ward_id=ward_id,
                 image_url=(
                     sample_img if (sample_img and random.random() < 0.15) else None
                 ),

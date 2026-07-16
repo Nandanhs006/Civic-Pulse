@@ -42,6 +42,8 @@ interface Suggestion {
   longitude?: number;
   sentiment?: string;
   ward_id?: number;
+  constituency_id?: number;
+  assembly_constituency_id?: number;
   assigned_officer_id?: number;
   image_url?: string;
   audio_url?: string;
@@ -148,7 +150,10 @@ const DUMMY_SUGGESTIONS: Suggestion[] = [
     dispatch_status: "Resolved",
     latitude: 12.973,
     longitude: 77.593,
-    image_url: "/images/bfr_aft/bfr6.webp"
+    image_url: "/images/bfr_aft/bfr6.webp",
+    constituency_id: 189,
+    assembly_constituency_id: 166,
+    ward_id: 1
   },
   {
     id: "s_mock_2",
@@ -159,7 +164,10 @@ const DUMMY_SUGGESTIONS: Suggestion[] = [
     dispatch_status: "Resolved",
     latitude: 12.970,
     longitude: 77.596,
-    image_url: "/images/bfr_aft/bfr2.jpg"
+    image_url: "/images/bfr_aft/bfr2.jpg",
+    constituency_id: 189,
+    assembly_constituency_id: 174,
+    ward_id: 2
   },
   {
     id: "s_mock_3",
@@ -170,7 +178,10 @@ const DUMMY_SUGGESTIONS: Suggestion[] = [
     dispatch_status: "Resolved",
     latitude: 12.974,
     longitude: 77.592,
-    image_url: "/images/bfr_aft/bfr8.webp"
+    image_url: "/images/bfr_aft/bfr8.webp",
+    constituency_id: 189,
+    assembly_constituency_id: 183,
+    ward_id: 3
   },
   {
     id: "s_mock_4",
@@ -181,7 +192,10 @@ const DUMMY_SUGGESTIONS: Suggestion[] = [
     dispatch_status: "Resolved",
     latitude: 12.976,
     longitude: 77.597,
-    image_url: "/images/bfr_aft/bfr9.webp"
+    image_url: "/images/bfr_aft/bfr9.webp",
+    constituency_id: 189,
+    assembly_constituency_id: 185,
+    ward_id: 4
   },
   {
     id: "s_mock_5",
@@ -192,7 +206,10 @@ const DUMMY_SUGGESTIONS: Suggestion[] = [
     dispatch_status: "Resolved",
     latitude: 12.971,
     longitude: 77.594,
-    image_url: "/images/bfr_aft/bfr5.jpg"
+    image_url: "/images/bfr_aft/bfr5.jpg",
+    constituency_id: 189,
+    assembly_constituency_id: 187,
+    ward_id: 2
   },
   {
     id: "s2",
@@ -203,7 +220,10 @@ const DUMMY_SUGGESTIONS: Suggestion[] = [
     dispatch_status: "Resolved",
     latitude: 12.975,
     longitude: 77.591,
-    image_url: "/images/bfr_aft/bfr7.webp"
+    image_url: "/images/bfr_aft/bfr7.webp",
+    constituency_id: 189,
+    assembly_constituency_id: 174,
+    ward_id: 3
   },
   {
     id: "s_mock_6",
@@ -214,7 +234,10 @@ const DUMMY_SUGGESTIONS: Suggestion[] = [
     dispatch_status: "Resolved",
     latitude: 12.9725,
     longitude: 77.6015,
-    image_url: "/images/bfr_aft/bfr1.jpg"
+    image_url: "/images/bfr_aft/bfr1.jpg",
+    constituency_id: 189,
+    assembly_constituency_id: 185,
+    ward_id: 1
   }
 ];
 
@@ -267,6 +290,19 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [localUpvotes, setLocalUpvotes] = useState<Record<string, number>>({});
   const [upvotedIssues, setUpvotedIssues] = useState<Record<string, boolean>>({});
+
+  // Dynamic Routing & Filtering States
+  const [statesList, setStatesList] = useState<string[]>([]);
+  const [selectedState, setSelectedState] = useState<string>('');
+  const [constituenciesList, setConstituenciesList] = useState<any[]>([]);
+  const [selectedConstituencyId, setSelectedConstituencyId] = useState<number | null>(null);
+  const [activeMpData, setActiveMpData] = useState<any | null>(null);
+  const [mlaList, setMlaList] = useState<any[]>([]);
+  const [selectedMlaId, setSelectedMlaId] = useState<number | null>(null);
+  const [selectedWardId, setSelectedWardId] = useState<number | null>(null);
+
+  // Tab state for the right-side detail panel: 'issue' or 'directory'
+  const [activeTimelineTab, setActiveTimelineTab] = useState<'issue' | 'directory'>('issue');
 
   const [issueComments, setIssueComments] = useState<Record<string, Array<{ id: number; author: string; text: string; date: string; isOfficer?: boolean }>>>({
 
@@ -461,7 +497,10 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
         const matchesStatus = timelineStatus === 'All' || s.status === timelineStatus;
         const matchesSearch = s.content.toLowerCase().includes(timelineSearch.toLowerCase()) ||
           (s.english_translation && s.english_translation.toLowerCase().includes(timelineSearch.toLowerCase()));
-        return matchesCategory && matchesStatus && matchesSearch;
+        const matchesConstituency = !selectedConstituencyId || s.constituency_id === selectedConstituencyId;
+        const matchesMla = !selectedMlaId || s.assembly_constituency_id === selectedMlaId;
+        const matchesWard = !selectedWardId || s.ward_id === selectedWardId;
+        return matchesCategory && matchesStatus && matchesSearch && matchesConstituency && matchesMla && matchesWard;
       })
       .sort((a, b) => {
         if (timelineSort === 'priority') {
@@ -533,6 +572,14 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
         setProjects(MOCK_PROJECTS);
       }
 
+      // 4. Fetch states list for constituency filtering
+      try {
+        const statesRes = await apiClient.get<string[]>('/api/v1/constituencies/states');
+        setStatesList(statesRes.data);
+      } catch (e) {
+        console.error("Failed to fetch states list:", e);
+      }
+
     } catch (err) {
       console.error("Error in synchronizing command data:", err);
     } finally {
@@ -543,6 +590,46 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Load constituencies when selected state changes
+  useEffect(() => {
+    if (!selectedState) {
+      setConstituenciesList([]);
+      setSelectedConstituencyId(null);
+      return;
+    }
+    apiClient
+      .get<any[]>('/api/v1/constituencies/', { params: { state: selectedState } })
+      .then((r) => setConstituenciesList(r.data))
+      .catch((e) => console.error('Failed to load constituencies', e));
+  }, [selectedState]);
+
+  // Load MP data and MLA assembly list when selected constituency changes
+  useEffect(() => {
+    if (!selectedConstituencyId) {
+      setActiveMpData(null);
+      setMlaList([]);
+      setSelectedMlaId(null);
+      return;
+    }
+    // Fetch MP details
+    apiClient
+      .get<any>(`/api/v1/mps/${selectedConstituencyId}`)
+      .then((r) => setActiveMpData(r.data))
+      .catch((e) => {
+        console.error('Failed to load MP details', e);
+        setActiveMpData(null);
+      });
+
+    // Fetch MLA assembly constituencies list
+    apiClient
+      .get<any[]>(`/api/v1/hierarchy/pc/${selectedConstituencyId}`)
+      .then((r) => setMlaList(r.data))
+      .catch((e) => {
+        console.error('Failed to load MLAs list', e);
+        setMlaList([]);
+      });
+  }, [selectedConstituencyId]);
 
   // 1. FixMyStreet Report Submission
   const handleFmsSubmit = async (e: React.FormEvent) => {
@@ -785,20 +872,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               </button>
             </div>
 
-            {/* Card 7: Ward Directory */}
-            <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
-                <span className="badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>Ward Committee Network</span>
-              </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Ward Directory</h3>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                Ward officer roster. Review local representative contacts, emails, assigned wards, and active workload monitors.
-              </p>
-              <button onClick={() => navigate('/participate/ward-directory')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
-                Open Platform
-              </button>
-            </div>
+
 
             {/* Card 8: CityPulse IoT */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1032,6 +1106,133 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             </button>
           </div>
 
+          {/* Representative & Geography Selector */}
+          <div className="glass-panel animate-fade-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MapPin size={18} color="var(--primary)" />
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Constituency & Ward Filters</h3>
+              </div>
+              {(selectedState || selectedConstituencyId || selectedMlaId || selectedWardId) && (
+                <button 
+                  onClick={() => {
+                    setSelectedState('');
+                    setSelectedConstituencyId(null);
+                    setSelectedMlaId(null);
+                    setSelectedWardId(null);
+                  }}
+                  className="btn btn-secondary" 
+                  style={{ padding: '4px 10px', fontSize: '11px' }}
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              {/* State Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>STATE / UT</span>
+                <select
+                  value={selectedState}
+                  onChange={(e) => setSelectedState(e.target.value)}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%' }}
+                >
+                  <option value="">Select State</option>
+                  {statesList.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* MP / Constituency Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>PARLIAMENTARY CONSTITUENCY (MP)</span>
+                <select
+                  value={selectedConstituencyId || ''}
+                  onChange={(e) => setSelectedConstituencyId(Number(e.target.value) || null)}
+                  disabled={!selectedState}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%', opacity: selectedState ? 1 : 0.5 }}
+                >
+                  <option value="">{selectedState ? 'Select Constituency' : 'Choose a state first'}</option>
+                  {constituenciesList.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* MLA / Assembly Constituency Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>ASSEMBLY CONSTITUENCY (MLA)</span>
+                <select
+                  value={selectedMlaId || ''}
+                  onChange={(e) => setSelectedMlaId(Number(e.target.value) || null)}
+                  disabled={!selectedConstituencyId}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%', opacity: selectedConstituencyId ? 1 : 0.5 }}
+                >
+                  <option value="">{selectedConstituencyId ? 'Select Assembly Seat' : 'Choose an MP seat first'}</option>
+                  {mlaList.map(item => (
+                    <option key={item.assembly_constituency.id} value={item.assembly_constituency.id}>
+                      {item.assembly_constituency.name} {item.mla ? `(${item.mla.name})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ward Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>MUNICIPAL WARD</span>
+                <select
+                  value={selectedWardId || ''}
+                  onChange={(e) => setSelectedWardId(Number(e.target.value) || null)}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%' }}
+                >
+                  <option value="">All Wards</option>
+                  <option value="1">Ward 1 - Central Business</option>
+                  <option value="2">Ward 2 - Industrial Zone</option>
+                  <option value="3">Ward 3 - Riverside Settlement</option>
+                  <option value="4">Ward 4 - Uptown Residential</option>
+                </select>
+              </div>
+            </div>
+
+            {/* MP Profile Card Drilldown */}
+            {activeMpData && (
+              <div className="glass-panel" style={{ display: 'flex', gap: '20px', padding: '16px', marginTop: '10px', alignItems: 'center', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+                {activeMpData.photo_url ? (
+                  <img src={activeMpData.photo_url} alt={activeMpData.name} style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary)' }} />
+                ) : (
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '20px', color: '#fff' }}>
+                    {activeMpData.name.charAt(0)}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--primary)', letterSpacing: '0.05em' }}>CONSTITUENCY MEMBER OF PARLIAMENT (MP)</span>
+                  <h4 style={{ margin: '2px 0', fontSize: '16px', fontWeight: 600 }}>{activeMpData.name}</h4>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    <span>{activeMpData.party_abbr || activeMpData.party || 'IND'}</span>
+                    <span>•</span>
+                    <span>{activeMpData.state}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Total Issues</div>
+                    <div style={{ fontSize: '15px', fontWeight: 700 }}>{activeMpData.total_suggestions}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Resolved</div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#22c55e' }}>{activeMpData.resolved_suggestions}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Sanctioned Projects</div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary)' }}>{activeMpData.sanctioned_projects}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Metric Overview Panels */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
             <div className="glass-panel" style={{ padding: '16px', textAlign: 'center' }}>
@@ -1187,311 +1388,403 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               )}
             </div>
 
-            {/* Right Column: Ticket Timeline & Details */}
+            {/* Right Column: Ticket Timeline & Details / Ward Directory */}
             <div className="glass-panel" style={{ padding: '24px', position: 'sticky', top: '20px', minHeight: '480px', display: 'flex', flexDirection: 'column' }}>
-              {(() => {
-                const issue = suggestions.find(s => s.id === selectedIssueId);
-                if (!issue) {
-                  return (
-                    <div style={{ flex: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-                      <Activity size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                      <h4 style={{ margin: 0, fontWeight: 600, fontSize: '16px' }}>Select an Issue</h4>
-                      <p style={{ fontSize: '12px', marginTop: '6px', maxWidth: '280px' }}>
-                        Select any reported ticket from the list to view its real-time workflow status, dispatch updates, and comments.
-                      </p>
-                    </div>
-                  );
-                }
+              {/* Tab Selector */}
+              <div style={{ display: 'flex', gap: '14px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '12px', marginBottom: '16px' }}>
+                <button
+                  onClick={() => setActiveTimelineTab('issue')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: activeTimelineTab === 'issue' ? 'var(--primary)' : 'var(--text-muted)',
+                    borderBottom: activeTimelineTab === 'issue' ? '2px solid var(--primary)' : '2px solid transparent',
+                    paddingBottom: '6px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Issue Details
+                </button>
+                <button
+                  onClick={() => setActiveTimelineTab('directory')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: activeTimelineTab === 'directory' ? 'var(--primary)' : 'var(--text-muted)',
+                    borderBottom: activeTimelineTab === 'directory' ? '2px solid var(--primary)' : '2px solid transparent',
+                    paddingBottom: '6px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Ward Directory
+                </button>
+              </div>
 
-                // Match assigned representative
-                const assignedOfficer = officers.find(o => o.id === issue.assigned_officer_id) ||
-                  (issue.ward_id ? officers.find(o => o.ward_id === issue.ward_id) : null);
-
-                const comments = issueComments[issue.id] || [];
-                const isUpvoted = upvotedIssues[issue.id];
-                const upvoteCount = (localUpvotes[issue.id] || 0);
-
-                // Define step states
-                const stepDispatched = !!issue.assigned_officer_id || issue.dispatch_status === 'Dispatched';
-                const stepResolved = issue.status === 'Resolved';
-
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: '1' }}>
-                    <div>
-                      <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--primary)', marginBottom: '8px' }}>
-                        {issue.category || 'General'}
-                      </span>
-                      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, lineHeight: 1.4 }}>{issue.content}</h3>
-                    </div>
-
-                    {/* Stepper Timeline Visualizer */}
-                    <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px' }}>
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Ticket Workflow Timeline</h4>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', paddingLeft: '24px' }}>
-                        {/* Line connector */}
-                        <div style={{ position: 'absolute', top: '8px', left: '7px', bottom: '8px', width: '2px', background: 'rgba(255,255,255,0.05)' }}></div>
-
-                        {/* Step 1: Submitted */}
-                        <div style={{ position: 'relative' }}>
-                          <span style={{
-                            position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
-                            background: '#22c55e', border: '2px solid var(--bg-card)'
-                          }} />
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>Submitted & Prioritized</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            Report registered at priority score **{issue.priority_score}/100**.
-                          </div>
-                        </div>
-
-                        {/* Step 2: Dispatched */}
-                        <div style={{ position: 'relative' }}>
-                          <span style={{
-                            position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
-                            background: stepDispatched ? 'var(--saffron)' : 'rgba(255,255,255,0.1)',
-                            border: '2px solid var(--bg-card)'
-                          }} />
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: stepDispatched ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                            Dispatched to Ward Representative
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            {stepDispatched ? (
-                              <span>Assigned to Ward Officer **{assignedOfficer?.name}** for inspection.</span>
-                            ) : (
-                              <span>Awaiting dispatch queue allocation.</span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Step 3: Resolved */}
-                        <div style={{ position: 'relative' }}>
-                          <span style={{
-                            position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
-                            background: stepResolved ? '#22c55e' : 'rgba(255,255,255,0.1)',
-                            border: '2px solid var(--bg-card)'
-                          }} />
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: stepResolved ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                            Resolution Verified
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            {stepResolved ? (
-                              <span style={{ color: '#22c55e', fontWeight: 600 }}>Resolved: Issue verified closed.</span>
-                            ) : (
-                              <span>Awaiting field execution and community sign-off.</span>
-                            )}
-                          </div>
-                        </div>
-
-                      </div>
-                    </div>
-
-                    {/* Before & After evidence block */}
-                    {(() => {
-                      const beforeImage = issue.image_url;
-
-                      const categoryMockAfters: Record<string, string> = {
-                        'Water': 'https://images.unsplash.com/photo-1542013936693-8848e574047a?w=400',
-                        'Roads': 'https://images.unsplash.com/photo-1515162305285-0293e4767cc2?w=400',
-                        'Education': 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400',
-                        'Health': 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400',
-                        'Sanitation': 'https://images.unsplash.com/photo-1616963172089-a038f8cfc8d3?w=400',
-                        'Safety': 'https://images.unsplash.com/photo-1508849789987-4e5333c12b78?w=400',
-                        'Electricity': 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=400',
-                        'General': 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=400'
-                      };
-
-                      const dummyAfters: Record<string, string> = {
-                        's_mock_1': '/images/bfr_aft/aft6.png',
-                        's_mock_2': '/images/bfr_aft/aft2.jpg',
-                        's_mock_3': '/images/bfr_aft/aft8.png',
-                        's_mock_4': '/images/bfr_aft/aft9.png',
-                        's_mock_5': '/images/bfr_aft/aft5.jpg',
-                        's2': '/images/bfr_aft/aft7.png',
-                        's_mock_6': '/images/bfr_aft/aft1.jpg',
-                      };
-
-                      const afterImage = resolvedImages[issue.id] || dummyAfters[issue.id] || categoryMockAfters[issue.category || 'General'];
-
+              {activeTimelineTab === 'directory' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} className="animate-fade-in">
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Ward Committee Directory</h4>
+                  <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Below are the active managers assigned to local wards. Click a manager to filter the timeline by their ward.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {officers.map(officer => {
+                      const color = WARD_COLORS[officer.ward_id as keyof typeof WARD_COLORS] || 'var(--primary)';
+                      const isSelectedWard = selectedWardId === officer.ward_id;
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Resolution Evidence (Before / After)</h4>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                            {/* Before Image */}
-                            <div className="glass-panel" style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(255,255,255,0.01)' }}>
-                              <div style={{ height: '90px', borderRadius: '4px', overflow: 'hidden', background: 'rgba(0,0,0,0.2)', position: 'relative' }}>
-                                {beforeImage ? (
-                                  <img src={beforeImage} alt="Before" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                ) : (
-                                  <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>No Photo Attached</div>
-                                )}
-                                <span className="badge" style={{ position: 'absolute', top: '4px', left: '4px', background: 'rgba(239,68,68,0.8)', color: 'white', fontSize: '9px', padding: '2px 4px' }}>BEFORE</span>
-                              </div>
+                        <div 
+                          key={officer.id} 
+                          onClick={() => setSelectedWardId(isSelectedWard ? null : officer.ward_id)}
+                          className="glass-panel transition-all hover-glow"
+                          style={{ 
+                            padding: '14px', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '10px', 
+                            position: 'relative',
+                            cursor: 'pointer',
+                            border: isSelectedWard ? `1px solid ${color}` : '1px solid var(--border-color)',
+                            background: isSelectedWard ? 'rgba(255,255,255,0.02)' : 'transparent',
+                            borderRadius: '8px'
+                          }}
+                        >
+                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: color, borderRadius: '8px 8px 0 0' }}></div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <img src={officer.avatar_url} alt={officer.name} style={{ width: '36px', height: '36px', borderRadius: '50%', border: `1.5px solid ${color}`, objectFit: 'cover' }} />
+                            <div>
+                              <h5 style={{ margin: 0, fontSize: '13px', fontWeight: 600 }}>{officer.name}</h5>
+                              <span style={{ fontSize: '9px', color: color, fontWeight: 700 }}>WARD {officer.ward_id} MANAGER</span>
                             </div>
-                            {/* After Image */}
-                            <div className="glass-panel" style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(255,255,255,0.01)' }}>
-                              <div style={{ height: '90px', borderRadius: '4px', overflow: 'hidden', background: 'rgba(0,0,0,0.2)', position: 'relative' }}>
-                                {stepResolved ? (
-                                  <img src={afterImage} alt="After" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                ) : (
-                                  <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--text-muted)', padding: '4px', textAlign: 'center' }}>
-                                    <span>Resolution Pending</span>
-                                  </div>
-                                )}
-                                <span className="badge" style={{ position: 'absolute', top: '4px', left: '4px', background: stepResolved ? 'rgba(34,197,94,0.8)' : 'rgba(255,255,255,0.2)', color: 'white', fontSize: '9px', padding: '2px 4px' }}>AFTER</span>
-                              </div>
+                          </div>
+
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div>📞 {officer.phone}</div>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✉️ {officer.email}</div>
+                          </div>
+
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
+                              <span>Active load</span>
+                              <span>{officer.active_cases} open cases</span>
+                            </div>
+                            <div style={{ height: '3px', background: 'rgba(255,255,255,0.08)', borderRadius: '1.5px', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${Math.min((officer.active_cases / 10) * 100, 100)}%`, background: color }}></div>
                             </div>
                           </div>
                         </div>
                       );
-                    })()}
+                    })}
+                  </div>
+                </div>
+              ) : (
+                (() => {
+                  const issue = suggestions.find(s => s.id === selectedIssueId);
+                  if (!issue) {
+                    return (
+                      <div style={{ flex: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }} className="animate-fade-in">
+                        <Activity size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+                        <h4 style={{ margin: 0, fontWeight: 600, fontSize: '16px' }}>Select an Issue</h4>
+                        <p style={{ fontSize: '12px', marginTop: '6px', maxWidth: '280px' }}>
+                          Select any reported ticket from the list to view its real-time workflow status, dispatch updates, and comments.
+                        </p>
+                      </div>
+                    );
+                  }
 
-                    {/* Officer info */}
-                    <div>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assigned Ward Officer</h4>
-                      {assignedOfficer ? (
-                        <div className="glass-panel" style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.01)' }}>
-                          <img src={assignedOfficer.avatar_url} alt={assignedOfficer.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                          <div style={{ display: 'flex', flexDirection: 'column', flex: '1' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 600 }}>{assignedOfficer.name}</span>
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Ward {assignedOfficer.ward_id} Officer</span>
-                          </div>
-                          <a href={`tel:${assignedOfficer.phone}`} className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--primary)', fontSize: '10px', cursor: 'pointer', textDecoration: 'none' }}>
-                            Contact
-                          </a>
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                          Awaiting representative allocation...
-                        </div>
-                      )}
-                    </div>
+                  // Match assigned representative
+                  const assignedOfficer = officers.find(o => o.id === issue.assigned_officer_id) ||
+                    (issue.ward_id ? officers.find(o => o.ward_id === issue.ward_id) : null);
 
-                    {/* Support and Upvote Action */}
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button
-                        onClick={() => handleTimelineUpvote(issue.id)}
-                        className={`btn ${isUpvoted ? 'btn-secondary' : 'btn-primary'}`}
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1', justifyContent: 'center', padding: '10px', fontSize: '13px' }}
-                        disabled={isUpvoted}
-                      >
-                        <ThumbsUp size={16} />
-                        {isUpvoted ? 'Supported' : `Support Issue (${upvoteCount})`}
-                      </button>
-                    </div>
+                  const comments = issueComments[issue.id] || [];
+                  const isUpvoted = upvotedIssues[issue.id];
+                  const upvoteCount = (localUpvotes[issue.id] || 0);
 
-                    {/* Resolve Form trigger and panel */}
-                    {!stepResolved && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {!isResolving ? (
-                          <button
-                            onClick={() => setIsResolving(true)}
-                            className="btn btn-secondary"
-                            style={{ width: '100%', padding: '10px', fontSize: '13px', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', background: 'rgba(34,197,94,0.05)' }}
-                          >
-                            Verify & Resolve Ticket
-                          </button>
-                        ) : (
-                          <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(34,197,94,0.02)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                            <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#22c55e' }}>Complete Ticket Resolution</h4>
+                  // Define step states
+                  const stepDispatched = !!issue.assigned_officer_id || issue.dispatch_status === 'Dispatched';
+                  const stepResolved = issue.status === 'Resolved';
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <label style={{ fontSize: '11px', fontWeight: 600 }}>Resolution Report / Note</label>
-                              <textarea
-                                value={resolveCommentText}
-                                onChange={(e) => setResolveCommentText(e.target.value)}
-                                placeholder="Explain what was fixed to resolve this issue..."
-                                style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 8px', borderRadius: '6px', outline: 'none', height: '60px', fontSize: '12px' }}
-                                required
-                              />
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: '1' }} className="animate-fade-in">
+                      <div>
+                        <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--primary)', marginBottom: '8px' }}>
+                          {issue.category || 'General'}
+                        </span>
+                        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, lineHeight: 1.4 }}>{issue.content}</h3>
+                      </div>
+
+                      {/* Stepper Timeline Visualizer */}
+                      <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px' }}>
+                        <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Ticket Workflow Timeline</h4>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', paddingLeft: '24px' }}>
+                          {/* Line connector */}
+                          <div style={{ position: 'absolute', top: '8px', left: '7px', bottom: '8px', width: '2px', background: 'rgba(255,255,255,0.05)' }}></div>
+
+                          {/* Step 1: Submitted */}
+                          <div style={{ position: 'relative' }}>
+                            <span style={{
+                              position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
+                              background: '#22c55e', border: '2px solid var(--bg-card)'
+                            }} />
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>Submitted & Prioritized</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              Report registered at priority score **{issue.priority_score}/100**.
                             </div>
+                          </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <label style={{ fontSize: '11px', fontWeight: 600 }}>Upload Evidence (After Photo)</label>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleResolveImageChange}
-                                style={{ fontSize: '11px', color: 'var(--text-muted)' }}
-                              />
-                              {resolveImagePreview && (
-                                <img src={resolveImagePreview} alt="Preview" style={{ height: '60px', width: '60px', objectFit: 'cover', borderRadius: '4px', marginTop: '4px' }} />
+                          {/* Step 2: Dispatched */}
+                          <div style={{ position: 'relative' }}>
+                            <span style={{
+                              position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
+                              background: stepDispatched ? 'var(--saffron)' : 'rgba(255,255,255,0.1)',
+                              border: '2px solid var(--bg-card)'
+                            }} />
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: stepDispatched ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                              Dispatched to Ward Representative
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              {stepDispatched ? (
+                                <span>Assigned to Ward Officer **{assignedOfficer?.name}** for inspection.</span>
+                              ) : (
+                                <span>Awaiting dispatch queue allocation.</span>
                               )}
                             </div>
+                          </div>
 
-                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
-                              <button
-                                onClick={() => {
-                                  setIsResolving(false);
-                                  setResolveImagePreview(null);
-                                  setResolveCommentText('');
-                                }}
-                                className="btn btn-secondary"
-                                style={{ padding: '4px 10px', fontSize: '12px' }}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                onClick={() => handleResolveSubmit(issue.id, assignedOfficer?.name || 'Grid Representative')}
-                                className="btn btn-primary"
-                                style={{ padding: '4px 10px', fontSize: '12px', background: '#22c55e', borderColor: '#22c55e' }}
-                              >
-                                Complete Resolution
-                              </button>
+                          {/* Step 3: Resolved */}
+                          <div style={{ position: 'relative' }}>
+                            <span style={{
+                              position: 'absolute', left: '-22px', top: '3px', width: '12px', height: '12px', borderRadius: '50%',
+                              background: stepResolved ? '#22c55e' : 'rgba(255,255,255,0.1)',
+                              border: '2px solid var(--bg-card)'
+                            }} />
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: stepResolved ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                              Resolution Verified
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              {stepResolved ? (
+                                <span style={{ color: '#22c55e', fontWeight: 600 }}>Resolved: Issue verified closed.</span>
+                              ) : (
+                                <span>Awaiting field execution and community sign-off.</span>
+                              )}
                             </div>
                           </div>
-                        )}
+
+                        </div>
                       </div>
-                    )}
 
-                    {/* Comments / Activity Feed Section */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', flex: '1' }}>
-                      <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Activity Feed</h4>
+                      {/* Before & After evidence block */}
+                      {(() => {
+                        const beforeImage = issue.image_url;
 
-                      {/* Comments Feed List */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '160px', flex: '1' }}>
-                        {comments.length === 0 ? (
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '10px' }}>
-                            No citizen comments posted yet.
+                        const categoryMockAfters: Record<string, string> = {
+                          'Water': 'https://images.unsplash.com/photo-1542013936693-8848e574047a?w=400',
+                          'Roads': 'https://images.unsplash.com/photo-1515162305285-0293e4767cc2?w=400',
+                          'Education': 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400',
+                          'Health': 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400',
+                          'Sanitation': 'https://images.unsplash.com/photo-1616963172089-a038f8cfc8d3?w=400',
+                          'Safety': 'https://images.unsplash.com/photo-1508849789987-4e5333c12b78?w=400',
+                          'Electricity': 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=400',
+                          'General': 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=400'
+                        };
+
+                        const dummyAfters: Record<string, string> = {
+                          's_mock_1': '/images/bfr_aft/aft6.png',
+                          's_mock_2': '/images/bfr_aft/aft2.jpg',
+                          's_mock_3': '/images/bfr_aft/aft8.png',
+                          's_mock_4': '/images/bfr_aft/aft9.png',
+                          's_mock_5': '/images/bfr_aft/aft5.jpg',
+                          's2': '/images/bfr_aft/aft7.png',
+                          's_mock_6': '/images/bfr_aft/aft1.jpg',
+                        };
+
+                        const afterImage = resolvedImages[issue.id] || dummyAfters[issue.id] || categoryMockAfters[issue.category || 'General'];
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Resolution Evidence (Before / After)</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                              {/* Before Image */}
+                              <div className="glass-panel" style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(255,255,255,0.01)' }}>
+                                <div style={{ height: '90px', borderRadius: '4px', overflow: 'hidden', background: 'rgba(0,0,0,0.2)', position: 'relative' }}>
+                                  {beforeImage ? (
+                                    <img src={beforeImage} alt="Before" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  ) : (
+                                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>No Photo Attached</div>
+                                  )}
+                                  <span className="badge" style={{ position: 'absolute', top: '4px', left: '4px', background: 'rgba(239,68,68,0.8)', color: 'white', fontSize: '9px', padding: '2px 4px' }}>BEFORE</span>
+                                </div>
+                              </div>
+                              {/* After Image */}
+                              <div className="glass-panel" style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(255,255,255,0.01)' }}>
+                                <div style={{ height: '90px', borderRadius: '4px', overflow: 'hidden', background: 'rgba(0,0,0,0.2)', position: 'relative' }}>
+                                  {stepResolved ? (
+                                    <img src={afterImage} alt="After" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  ) : (
+                                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--text-muted)', padding: '4px', textAlign: 'center' }}>
+                                      <span>Resolution Pending</span>
+                                    </div>
+                                  )}
+                                  <span className="badge" style={{ position: 'absolute', top: '4px', left: '4px', background: stepResolved ? 'rgba(34,197,94,0.8)' : 'rgba(255,255,255,0.2)', color: 'white', fontSize: '9px', padding: '2px 4px' }}>AFTER</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Officer info */}
+                      <div>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assigned Ward Officer</h4>
+                        {assignedOfficer ? (
+                          <div className="glass-panel" style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.01)' }}>
+                            <img src={assignedOfficer.avatar_url} alt={assignedOfficer.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', flex: '1' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600 }}>{assignedOfficer.name}</span>
+                              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Ward {assignedOfficer.ward_id} Officer</span>
+                            </div>
+                            <a href={`tel:${assignedOfficer.phone}`} className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--primary)', fontSize: '10px', cursor: 'pointer', textDecoration: 'none' }}>
+                              Contact
+                            </a>
                           </div>
                         ) : (
-                          comments.map(c => (
-                            <div key={c.id} style={{
-                              padding: '10px', borderRadius: '6px',
-                              background: c.isOfficer ? 'rgba(59,130,246,0.05)' : 'rgba(255,255,255,0.02)',
-                              border: c.isOfficer ? '1px solid rgba(59,130,246,0.2)' : '1px solid var(--border-color)'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                                <span style={{ fontWeight: 600, color: c.isOfficer ? 'var(--primary)' : 'var(--text-main)' }}>{c.author}</span>
-                                <span>{c.date}</span>
-                              </div>
-                              <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.3 }}>{c.text}</p>
-                            </div>
-                          ))
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            Awaiting representative allocation...
+                          </div>
                         )}
                       </div>
 
-                      {/* Add comment Form */}
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '4px 8px' }}>
-                        <input
-                          type="text"
-                          value={newCommentText}
-                          onChange={(e) => setNewCommentText(e.target.value)}
-                          placeholder="Write a comment or status update..."
-                          style={{ background: 'none', border: 'none', color: 'var(--text-main)', width: '100%', outline: 'none', fontSize: '12px' }}
-                          onKeyDown={(e) => e.key === 'Enter' && handleAddComment(issue.id)}
-                        />
+                      {/* Support and Upvote Action */}
+                      <div style={{ display: 'flex', gap: '10px' }}>
                         <button
-                          onClick={() => handleAddComment(issue.id)}
-                          style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '2px' }}
-                          disabled={!newCommentText}
+                          onClick={() => handleTimelineUpvote(issue.id)}
+                          className={`btn ${isUpvoted ? 'btn-secondary' : 'btn-primary'}`}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1', justifyContent: 'center', padding: '10px', fontSize: '13px' }}
+                          disabled={isUpvoted}
                         >
-                          <Send size={14} />
+                          <ThumbsUp size={16} />
+                          {isUpvoted ? 'Supported' : `Support Issue (${upvoteCount})`}
                         </button>
                       </div>
+
+                      {/* Resolve Form trigger and panel */}
+                      {!stepResolved && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {!isResolving ? (
+                            <button
+                              onClick={() => setIsResolving(true)}
+                              className="btn btn-secondary"
+                              style={{ width: '100%', padding: '10px', fontSize: '13px', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', background: 'rgba(34,197,94,0.05)' }}
+                            >
+                              Verify & Resolve Ticket
+                            </button>
+                          ) : (
+                            <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(34,197,94,0.02)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                              <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#22c55e' }}>Complete Ticket Resolution</h4>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '11px', fontWeight: 600 }}>Resolution Report / Note</label>
+                                <textarea
+                                  value={resolveCommentText}
+                                  onChange={(e) => setResolveCommentText(e.target.value)}
+                                  placeholder="Explain what was fixed to resolve this issue..."
+                                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 8px', borderRadius: '6px', outline: 'none', height: '60px', fontSize: '12px' }}
+                                  required
+                                />
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '11px', fontWeight: 600 }}>Upload Evidence (After Photo)</label>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleResolveImageChange}
+                                  style={{ fontSize: '11px', color: 'var(--text-muted)' }}
+                                />
+                                {resolveImagePreview && (
+                                  <img src={resolveImagePreview} alt="Preview" style={{ height: '60px', width: '60px', objectFit: 'cover', borderRadius: '4px', marginTop: '4px' }} />
+                                )}
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                                <button
+                                  onClick={() => {
+                                    setIsResolving(false);
+                                    setResolveImagePreview(null);
+                                    setResolveCommentText('');
+                                  }}
+                                  className="btn btn-secondary"
+                                  style={{ padding: '4px 10px', fontSize: '12px' }}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => handleResolveSubmit(issue.id, assignedOfficer?.name || 'Grid Representative')}
+                                  className="btn btn-primary"
+                                  style={{ padding: '4px 10px', fontSize: '12px', background: '#22c55e', borderColor: '#22c55e' }}
+                                >
+                                  Complete Resolution
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Comments / Activity Feed Section */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', flex: '1' }}>
+                        <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Activity Feed</h4>
+
+                        {/* Comments Feed List */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '160px', flex: '1' }}>
+                          {comments.length === 0 ? (
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '10px' }}>
+                              No citizen comments posted yet.
+                            </div>
+                          ) : (
+                            comments.map(c => (
+                              <div key={c.id} style={{
+                                padding: '10px', borderRadius: '6px',
+                                background: c.isOfficer ? 'rgba(59,130,246,0.05)' : 'rgba(255,255,255,0.02)',
+                                border: c.isOfficer ? '1px solid rgba(59,130,246,0.2)' : '1px solid var(--border-color)'
+                              }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                  <span style={{ fontWeight: 600, color: c.isOfficer ? 'var(--primary)' : 'var(--text-main)' }}>{c.author}</span>
+                                  <span>{c.date}</span>
+                                </div>
+                                <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.3 }}>{c.text}</p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Add comment Form */}
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '4px 8px' }}>
+                          <input
+                            type="text"
+                            value={newCommentText}
+                            onChange={(e) => setNewCommentText(e.target.value)}
+                            placeholder="Write a comment or status update..."
+                            style={{ background: 'none', border: 'none', color: 'var(--text-main)', width: '100%', outline: 'none', fontSize: '12px' }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddComment(issue.id)}
+                          />
+                          <button
+                            onClick={() => handleAddComment(issue.id)}
+                            style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '2px' }}
+                            disabled={!newCommentText}
+                          >
+                            <Send size={14} />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()
+              )}
             </div>
           </div>
 
