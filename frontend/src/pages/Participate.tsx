@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/apiClient';
 import { MapContainer, TileLayer, Popup, Marker, CircleMarker } from 'react-leaflet';
 import { LatLngExpression } from 'leaflet';
-import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X } from 'lucide-react';
+import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X, Calendar, AlertTriangle, BarChart2, Phone } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 
 const CATEGORIES = [
@@ -57,6 +57,8 @@ interface ProposedProject {
   description?: string;
   category: string;
   target_ward_id?: number;
+  constituency_id?: number;
+  assembly_constituency_id?: number;
   estimated_cost: number;
   priority_score: number;
   supporting_suggestions_count: number;
@@ -126,7 +128,10 @@ const MOCK_PROJECTS: ProposedProject[] = [
     estimated_cost: 350000,
     priority_score: 82,
     supporting_suggestions_count: 14,
-    status: "Proposed"
+    status: "Proposed",
+    constituency_id: 189,
+    assembly_constituency_id: 166,
+    target_ward_id: 1
   },
   {
     id: 2,
@@ -136,7 +141,10 @@ const MOCK_PROJECTS: ProposedProject[] = [
     estimated_cost: 180000,
     priority_score: 75,
     supporting_suggestions_count: 9,
-    status: "Proposed"
+    status: "Proposed",
+    constituency_id: 189,
+    assembly_constituency_id: 174,
+    target_ward_id: 2
   }
 ];
 
@@ -244,7 +252,7 @@ const DUMMY_SUGGESTIONS: Suggestion[] = [
 const MOCK_SUGGESTIONS: Suggestion[] = [];
 
 interface ParticipateProps {
-  activeApp?: 'hub' | 'fixmystreet' | 'decidim' | 'cpgrams' | 'seeclickfix' | 'ushahidi' | 'hotline' | 'ward' | 'citybrain' | 'mailbox';
+  activeApp?: 'hub' | 'fixmystreet' | 'decidim' | 'cpgrams' | 'seeclickfix' | 'ushahidi' | 'hotline' | 'ward' | 'citybrain' | 'mailbox' | 'civic-integrate';
 }
 
 const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
@@ -303,6 +311,146 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
 
   // Tab state for the right-side detail panel: 'issue' or 'directory'
   const [activeTimelineTab, setActiveTimelineTab] = useState<'issue' | 'directory'>('issue');
+  
+  // Tab state for the integrated pages 4th tab
+  const [integrateTab, setIntegrateTab] = useState<'meetings' | 'aegis' | 'hotspot' | 'dispatch' | 'iot' | 'mailbox' | 'bulletins' | 'polls' | 'resources'>('meetings');
+
+  // Civic Integrate States
+  const [wardMeetings, setWardMeetings] = useState<Array<{
+    id: number;
+    title: string;
+    dateTime: string;
+    type: 'online' | 'in-person';
+    location: string;
+    agenda: string[];
+    wardId: number;
+    registrations: number;
+    registered: boolean;
+  }>>([
+    {
+      id: 1,
+      title: "Solid Waste & Potholes Strategy Meet",
+      dateTime: "2026-07-20T10:00",
+      type: "in-person",
+      location: "Community Hall, Ward 2",
+      agenda: [
+        "Review garbage disposal spots near Industrial Zone",
+        "Finalize pothole road patching priority list",
+        "Public feedback session"
+      ],
+      wardId: 2,
+      registrations: 34,
+      registered: false
+    },
+    {
+      id: 2,
+      title: "Water Contamination Emergency Action",
+      dateTime: "2026-07-22T15:30",
+      type: "online",
+      location: "https://meet.google.com/abc-defg-hij",
+      agenda: [
+        "Explain water treatment pipe extension progress",
+        "Discuss temporary water tanker route scheduling",
+        "Water quality test reporting procedures"
+      ],
+      wardId: 2,
+      registrations: 56,
+      registered: false
+    },
+    {
+      id: 3,
+      title: "Commercial Zone Drainage Redevelopment",
+      dateTime: "2026-07-25T11:00",
+      type: "in-person",
+      location: "District Office Building, Ward 1",
+      agenda: [
+        "Monsoon drainage blockage clearance plan",
+        "Store owners trade association representation"
+      ],
+      wardId: 1,
+      registrations: 18,
+      registered: false
+    }
+  ]);
+
+  const [bulletins, setBulletins] = useState<Array<{
+    id: number;
+    title: string;
+    content: string;
+    urgency: 'high' | 'medium' | 'info';
+    wardId: number;
+    date: string;
+  }>>([
+    {
+      id: 1,
+      title: "12-Hour Scheduled Water Supply Interruption",
+      content: "Scheduled pipe connection works will cause a supply cut in Ward 2 this Saturday from 8 AM to 8 PM. Please store sufficient water.",
+      urgency: "high",
+      wardId: 2,
+      date: "2026-07-16"
+    },
+    {
+      id: 2,
+      title: "Market Road Pavement Repairs Commencing",
+      content: "Road works on Main Avenue will cause minor lane restrictions. Drivers are advised to use alternative routes.",
+      urgency: "medium",
+      wardId: 1,
+      date: "2026-07-15"
+    },
+    {
+      id: 3,
+      title: "Free Vaccination Drive at Health Center",
+      content: "A free public vaccination camp is set up in Ward 4 residential clinic. No prior booking required.",
+      urgency: "info",
+      wardId: 4,
+      date: "2026-07-14"
+    }
+  ]);
+
+  const [communityPolls, setCommunityPolls] = useState<Array<{
+    id: number;
+    question: string;
+    options: Array<{ text: string; votes: number }>;
+    votedOptionIndex: number | null;
+    wardId: number;
+  }>>([
+    {
+      id: 1,
+      question: "Should a portion of the market budget be allocated to building an electric vehicle charging station in Ward 1?",
+      options: [
+        { text: "Yes, immediately", votes: 45 },
+        { text: "Yes, but in the next phase", votes: 28 },
+        { text: "No, prioritize roads/drainage", votes: 87 }
+      ],
+      votedOptionIndex: null,
+      wardId: 1
+    },
+    {
+      id: 2,
+      question: "How would you rate the waste segregation enforcement in Ward 2?",
+      options: [
+        { text: "Highly effective", votes: 12 },
+        { text: "Needs improvement", votes: 64 },
+        { text: "Completely inactive", votes: 48 }
+      ],
+      votedOptionIndex: null,
+      wardId: 2
+    }
+  ]);
+
+  // Form states for adding items
+  const [newMeetTitle, setNewMeetTitle] = useState('');
+  const [newMeetDateTime, setNewMeetDateTime] = useState('');
+  const [newMeetType, setNewMeetType] = useState<'online' | 'in-person'>('in-person');
+  const [newMeetLocation, setNewMeetLocation] = useState('');
+  const [newMeetAgenda, setNewMeetAgenda] = useState('');
+
+  const [newBullTitle, setNewBullTitle] = useState('');
+  const [newBullContent, setNewBullContent] = useState('');
+  const [newBullUrgency, setNewBullUrgency] = useState<'high' | 'medium' | 'info'>('info');
+
+  const [newPollQ, setNewPollQ] = useState('');
+  const [newPollOpts, setNewPollOpts] = useState('');
 
   const [issueComments, setIssueComments] = useState<Record<string, Array<{ id: number; author: string; text: string; date: string; isOfficer?: boolean }>>>({
 
@@ -515,6 +663,18 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
           if (dateA && dateB) return dateB - dateA;
           return b.id.localeCompare(a.id);
         }
+      });
+  };
+
+  const getFilteredProjects = () => {
+    return projects
+      .filter(p => {
+        const matchesState = !selectedState || 
+          (p.constituency_id !== undefined && constituenciesList.some(c => c.id === p.constituency_id));
+        const matchesConstituency = !selectedConstituencyId || p.constituency_id === selectedConstituencyId;
+        const matchesMla = !selectedMlaId || p.assembly_constituency_id === selectedMlaId;
+        const matchesWard = !selectedWardId || p.target_ward_id === selectedWardId;
+        return matchesState && matchesConstituency && matchesMla && matchesWard;
       });
   };
 
@@ -779,7 +939,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             </p>
           </div>
 
-          {/* 3x3 Grid of Platforms */}
+          {/* 2x2 Grid of Platforms */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
 
             {/* Card 1: StreetMapper */}
@@ -812,22 +972,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               </button>
             </div>
 
-            {/* Card 3: Aegis AI Redress */}
-            <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
-                <span className="badge" style={{ background: 'rgba(249,115,22,0.1)', color: 'var(--saffron)' }}>AI Redressal</span>
-              </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Aegis AI Redress</h3>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                Centralized grievance tracker. Submissions are classified, translated, and scored for priority by Gemini AI.
-              </p>
-              <button onClick={() => navigate('/participate/aegis-ai')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
-                Open Platform
-              </button>
-            </div>
-
-            {/* Card 4: CivicTimeline */}
+            {/* Card 3: CivicTimeline */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
@@ -842,64 +987,17 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
               </button>
             </div>
 
-            {/* Card 5: Hotspot Tracker */}
+            {/* Card 4: Civic Integrate */}
             <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
-                <span className="badge" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>Crisis Map</span>
+                <span className="badge" style={{ background: 'rgba(168,85,247,0.1)', color: 'var(--primary)' }}>Integrated Tools</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Hotspot Tracker</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Civic Integrate</h3>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                Crowdsourced incident locator. Heatmaps highlight active grievances and pinpoint infrastructure distress hotspots.
+                Access integrated civic utilities including Ward Meetings, Aegis AI Redress, Hotspot Tracker, Command Dispatch, CityPulse IoT, and more.
               </p>
-              <button onClick={() => navigate('/participate/hotspot-tracker')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
-                Open Platform
-              </button>
-            </div>
-
-            {/* Card 6: Command Dispatch */}
-            <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
-                <span className="badge" style={{ background: 'rgba(168,85,247,0.1)', color: 'var(--primary)' }}>Unified Dispatch</span>
-              </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Command Dispatch</h3>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                Unified admin dispatch board. Review reports and allocate tasks directly to local ward officers in real-time.
-              </p>
-              <button onClick={() => navigate('/participate/command-dispatch')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
-                Open Platform
-              </button>
-            </div>
-
-
-
-            {/* Card 8: CityPulse IoT */}
-            <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
-                <span className="badge" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>IoT Brain</span>
-              </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>CityPulse IoT</h3>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                Real-time smart city dashboard simulator. Monitors utility loads and coordinates emergency department alerts.
-              </p>
-              <button onClick={() => navigate('/participate/citypulse-iot')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
-                Open Platform
-              </button>
-            </div>
-
-            {/* Card 9: Constituency Mailbox */}
-            <div className="glass-panel transition-all hover-glow" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>CIVIC PULSE</span>
-                <span className="badge" style={{ background: 'rgba(249,115,22,0.1)', color: 'var(--saffron)' }}>Mayor Mailbox</span>
-              </div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Constituency Mailbox</h3>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                Direct consultation interface. Post long-term structural proposals and track planning replies from the MP.
-              </p>
-              <button onClick={() => navigate('/participate/constituency-mailbox')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
+              <button onClick={() => navigate('/participate/civic-integrate')} className="btn btn-primary" style={{ marginTop: 'auto', width: '100%' }}>
                 Open Platform
               </button>
             </div>
@@ -974,6 +1072,133 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <ArrowLeft size={16} /> Back to Hub
           </button>
 
+          {/* Representative & Geography Selector */}
+          <div className="glass-panel animate-fade-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MapPin size={18} color="var(--primary)" />
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Constituency & Ward Filters</h3>
+              </div>
+              {(selectedState || selectedConstituencyId || selectedMlaId || selectedWardId) && (
+                <button 
+                  onClick={() => {
+                    setSelectedState('');
+                    setSelectedConstituencyId(null);
+                    setSelectedMlaId(null);
+                    setSelectedWardId(null);
+                  }}
+                  className="btn btn-secondary" 
+                  style={{ padding: '4px 10px', fontSize: '11px' }}
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              {/* State Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>STATE / UT</span>
+                <select
+                  value={selectedState}
+                  onChange={(e) => setSelectedState(e.target.value)}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%' }}
+                >
+                  <option value="">Select State</option>
+                  {statesList.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* MP / Constituency Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>PARLIAMENTARY CONSTITUENCY (MP)</span>
+                <select
+                  value={selectedConstituencyId || ''}
+                  onChange={(e) => setSelectedConstituencyId(Number(e.target.value) || null)}
+                  disabled={!selectedState}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%', opacity: selectedState ? 1 : 0.5 }}
+                >
+                  <option value="">{selectedState ? 'Select Constituency' : 'Choose a state first'}</option>
+                  {constituenciesList.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* MLA / Assembly Constituency Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>ASSEMBLY CONSTITUENCY (MLA)</span>
+                <select
+                  value={selectedMlaId || ''}
+                  onChange={(e) => setSelectedMlaId(Number(e.target.value) || null)}
+                  disabled={!selectedConstituencyId}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%', opacity: selectedConstituencyId ? 1 : 0.5 }}
+                >
+                  <option value="">{selectedConstituencyId ? 'Select Assembly Seat' : 'Choose an MP seat first'}</option>
+                  {mlaList.map(item => (
+                    <option key={item.assembly_constituency.id} value={item.assembly_constituency.id}>
+                      {item.assembly_constituency.name} {item.mla ? `(${item.mla.name})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ward Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>MUNICIPAL WARD</span>
+                <select
+                  value={selectedWardId || ''}
+                  onChange={(e) => setSelectedWardId(Number(e.target.value) || null)}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%' }}
+                >
+                  <option value="">All Wards</option>
+                  <option value="1">Ward 1 - Central Business</option>
+                  <option value="2">Ward 2 - Industrial Zone</option>
+                  <option value="3">Ward 3 - Riverside Settlement</option>
+                  <option value="4">Ward 4 - Uptown Residential</option>
+                </select>
+              </div>
+            </div>
+
+            {/* MP Profile Card Drilldown */}
+            {activeMpData && (
+              <div className="glass-panel" style={{ display: 'flex', gap: '20px', padding: '16px', marginTop: '10px', alignItems: 'center', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+                {activeMpData.photo_url ? (
+                  <img src={activeMpData.photo_url} alt={activeMpData.name} style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary)' }} />
+                ) : (
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '20px', color: '#fff' }}>
+                    {activeMpData.name.charAt(0)}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--primary)', letterSpacing: '0.05em' }}>CONSTITUENCY MEMBER OF PARLIAMENT (MP)</span>
+                  <h4 style={{ margin: '2px 0', fontSize: '16px', fontWeight: 600 }}>{activeMpData.name}</h4>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    <span>{activeMpData.party_abbr || activeMpData.party || 'IND'}</span>
+                    <span>•</span>
+                    <span>{activeMpData.state}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Total Issues</div>
+                    <div style={{ fontSize: '15px', fontWeight: 700 }}>{activeMpData.total_suggestions}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Resolved</div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#22c55e' }}>{activeMpData.resolved_suggestions}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Sanctioned Projects</div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary)' }}>{activeMpData.sanctioned_projects}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="glass-panel" style={{ padding: '24px' }}>
             <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>CivicFund Participatory Budgeting</h2>
             <p style={{ margin: '0 0 24px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
@@ -981,7 +1206,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              {projects.map(project => (
+              {getFilteredProjects().map(project => (
                 <div key={project.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span className="badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{project.category}</span>
@@ -1011,6 +1236,11 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 </div>
               ))}
             </div>
+            {getFilteredProjects().length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                No proposed projects found matching the selected filters. Try adjusting your State, MP, MLA, or Ward selectors above.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2136,6 +2366,962 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeApp === 'civic-integrate' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ArrowLeft size={16} /> Back to Hub
+          </button>
+
+          {/* Constituency & Ward Filters */}
+          <div className="glass-panel animate-fade-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Constituency & Ward Filters</h3>
+                <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>Filter integrated tools based on MP/MLA constituencies and municipal wards.</p>
+              </div>
+              {(selectedState || selectedConstituencyId || selectedMlaId || selectedWardId) && (
+                <button 
+                  onClick={() => {
+                    setSelectedState('');
+                    setSelectedConstituencyId(null);
+                    setSelectedMlaId(null);
+                    setSelectedWardId(null);
+                  }}
+                  className="btn btn-secondary" 
+                  style={{ padding: '4px 10px', fontSize: '11px' }}
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              {/* State Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>STATE / UT</span>
+                <select
+                  value={selectedState}
+                  onChange={(e) => setSelectedState(e.target.value)}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%' }}
+                >
+                  <option value="">Select State</option>
+                  {statesList.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* MP / Constituency Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>PARLIAMENTARY CONSTITUENCY (MP)</span>
+                <select
+                  value={selectedConstituencyId || ''}
+                  onChange={(e) => setSelectedConstituencyId(Number(e.target.value) || null)}
+                  disabled={!selectedState}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%', opacity: selectedState ? 1 : 0.5 }}
+                >
+                  <option value="">{selectedState ? 'Select Constituency' : 'Choose a state first'}</option>
+                  {constituenciesList.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* MLA / Assembly Constituency Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>ASSEMBLY CONSTITUENCY (MLA)</span>
+                <select
+                  value={selectedMlaId || ''}
+                  onChange={(e) => setSelectedMlaId(Number(e.target.value) || null)}
+                  disabled={!selectedConstituencyId}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%', opacity: selectedConstituencyId ? 1 : 0.5 }}
+                >
+                  <option value="">{selectedConstituencyId ? 'Select Assembly Seat' : 'Choose an MP seat first'}</option>
+                  {mlaList.map(item => (
+                    <option key={item.assembly_constituency.id} value={item.assembly_constituency.id}>
+                      {item.assembly_constituency.name} {item.mla ? `(${item.mla.name})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ward Dropdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>MUNICIPAL WARD</span>
+                <select
+                  value={selectedWardId || ''}
+                  onChange={(e) => setSelectedWardId(Number(e.target.value) || null)}
+                  style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', outline: 'none', width: '100%' }}
+                >
+                  <option value="">All Wards</option>
+                  <option value="1">Ward 1 - Central Business</option>
+                  <option value="2">Ward 2 - Industrial Zone</option>
+                  <option value="3">Ward 3 - Riverside Settlement</option>
+                  <option value="4">Ward 4 - Uptown Residential</option>
+                </select>
+              </div>
+            </div>
+
+            {/* MP Profile Card Drilldown */}
+            {activeMpData && (
+              <div className="glass-panel" style={{ display: 'flex', gap: '20px', padding: '16px', marginTop: '10px', alignItems: 'center', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+                {activeMpData.photo_url ? (
+                  <img src={activeMpData.photo_url} alt={activeMpData.name} style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary)' }} />
+                ) : (
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '20px', color: '#fff' }}>
+                    {activeMpData.name.charAt(0)}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--primary)', letterSpacing: '0.05em' }}>CONSTITUENCY MEMBER OF PARLIAMENT (MP)</span>
+                  <h4 style={{ margin: '2px 0', fontSize: '16px', fontWeight: 600 }}>{activeMpData.name}</h4>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    <span>{activeMpData.party_abbr || activeMpData.party || 'IND'}</span>
+                    <span>•</span>
+                    <span>{activeMpData.state}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Total Issues</div>
+                    <div style={{ fontSize: '15px', fontWeight: 700 }}>{activeMpData.total_suggestions}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Performance Index</div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary)' }}>
+                      {activeMpData.performance_index ? `${activeMpData.performance_index}%` : 'N/A'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Tab Selector Bar */}
+          <div className="glass-panel animate-fade-in" style={{ padding: '12px 20px', display: 'flex', gap: '10px', overflowX: 'auto', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+            <button
+              onClick={() => setIntegrateTab('meetings')}
+              className={`btn ${integrateTab === 'meetings' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Calendar size={14} /> Ward Meetings
+            </button>
+            <button
+              onClick={() => setIntegrateTab('aegis')}
+              className={`btn ${integrateTab === 'aegis' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Brain size={14} /> Aegis AI Redress
+            </button>
+            <button
+              onClick={() => setIntegrateTab('hotspot')}
+              className={`btn ${integrateTab === 'hotspot' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <MapPin size={14} /> Hotspot Tracker
+            </button>
+            <button
+              onClick={() => setIntegrateTab('dispatch')}
+              className={`btn ${integrateTab === 'dispatch' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Activity size={14} /> Command Dispatch
+            </button>
+            <button
+              onClick={() => setIntegrateTab('iot')}
+              className={`btn ${integrateTab === 'iot' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Sliders size={14} /> CityPulse IoT
+            </button>
+            <button
+              onClick={() => setIntegrateTab('mailbox')}
+              className={`btn ${integrateTab === 'mailbox' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <MessageSquare size={14} /> Constituency Mailbox
+            </button>
+            <button
+              onClick={() => setIntegrateTab('bulletins')}
+              className={`btn ${integrateTab === 'bulletins' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <AlertTriangle size={14} /> Local Notices
+            </button>
+            <button
+              onClick={() => setIntegrateTab('polls')}
+              className={`btn ${integrateTab === 'polls' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <BarChart2 size={14} /> Community Polls
+            </button>
+            <button
+              onClick={() => setIntegrateTab('resources')}
+              className={`btn ${integrateTab === 'resources' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Phone size={14} /> Resource Directory
+            </button>
+          </div>
+
+          {/* Sub-Views */}
+          <div className="animate-fade-in">
+            {integrateTab === 'meetings' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
+                {/* Meetings List */}
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>Ward Meetings & Consultations</h3>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                      Participate in local ward-level decisions, check the agenda, and register to attend face-to-face or online meetings.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {wardMeetings
+                      .filter(m => !selectedWardId || m.wardId === selectedWardId)
+                      .map(meeting => (
+                        <div key={meeting.id} style={{ padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>{meeting.title}</h4>
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                📅 {new Date(meeting.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                              </span>
+                            </div>
+                            <span className="badge" style={{
+                              background: meeting.type === 'online' ? 'rgba(59,130,246,0.1)' : 'rgba(34,197,94,0.1)',
+                              color: meeting.type === 'online' ? 'var(--primary)' : '#22c55e',
+                              fontSize: '11px'
+                            }}>
+                              {meeting.type === 'online' ? '🌐 Online' : '📍 In-person'}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                            <strong>Venue / Link: </strong>
+                            {meeting.type === 'online' ? (
+                              <a href={meeting.location} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>{meeting.location}</a>
+                            ) : meeting.location}
+                          </div>
+
+                          <div style={{ background: 'rgba(255,255,255,0.01)', padding: '10px 14px', borderRadius: '6px', borderLeft: '3px solid var(--border-color)' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Meeting Agenda</span>
+                            <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {meeting.agenda.map((item, idx) => (
+                                <li key={idx}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '4px' }}>
+                            <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                              👥 <strong>{meeting.registrations}</strong> citizens registered
+                            </span>
+                            <button
+                              onClick={() => {
+                                setWardMeetings(prev => prev.map(m => {
+                                  if (m.id === meeting.id) {
+                                    return {
+                                      ...m,
+                                      registrations: m.registered ? m.registrations - 1 : m.registrations + 1,
+                                      registered: !m.registered
+                                    };
+                                  }
+                                  return m;
+                                }));
+                              }}
+                              className={`btn ${meeting.registered ? 'btn-secondary' : 'btn-primary'}`}
+                              style={{ padding: '6px 16px', fontSize: '12px' }}
+                            >
+                              {meeting.registered ? 'Cancel Registration' : 'Register to Attend'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    
+                    {wardMeetings.filter(m => !selectedWardId || m.wardId === selectedWardId).length === 0 && (
+                      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <Calendar size={40} style={{ opacity: 0.3, marginBottom: '10px' }} />
+                        <p style={{ fontWeight: 600, margin: 0 }}>No Ward Meetings Scheduled</p>
+                        <p style={{ fontSize: '12px', margin: '4px 0 0 0' }}>There are no meetings scheduled for the selected ward.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Schedule a Meeting Form */}
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', height: 'fit-content' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Schedule Ward Meeting</h3>
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                    Ward Officers and administrators can publish new meeting timelines and agendas.
+                  </p>
+
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newMeetTitle || !newMeetDateTime || !newMeetLocation) return;
+                    const newMeet = {
+                      id: wardMeetings.length + 1,
+                      title: newMeetTitle,
+                      dateTime: newMeetDateTime,
+                      type: newMeetType,
+                      location: newMeetLocation,
+                      agenda: newMeetAgenda ? newMeetAgenda.split('\n').map(a => a.trim()).filter(Boolean) : ["General Discussion"],
+                      wardId: selectedWardId || 1,
+                      registrations: 0,
+                      registered: false
+                    };
+                    setWardMeetings(prev => [...prev, newMeet]);
+                    setNewMeetTitle('');
+                    setNewMeetDateTime('');
+                    setNewMeetLocation('');
+                    setNewMeetAgenda('');
+                    setSyncMsg('Meeting successfully scheduled and published!');
+                    setTimeout(() => setSyncMsg(''), 3000);
+                  }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>MEETING TITLE</label>
+                      <input
+                        type="text"
+                        value={newMeetTitle}
+                        onChange={e => setNewMeetTitle(e.target.value)}
+                        placeholder="e.g., Ward Sanitation Review"
+                        required
+                        style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>DATE & TIME</label>
+                        <input
+                          type="datetime-local"
+                          value={newMeetDateTime}
+                          onChange={e => setNewMeetDateTime(e.target.value)}
+                          required
+                          style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px 8px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>TYPE</label>
+                        <select
+                          value={newMeetType}
+                          onChange={e => setNewMeetType(e.target.value as any)}
+                          style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                        >
+                          <option value="in-person">📍 In-person</option>
+                          <option value="online">🌐 Online</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>LOCATION / MEETING LINK</label>
+                      <input
+                        type="text"
+                        value={newMeetLocation}
+                        onChange={e => setNewMeetLocation(e.target.value)}
+                        placeholder="e.g., Community Hall or Meet link"
+                        required
+                        style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>AGENDA ITEMS (ONE PER LINE)</label>
+                      <textarea
+                        value={newMeetAgenda}
+                        onChange={e => setNewMeetAgenda(e.target.value)}
+                        placeholder="e.g., Item 1&#10;Item 2"
+                        rows={3}
+                        style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '6px', fontSize: '12px', outline: 'none', resize: 'none' }}
+                      />
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" style={{ marginTop: '4px', width: '100%', fontSize: '12px', padding: '8px' }}>
+                      Publish Meeting
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {integrateTab === 'aegis' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="glass-panel" style={{ padding: '24px' }}>
+                  <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Aegis AI Redress Engine</h3>
+                  <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    Submit a complaint in any language. The AI service will translate to English, predict the issue category, analyze sentiment, and compute a priority score.
+                  </p>
+
+                  <form onSubmit={handleCpgAnalyze} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <textarea
+                      value={cpgText}
+                      onChange={(e) => setCpgText(e.target.value)}
+                      placeholder="E.g., सड़कों पर बहुत पानी भरा हुआ है, जिससे लोगों का चलना मुश्किल हो गया है..."
+                      style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
+                    />
+                    <button type="submit" className="btn btn-primary" disabled={loading || !cpgText}>
+                      Analyze Grievance
+                    </button>
+                  </form>
+                </div>
+
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  {!cpgResult ? (
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <Brain size={48} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                      <p style={{ fontWeight: 600 }}>No Analysis Performed Yet</p>
+                      <p style={{ fontSize: '12px' }}>Enter text on the left and submit.</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>AI Classification Output</h3>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '6px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>English Translation:</span>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '13px' }}>{cpgResult.english}</p>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Predicted Category:</span>
+                          <span style={{ fontWeight: 600 }}>{cpgResult.category}</span>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Sentiment:</span>
+                          <span style={{ fontWeight: 600, color: cpgResult.sentiment === 'Negative' ? '#ef4444' : '#22c55e' }}>
+                            {cpgResult.sentiment}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Priority Rating:</span>
+                          <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{cpgResult.priority_score}/100</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {integrateTab === 'hotspot' && (
+              <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <h2 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Hotspot Tracker Map</h2>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                    Glowing circular markers highlight regions with the highest density of unresolved citizen grievances.
+                  </p>
+                </div>
+
+                <div style={{ height: '480px', borderRadius: '8px', overflow: 'hidden' }}>
+                  <MapContainer center={MAP_CENTER} zoom={14} style={{ width: '100%', height: '100%' }}>
+                    <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+
+                    {getFilteredSuggestions().filter(s => s.latitude && s.longitude).map(s => {
+                      const lat = Number(s.latitude);
+                      const lng = Number(s.longitude);
+                      const radius = s.priority_score > 70 ? 25 : 12;
+                      return (
+                        <CircleMarker
+                          key={s.id}
+                          center={[lat, lng]}
+                          radius={radius}
+                          pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.45, weight: 1 }}
+                        >
+                          <Popup>
+                            <div style={{ color: 'black' }}>
+                              <strong>Complaint:</strong> {s.content}<br />
+                              <strong>Priority:</strong> {s.priority_score}/100
+                            </div>
+                          </Popup>
+                        </CircleMarker>
+                      );
+                    })}
+                  </MapContainer>
+                </div>
+              </div>
+            )}
+
+            {integrateTab === 'dispatch' && (
+              <div className="glass-panel" style={{ padding: '24px' }}>
+                <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>Command Dispatch Console</h2>
+                <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
+                  Administrators review incoming grievances and route accountability directly to local ward officers.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {getFilteredSuggestions().filter(s => s.dispatch_status === 'Unassigned' || !s.dispatch_status).map(issue => (
+                    <div key={issue.id} style={{ padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <p style={{ margin: 0, fontSize: '14px' }}>{issue.content}</p>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Route to Officer:</span>
+                          <select
+                            value={selectedOfficer[issue.id] || ''}
+                            onChange={(e) => setSelectedOfficer(prev => ({ ...prev, [issue.id]: Number(e.target.value) }))}
+                            style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '6px', borderRadius: '6px', fontSize: '12px' }}
+                          >
+                            <option value="">-- Choose Officer --</option>
+                            {officers.map(o => (
+                              <option key={o.id} value={o.id}>{o.name} (Ward {o.ward_id})</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <button
+                          onClick={() => handleHotlineDispatch(issue.id)}
+                          className="btn btn-primary"
+                          style={{ padding: '6px 14px', fontSize: '12px' }}
+                          disabled={!selectedOfficer[issue.id] || loading}
+                        >
+                          Dispatch Ticket
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {integrateTab === 'iot' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>CityPulse IoT Event Monitor</h3>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                      Simulates automated coordination dispatches when infrastructure drops occur.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Water Flow Rate</div>
+                      <div style={{ fontSize: '20px', fontWeight: 700, margin: '6px 0', color: '#22c55e' }}>92%</div>
+                      <span style={{ fontSize: '10px', color: '#22c55e' }}>● Stable</span>
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Traffic Speed Avg</div>
+                      <div style={{ fontSize: '20px', fontWeight: 700, margin: '6px 0', color: 'var(--saffron)' }}>34 km/h</div>
+                      <span style={{ fontSize: '10px', color: 'var(--saffron)' }}>● Delayed</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={triggerCityBrainSim}
+                    className="btn btn-primary"
+                    disabled={brainProcessing}
+                  >
+                    {brainProcessing ? 'Processing Alert...' : 'Simulate IoT Infrastructure Alert'}
+                  </button>
+                </div>
+
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px' }}>Dispatch Logs</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '340px' }}>
+                    {cityBrainAlerts.map(alert => (
+                      <div key={alert.id} style={{
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        border: '1px solid var(--border-color)',
+                        background: alert.type === 'error' ? 'rgba(239,68,68,0.1)' :
+                          alert.type === 'dispatch' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)',
+                        color: alert.type === 'error' ? '#ef4444' :
+                          alert.type === 'dispatch' ? 'var(--primary)' : 'var(--text-muted)'
+                      }}>
+                        {alert.msg}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {integrateTab === 'mailbox' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="glass-panel" style={{ padding: '24px' }}>
+                  <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>Constituency Mailbox Manager</h3>
+                  <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    Suggest long-term structural or policy adjustments. The MP team reviews mailboxes periodically.
+                  </p>
+
+                  <form onSubmit={handleMailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <textarea
+                      value={mailContent}
+                      onChange={(e) => setMailContent(e.target.value)}
+                      placeholder="Type your development suggestion..."
+                      style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '8px', height: '140px', outline: 'none', fontSize: '13px' }}
+                    />
+                    <button type="submit" className="btn btn-primary" disabled={!mailContent}>
+                      Deliver to MP Mailbox
+                    </button>
+                  </form>
+                </div>
+
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px' }}>Mailbox History & Answers</h3>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', maxHeight: '340px' }}>
+                    {mailBoxItems.map(item => (
+                      <div key={item.id} style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', fontSize: '13px' }}>
+                        <div style={{ color: 'var(--text-main)', fontWeight: 600 }}>{item.text}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Filed on {item.date}</div>
+
+                        <div style={{ marginTop: '10px', background: 'rgba(59,130,246,0.05)', padding: '8px', borderRadius: '4px', borderLeft: '3px solid var(--primary)', fontSize: '12px', color: 'var(--text-main)' }}>
+                          <strong>MP Reply:</strong> Under consideration for next financial year sanction list.
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {integrateTab === 'bulletins' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>Local Alerts & Notices</h3>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                      Keep up with important infrastructure maintenance alerts, health programs, and administrative announcements in your ward.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {bulletins
+                      .filter(b => !selectedWardId || b.wardId === selectedWardId)
+                      .map(bulletin => {
+                        const borderColors = {
+                          high: '#ef4444',
+                          medium: 'var(--saffron)',
+                          info: 'var(--primary)'
+                        };
+                        const badges = {
+                          high: '🔴 URGENT',
+                          medium: '🟡 MAINTENANCE',
+                          info: '🔵 GENERAL INFO'
+                        };
+                        return (
+                          <div key={bulletin.id} style={{
+                            padding: '16px',
+                            borderRadius: '8px',
+                            background: 'rgba(255,255,255,0.02)',
+                            border: '1px solid var(--border-color)',
+                            borderLeft: `4px solid ${borderColors[bulletin.urgency]}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '10px', fontWeight: 700, color: borderColors[bulletin.urgency] }}>{badges[bulletin.urgency]}</span>
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{bulletin.date}</span>
+                            </div>
+                            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>{bulletin.title}</h4>
+                            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>{bulletin.content}</p>
+                          </div>
+                        );
+                      })}
+
+                    {bulletins.filter(b => !selectedWardId || b.wardId === selectedWardId).length === 0 && (
+                      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <AlertTriangle size={40} style={{ opacity: 0.3, marginBottom: '10px' }} />
+                        <p style={{ fontWeight: 600, margin: 0 }}>No Notices Active</p>
+                        <p style={{ fontSize: '12px', margin: '4px 0 0 0' }}>There are no active notices for the selected ward.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Post a Notice Form */}
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', height: 'fit-content' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Post Local Notice</h3>
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                    Post a community alert to inform residents about services and activities in the selected ward.
+                  </p>
+
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newBullTitle || !newBullContent) return;
+                    const newBull = {
+                      id: bulletins.length + 1,
+                      title: newBullTitle,
+                      content: newBullContent,
+                      urgency: newBullUrgency,
+                      wardId: selectedWardId || 1,
+                      date: new Date().toISOString().split('T')[0]
+                    };
+                    setBulletins(prev => [newBull, ...prev]);
+                    setNewBullTitle('');
+                    setNewBullContent('');
+                    setSyncMsg('Notice published successfully!');
+                    setTimeout(() => setSyncMsg(''), 3000);
+                  }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>NOTICE TITLE</label>
+                      <input
+                        type="text"
+                        value={newBullTitle}
+                        onChange={e => setNewBullTitle(e.target.value)}
+                        placeholder="e.g., Scheduled Power Shutdown"
+                        required
+                        style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>URGENCY LEVEL</label>
+                      <select
+                        value={newBullUrgency}
+                        onChange={e => setNewBullUrgency(e.target.value as any)}
+                        style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                      >
+                        <option value="high">Urgent Alert</option>
+                        <option value="medium">Maintenance Notice</option>
+                        <option value="info">General Information</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>CONTENT DETAIL</label>
+                      <textarea
+                        value={newBullContent}
+                        onChange={e => setNewBullContent(e.target.value)}
+                        placeholder="Provide details about the event, timings, and instructions..."
+                        rows={4}
+                        required
+                        style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '6px', fontSize: '12px', outline: 'none', resize: 'none' }}
+                      />
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" style={{ marginTop: '4px', width: '100%', fontSize: '12px', padding: '8px' }}>
+                      Publish Notice
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {integrateTab === 'polls' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>Community Consensus Polls</h3>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                      Cast your vote to show support or register opinions on critical local ward matters.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {communityPolls
+                      .filter(p => !selectedWardId || p.wardId === selectedWardId)
+                      .map(poll => {
+                        const totalVotes = poll.options.reduce((sum, opt) => sum + opt.votes, 0) || 1;
+                        return (
+                          <div key={poll.id} style={{ padding: '18px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 600, lineHeight: 1.4 }}>{poll.question}</h4>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              {poll.options.map((option, idx) => {
+                                const percentage = Math.round((option.votes / totalVotes) * 100);
+                                const isVoted = poll.votedOptionIndex === idx;
+                                return (
+                                  <div key={idx} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <button
+                                      onClick={() => {
+                                        if (poll.votedOptionIndex !== null) return;
+                                        setCommunityPolls(prev => prev.map(p => {
+                                          if (p.id === poll.id) {
+                                            const updatedOptions = p.options.map((o, oIdx) => oIdx === idx ? { ...o, votes: o.votes + 1 } : o);
+                                            return { ...p, options: updatedOptions, votedOptionIndex: idx };
+                                          }
+                                          return p;
+                                        }));
+                                      }}
+                                      disabled={poll.votedOptionIndex !== null}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        borderRadius: '6px',
+                                        border: isVoted ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                                        background: isVoted ? 'rgba(59,130,246,0.05)' : 'rgba(255,255,255,0.01)',
+                                        color: 'var(--text-main)',
+                                        cursor: poll.votedOptionIndex === null ? 'pointer' : 'default',
+                                        textAlign: 'left',
+                                        fontSize: '13px',
+                                        fontWeight: isVoted ? 600 : 400,
+                                        zIndex: 2,
+                                        position: 'relative'
+                                      }}
+                                    >
+                                      <span>{option.text}</span>
+                                      {poll.votedOptionIndex !== null && (
+                                        <span style={{ fontWeight: 700, color: isVoted ? 'var(--primary)' : 'var(--text-muted)' }}>{percentage}% ({option.votes})</span>
+                                      )}
+                                    </button>
+
+                                    {poll.votedOptionIndex !== null && (
+                                      <div style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        bottom: 0,
+                                        width: `${percentage}%`,
+                                        background: isVoted ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.03)',
+                                        borderRadius: '6px',
+                                        zIndex: 1,
+                                        transition: 'width 0.4s ease'
+                                      }}></div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
+                              <span>Total Votes Cast: <strong>{totalVotes}</strong></span>
+                              {poll.votedOptionIndex !== null && <span style={{ color: 'var(--primary)', fontWeight: 600 }}>✓ Vote registered</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                    {communityPolls.filter(p => !selectedWardId || p.wardId === selectedWardId).length === 0 && (
+                      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <BarChart2 size={40} style={{ opacity: 0.3, marginBottom: '10px' }} />
+                        <p style={{ fontWeight: 600, margin: 0 }}>No Polls Active</p>
+                        <p style={{ fontSize: '12px', margin: '4px 0 0 0' }}>There are no active community polls for the selected ward.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Create a Poll Form */}
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', height: 'fit-content' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Launch Local Poll</h3>
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                    Start a quick consensus poll to gather community feedback on specific proposals.
+                  </p>
+
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newPollQ || !newPollOpts) return;
+                    const opts = newPollOpts.split('\n').map(o => o.trim()).filter(Boolean);
+                    if (opts.length < 2) return;
+                    const newPoll = {
+                      id: communityPolls.length + 1,
+                      question: newPollQ,
+                      options: opts.map(o => ({ text: o, votes: 0 })),
+                      votedOptionIndex: null,
+                      wardId: selectedWardId || 1
+                    };
+                    setCommunityPolls(prev => [...prev, newPoll]);
+                    setNewPollQ('');
+                    setNewPollOpts('');
+                    setSyncMsg('Poll launched successfully!');
+                    setTimeout(() => setSyncMsg(''), 3000);
+                  }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>SURVEY QUESTION</label>
+                      <input
+                        type="text"
+                        value={newPollQ}
+                        onChange={e => setNewPollQ(e.target.value)}
+                        placeholder="e.g., Should we install solar streetlights?"
+                        required
+                        style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>OPTIONS (ONE PER LINE, MIN 2)</label>
+                      <textarea
+                        value={newPollOpts}
+                        onChange={e => setNewPollOpts(e.target.value)}
+                        placeholder="e.g., Option A&#10;Option B"
+                        rows={3}
+                        required
+                        style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-main)', border: '1px solid var(--border-color)', padding: '8px 10px', borderRadius: '6px', fontSize: '12px', outline: 'none', resize: 'none' }}
+                      />
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" style={{ marginTop: '4px', width: '100%', fontSize: '12px', padding: '8px' }}>
+                      Launch Poll
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {integrateTab === 'resources' && (
+              <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Ward Representative & Emergency Directory</h3>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                    Immediate contact coordinates for local administrative, electrical, sanitary, and emergency response officers.
+                  </p>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+                  {officers.map(officer => {
+                    const color = WARD_COLORS[officer.ward_id as keyof typeof WARD_COLORS] || 'var(--primary)';
+                    return (
+                      <div key={officer.id} className="glass-panel hover-glow transition-all" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', background: 'rgba(255,255,255,0.01)' }}>
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: color }}></div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <img src={officer.avatar_url} alt={officer.name} style={{ width: '44px', height: '44px', borderRadius: '50%', border: `2px solid ${color}`, objectFit: 'cover' }} />
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '14.5px', fontWeight: 600 }}>{officer.name}</h4>
+                            <span style={{ fontSize: '10.5px', color: color, fontWeight: 700 }}>WARD {officer.ward_id} MANAGER</span>
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+                          <div>📞 <a href={`tel:${officer.phone}`} style={{ color: 'var(--text-main)', textDecoration: 'underline' }}>{officer.phone}</a></div>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✉️ <a href={`mailto:${officer.email}`} style={{ color: 'var(--text-main)' }}>{officer.email}</a></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Generic Emergency Services */}
+                  <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', background: 'rgba(255,255,255,0.01)' }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: '#ef4444' }}></div>
+                    <h4 style={{ margin: 0, fontSize: '14.5px', fontWeight: 600, color: '#ef4444' }}>🚨 Emergency Helpdesk</h4>
+                    <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Municipal Fire Station</span>
+                        <a href="tel:101" style={{ color: 'var(--text-main)', fontWeight: 700, textDecoration: 'underline' }}>101</a>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Local Police Station</span>
+                        <a href="tel:100" style={{ color: 'var(--text-main)', fontWeight: 700, textDecoration: 'underline' }}>100</a>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Ambulance Dispatch</span>
+                        <a href="tel:108" style={{ color: 'var(--text-main)', fontWeight: 700, textDecoration: 'underline' }}>108</a>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Child Helpline</span>
+                        <a href="tel:1098" style={{ color: 'var(--text-main)', fontWeight: 700, textDecoration: 'underline' }}>1098</a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

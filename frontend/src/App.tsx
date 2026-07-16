@@ -84,6 +84,7 @@ const App: React.FC = () => (
     <Route path="/participate/command-dispatch" element={<Layout><Participate activeApp="hotline" /></Layout>} />
     <Route path="/participate/citypulse-iot" element={<Layout><Participate activeApp="citybrain" /></Layout>} />
     <Route path="/participate/constituency-mailbox" element={<Layout><Participate activeApp="mailbox" /></Layout>} />
+    <Route path="/participate/civic-integrate" element={<Layout><Participate activeApp="civic-integrate" /></Layout>} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 );

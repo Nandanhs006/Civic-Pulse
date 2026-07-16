@@ -28,12 +28,23 @@ class ProjectService:
         self,
         category: Optional[str] = None,
         constituency_id: Optional[int] = None,
+        assembly_constituency_id: Optional[int] = None,
+        ward_id: Optional[int] = None,
+        state: Optional[str] = None,
     ) -> List[ProposedProject]:
         query = self.db.query(ProposedProject)
         if category:
             query = query.filter(ProposedProject.category == category)
         if constituency_id:
             query = query.filter(ProposedProject.constituency_id == constituency_id)
+        if assembly_constituency_id:
+            query = query.filter(ProposedProject.assembly_constituency_id == assembly_constituency_id)
+        if ward_id:
+            query = query.filter(ProposedProject.target_ward_id == ward_id)
+        if state:
+            query = query.join(Constituency, ProposedProject.constituency_id == Constituency.id).filter(
+                Constituency.state == state
+            )
         return query.order_by(ProposedProject.priority_score.desc()).all()
 
     def generate_recommendations(

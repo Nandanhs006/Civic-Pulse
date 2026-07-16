@@ -14,6 +14,9 @@ router = APIRouter()
 def get_projects_list(
     category: Optional[str] = None,
     constituency_id: Optional[int] = None,
+    assembly_constituency_id: Optional[int] = None,
+    ward_id: Optional[int] = None,
+    state: Optional[str] = None,
     service: ProjectService = Depends(deps.get_project_service),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
@@ -22,7 +25,13 @@ def get_projects_list(
     own constituency; the PMO may pass constituency_id or see all.
     """
     scoped = deps.resolve_scope(current_user, constituency_id)
-    return service.get_projects(category=category, constituency_id=scoped)
+    return service.get_projects(
+        category=category,
+        constituency_id=scoped,
+        assembly_constituency_id=assembly_constituency_id,
+        ward_id=ward_id,
+        state=state,
+    )
 
 
 @router.post("/recommend", response_model=List[ProjectOut])
