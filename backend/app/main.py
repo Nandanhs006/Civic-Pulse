@@ -140,6 +140,18 @@ async def debug_test_timeout(seconds: float = 35.0):
 Instrumentator().instrument(app).expose(app)
 
 
+def _warm_caches() -> None:
+    """Pre-warm slow external-data caches so the first user request is instant."""
+    try:
+        from app.services.air_quality import get_stations
+        get_stations()  # CPCB AQI (live -> fallback), cached for the TTL
+    except Exception as exc:  # noqa: BLE001
+        print(f"[Warmup] air-quality cache warm failed: {exc}")
+
+
+threading.Thread(target=_warm_caches, daemon=True).start()
+
+
 @app.on_event("startup")
 async def startup_event():
 

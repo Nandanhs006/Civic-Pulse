@@ -1,123 +1,63 @@
-# Implementation Plan: Phase 3 - Grid Governance & Participatory Dashboard ("Participate")
+# Implementation Plan: Offline & Mobile Sync Pipeline
 
-This plan outlines the architecture, database models, API routing, and frontend design required to integrate a Grid Governance and Dispatch dashboard (under a new tab **"Participate"**) as Phase 3 of the Civic Pulse platform.
+This plan outlines the implementation of backend sync endpoints and a client-side simulated offline mode for the citizen Portal. This allows you to demonstrate the local-first queuing and background sync capabilities live during your pitch.
 
 ---
 
-## User Review Required
+## 📢 Proposed Approach
 
-Please review the proposed design parameters for Grid Governance:
-> [!IMPORTANT]
-> **Participate Sub-App Placement**: A new navigation tab `/participate` will be added directly after the "Live Map" tab in the portal header.
-> 
-> **Interactive Grid Overlay**: We will render a multi-color grid layout representing wards or segments on a map.
-> 
-> **Dispatch Workflows**: Admin users will have a "Dispatch Center" to assign citizen suggestions directly to Grid Officers, changing states in real-time.
+### 1. Backend Intake & Sync APIs
+We will expose two new endpoints to support off-platform channels:
+*   `POST /api/v1/suggestions/sync` (Mobile Batch Sync): Accepts a list of suggestions from the offline queue, runs them through the full translation/vision/routing pipeline, and registers them. It uses idempotency tokens (local UUIDs) to prevent double-submitting on connection drops.
+*   `POST /api/v1/sms/intake` (SMS Gateway Parser): A public webhook endpoint that parses plain text SMS formatted reports (e.g., `REPORT Category Description`), autodetects user location, and submits them.
+
+### 2. Frontend "Simulate Offline Mode" (For Pitch Presentation)
+We will add a prominent **"Simulate Offline Mode"** toggle in the citizen Portal header:
+*   **When Offline**:
+    *   Form submissions are intercepted.
+    *   The complaint (text, phone, coordinates, and attachments) is saved into a local queue inside the browser (`localStorage`).
+    *   A warning badge displays: `⚠️ Connection Lost: Queued [N] reports`.
+*   **When Online**:
+    *   The queue is automatically read.
+    *   The client pushes all queued complaints to the backend `/sync` API in a single batch.
+    *   A success toast notification appears: `✅ Successfully synced [N] offline reports!`.
 
 ---
 
 ## Proposed Changes
 
-### 1. Database Schema Extensions (`backend`)
+### Backend Component
 
-We need a dedicated representation for **Grid Officers** and their relationship to **Wards** (Grids) and **Suggestions**.
+#### [MODIFY] [suggestions.py](file:///Volumes/DiskD/HACKATHONS/Civic-Pulse/backend/app/api/v1/suggestions.py)
+Expose the `/sync` and `/sms/intake` endpoints:
+*   `POST /suggestions/sync`: Accepts `List[SuggestionSyncIn]` containing description, coordinates, phone, and optional file attachments.
+*   `POST /suggestions/sms/intake`: Webhook callback for Twilio/telecom gateways.
 
-#### [NEW] [grid_officer.py](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/backend/app/db/models/grid_officer.py)
-Create a `GridOfficer` database model representing the localized official handling reports:
-```python
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
-from sqlalchemy.orm import relationship
-from app.db.base_class import Base
-
-class GridOfficer(Base):
-    __tablename__ = "grid_officers"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    email = Column(String(100), unique=True, nullable=False)
-    phone = Column(String(20), nullable=False)
-    avatar_url = Column(String(255), nullable=True)
-    is_active = Column(Boolean, default=True)
-    
-    # Associated Ward (Grid)
-    ward_id = Column(Integer, ForeignKey("wards.id"), nullable=False)
-    ward = relationship("Ward")
-```
-
-#### [MODIFY] [suggestion.py](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/backend/app/db/models/suggestion.py)
-Add association fields to link a suggestion to an assigned officer and grid:
-* `assigned_officer_id`: ForeignKey to `grid_officers.id` (nullable).
-* `dispatch_status`: Column `String(50)` (e.g. `Unassigned`, `Dispatched`, `In Progress`, `Resolved`).
+#### [MODIFY] [suggestion_service.py](file:///Volumes/DiskD/HACKATHONS/Civic-Pulse/backend/app/services/suggestion_service.py)
+*   Add `sync_suggestions(payloads)` handling batch ingestion and database inserts.
 
 ---
 
-### 2. API Endpoint Extensions (`backend`)
+### Frontend Component
 
-We will add routing endpoints to fetch grid data, query officers, and trigger dispatches.
-
-#### [NEW] [grid.py](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/backend/app/api/v1/grid.py)
-Provide endpoints for:
-1. `GET /api/v1/grid/officers` - List all grid officers and their active workloads.
-2. `POST /api/v1/grid/dispatch` - Assign a suggestion to an officer.
-   * Payload: `{"suggestion_id": int, "officer_id": int}`
-   * Updates `suggestion.assigned_officer_id` and shifts status to `"Dispatched"`.
-3. `GET /api/v1/grid/my-officer` - Query assigned officer based on geo-coordinates.
-   * Query params: `latitude`, `longitude`
-
----
-
-### 3. Frontend App Additions (`frontend`)
-
-We will build the **Participate** sub-app as a responsive dashboard inside `/participate`.
-
-#### [NEW] [Participate.tsx](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/frontend/src/pages/Participate.tsx)
-The main entry point for the Participate sub-app, consisting of four sub-views:
-
-```mermaid
-graph TD
-    Participate[Participate Main Tab] --> View1[Interactive Grid Map]
-    Participate --> View2[Grid Officer Directory]
-    Participate --> View3[Admin Dispatch Hub]
-    Participate --> View4[Citizen 'My Grid' Finder]
-```
-
-*   **Interactive Grid Map**: Renders Leaflet polygons representing boundary segments (grids). Clicking a grid displays popups showing active reports, the assigned Grid Officer, and a button to view details.
-*   **Grid Officer Directory**: Glassmorphic grid layout displaying officers, their photo avatars, contact details, assigned wards, and active workload gauges.
-*   **Admin Dispatch Hub (Role Restricted)**:
-    *   Lists unassigned citizen complaints with high AI-priority scores.
-    *   Dropdown menu to choose an available Grid Officer.
-    *   **"Dispatch Action"** button trigger to route the task to the officer in real-time.
-*   **Citizen "My Grid" Finder**:
-    *   A simple location lookup card using the browser's Geolocation API.
-    *   Identifies the user's grid and displays their local officer's contact details, encouraging direct communication.
-
-#### [MODIFY] [TopBar.tsx](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/frontend/src/components/layouts/TopBar.tsx)
-Add the Participate navigation link:
-```tsx
-<NavLink to="/participate" style={navLinkStyle} title={t('nav.participate')}>
-  <Users size={16} /> {!isMobile && t('nav.participate')}
-</NavLink>
-```
-
-#### [MODIFY] [App.tsx](file:///Volumes/DiskD/Civicpulse/Civic-Pulse/frontend/src/App.tsx)
-Register the new route:
-```tsx
-<Route path="/participate" element={<Layout><Participate /></Layout>} />
-```
+#### [MODIFY] [Portal.tsx](file:///Volumes/DiskD/HACKATHONS/Civic-Pulse/frontend/src/pages/Portal.tsx)
+*   Add a local state check `isOffline` linked to a top bar toggle.
+*   Intercept `handleSubmit`: if `isOffline` is true, write the suggestion payload to `localStorage` and show a local offline queue preview card.
+*   Add a `useEffect` watcher: when `isOffline` changes from `true` to `false`, run the bulk sync task to flush the local queue to the backend.
 
 ---
 
 ## Verification Plan
 
 ### Automated Tests
-* Create unit tests in `backend/tests/test_grid.py` verifying:
-  * Fetching list of grid officers.
-  * Successful dispatch updates db entries and sets status code to `200`.
-  * Geo-lookup returns the correct officer for specified coordinates.
+```bash
+# Run pytest on the new router logic
+pytest backend/tests/test_sync_api.py
+```
 
 ### Manual Verification
-* Run frontend development server.
-* Open `http://localhost/participate`.
-* Test the user flow:
-  1. Click "Locate Me" as a citizen to find the local Grid Officer.
-  2. Log in as Admin, go to Participate -> Dispatch Hub, assign an issue, and verify the suggestion updates to "Dispatched" instantly.
+1. Open the Portal at `http://localhost:5173`.
+2. Turn on the **"Simulate Offline Mode"** toggle.
+3. Submit a complaint about water drainage. Confirm it shows *"Stored in Offline Queue"* with a warning card.
+4. Turn off the **"Simulate Offline Mode"** toggle.
+5. Verify that a success alert is shown and the complaint appears instantly on the MP dashboard map.

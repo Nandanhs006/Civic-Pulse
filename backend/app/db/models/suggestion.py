@@ -37,6 +37,8 @@ class Suggestion(Base):
         Integer, ForeignKey("ward_officers.id"), nullable=True, index=True
     )
     dispatch_status: Any = Column(String(50), default="Unassigned")
+    # Government department the MP assigned this issue to (workflow routing).
+    department: Any = Column(String(80), nullable=True)
 
     # ── AI Enhancement Fields (Module 1: Vertex AI + Module 3: Vision + Module 4: Embeddings) ──
     ai_confidence = Column(Float, nullable=True)          # Vertex AI classification confidence (0.0–1.0)

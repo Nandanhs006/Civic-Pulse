@@ -3,7 +3,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.db.models.suggestion import Suggestion
 from app.db.models.project import ProposedProject
-from app.db.models.ward_officer import WardOfficer
+from app.services.issue_timeline import STATUS_TO_STAGE, STAGE_KEYS, STAGE_META
+
+# Statuses that count as "resolved" (the seed/app uses "Completed").
+_RESOLVED = ("Completed", "Resolved")
 
 
 class BigQueryService:
@@ -39,51 +42,40 @@ class BigQueryService:
             sent: count for sent, count in sentiment_data if sent is not None
         }
 
-        # Calculate Average Turnaround Time (TAT) in Days
+        # Turnaround time (TAT) over resolved tickets.
         resolved_tickets = (
-            db.query(Suggestion).filter(Suggestion.status == "Resolved").all()
+            db.query(Suggestion).filter(Suggestion.status.in_(_RESOLVED)).all()
         )
         total_days = 0.0
         resolved_count = len(resolved_tickets)
         for ticket in resolved_tickets:
-            delta = ticket.updated_at - ticket.created_at
-            total_days += delta.total_seconds() / 86400.0
-
+            if ticket.updated_at and ticket.created_at:
+                total_days += (ticket.updated_at - ticket.created_at).total_seconds() / 86400.0
         avg_tat_days = (
-            round(total_days / resolved_count, 1) if resolved_count > 0 else 2.4
+            round(total_days / resolved_count, 1) if resolved_count > 0 else 0.0
         )
 
-        # Dispatch saturation
-        total_dispatched = (
-            db.query(Suggestion)
-            .filter(Suggestion.dispatch_status == "Dispatched")
-            .count()
-        )
-        dispatch_saturation = (
-            round((total_dispatched / total_suggestions * 100), 1)
-            if total_suggestions > 0
-            else 65.0
+        resolution_rate = (
+            round(resolved_count / total_suggestions * 100, 1)
+            if total_suggestions > 0 else 0.0
         )
 
-        # Roster Officer Load
-        officers = db.query(WardOfficer).all()
-        officer_load = []
-        for o in officers:
-            active_cases = (
-                db.query(Suggestion)
-                .filter(
-                    Suggestion.assigned_officer_id == o.id,
-                    Suggestion.status != "Resolved",
-                )
-                .count()
-            )
-            officer_load.append(
-                {
-                    "name": o.name,
-                    "ward_id": o.ward_id,
-                    "active_cases": active_cases,
-                }
-            )
+        # Resolution pipeline: how many issues sit at each tracking stage
+        # (Received -> Under Review -> Assigned -> In Progress -> Resolved).
+        status_rows = (
+            db.query(Suggestion.status, func.count(Suggestion.id))
+            .group_by(Suggestion.status)
+            .all()
+        )
+        stage_counts = {k: 0 for k in STAGE_KEYS}
+        for status, cnt in status_rows:
+            stage = STATUS_TO_STAGE.get(status or "", "received")
+            if stage in stage_counts:
+                stage_counts[stage] += int(cnt)
+        pipeline = [
+            {"key": k, "label": STAGE_META[k]["label"], "count": stage_counts[k]}
+            for k in STAGE_KEYS
+        ]
 
         return {
             "connection_status": "Dashboard Connection (Live Sync)",
@@ -92,8 +84,8 @@ class BigQueryService:
             "category_counts": category_counts,
             "sentiment_distribution": sentiment_distribution,
             "avg_tat_days": avg_tat_days,
-            "dispatch_saturation": dispatch_saturation,
-            "officer_load": officer_load,
+            "resolution_rate": resolution_rate,
+            "pipeline": pipeline,
             "resolved_count": resolved_count,
         }
 

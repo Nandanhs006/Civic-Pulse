@@ -77,6 +77,7 @@ class SuggestionOut(BaseModel):
     assembly_constituency_id: Optional[int] = None
     assigned_officer_id: Optional[int] = None
     dispatch_status: Optional[str] = "Unassigned"
+    department: Optional[str] = None
     # AI Enhancement Fields
     ai_confidence: Optional[float] = None
     ai_reasoning: Optional[str] = None
@@ -103,6 +104,9 @@ class MapIssueOut(BaseModel):
     image_url: Optional[str] = None
     constituency_id: Optional[int] = None
     created_at: datetime
+    state: Optional[str] = None
+    city: Optional[str] = None
+    mp: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -250,15 +254,57 @@ class SosRequest(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     note: Optional[str] = None
+    share_precise: bool = False  # share exact location with responders who ack
 
 
 class SosResponse(BaseModel):
     incident_id: Optional[int] = None
     logged: bool = True  # False when outside the Bengaluru service area
     emergency_number: str = "112"  # India ERSS / national emergency number
+    resolve_token: Optional[str] = None  # secret for the creator to mark-safe
+    share_precise: bool = False
+    credibility_score: Optional[int] = None   # advisory triage — never suppresses
+    credibility_level: Optional[str] = None
+    credibility_note: Optional[str] = None
     constituency: Optional[ConstituencyOut] = None
     mp: Optional[MPOut] = None
     message: str
+
+
+class MessageRequest(BaseModel):
+    responder_id: str
+    text: str
+    is_owner: bool = False
+
+
+class MessageOut(BaseModel):
+    id: int
+    responder_id: str
+    is_owner: bool = False
+    text: str
+    created_at: Optional[datetime] = None
+
+
+class AckRequest(BaseModel):
+    responder_id: str          # anonymous browser token (localStorage)
+    responding: bool = False   # True = "I'm heading over"
+
+
+class ResolveRequest(BaseModel):
+    resolve_token: str
+
+
+class ShareRequest(BaseModel):
+    resolve_token: str
+    share_precise: bool
+
+
+class IncidentStatus(BaseModel):
+    incident_id: int
+    status: str
+    aware_count: int = 0
+    responding_count: int = 0
+    share_precise: bool = False
 
 
 class SafetyIncidentPoint(BaseModel):
@@ -275,3 +321,21 @@ class SafetySummary(BaseModel):
     total: int = 0
     last_30_days: int = 0
     by_hour: List[int] = []  # 24 buckets, index = hour of day (local server time)
+
+
+# Sync Schemas
+class SuggestionSyncIn(BaseModel):
+    offline_uuid: str
+    content: Optional[str] = None
+    citizen_phone: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    constituency_id: Optional[int] = None
+    language_code: Optional[str] = "en"
+    created_at_offline: Optional[str] = None
+
+
+class SuggestionSyncOut(BaseModel):
+    offline_uuid: str
+    live_id: Optional[str] = None
+    status: str  # "synced", "duplicate", "error"

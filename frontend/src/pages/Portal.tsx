@@ -4,6 +4,7 @@ import apiClient from '../services/apiClient';
 import { Mic, MicOff, Send, CheckCircle2, Image, MapPin, Loader2, UserCheck, Trash2, Brain } from 'lucide-react';
 import { Suggestion, Constituency, MP, Hierarchy } from '../types';
 import ConstituencyPicker, { Autofill } from '../components/common/ConstituencyPicker';
+import IssueTimeline from '../components/common/IssueTimeline';
 import Avatar from '../components/common/Avatar';
 import RoutingTree from '../components/common/RoutingTree';
 import { useLang } from '../context/LanguageContext';
@@ -194,9 +195,15 @@ const Portal: React.FC = () => {
     if (imageFile) formData.append('image', imageFile, imageFile.name);
 
     try {
-      const response = await apiClient.post<Suggestion>('/api/v1/suggestions/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const response = await apiClient.post<Suggestion & { is_spam?: boolean; message?: string }>(
+        '/api/v1/suggestions/', formData, { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      // AI dropped it as a test / non-issue — don't show the success flow.
+      if (response.data.is_spam) {
+        alert(response.data.message || t('portal.spamRejected'));
+        setSubmitting(false);
+        return;
+      }
       setSuccessData(response.data);
       setSentToMp(targetMp);
       setPhone('');
@@ -234,6 +241,17 @@ const Portal: React.FC = () => {
         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px' }}>
           <CheckCircle2 size={60} color="var(--success)" />
           <h2 style={{ fontSize: '24px' }}>{t('portal.successTitle')}</h2>
+          <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-card)', padding: '10px 20px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', width: '100%', maxWidth: '320px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>COMPLAINT REFERENCE ID</span>
+            <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--accent)', fontFamily: 'monospace', letterSpacing: '0.1em' }}>
+              {successData.id.slice(0, 8).toUpperCase()}
+            </span>
+            {successData.citizen_phone && (
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                📲 Reference ID sent via SMS to {successData.citizen_phone}
+              </span>
+            )}
+          </div>
           {displayHierarchy?.parliamentary ? (
             <div style={{ width: '100%', textAlign: 'left' }}>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', textAlign: 'center' }}>
@@ -272,6 +290,10 @@ const Portal: React.FC = () => {
                 <p style={{ fontWeight: 600, color: 'var(--accent)' }}>{successData.priority_score}/100</p>
               </div>
             </div>
+          </div>
+          {/* Live tracking timeline (with the citizen's tracking ID) */}
+          <div style={{ ...softPanel, width: '100%', textAlign: 'left' }}>
+            <IssueTimeline issueId={successData.id} />
           </div>
           <button onClick={() => setSuccessData(null)} className="btn-primary" style={{ marginTop: '10px' }}>
             {t('portal.submitAnother')}

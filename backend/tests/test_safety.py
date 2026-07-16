@@ -57,6 +57,81 @@ def test_summary_and_incidents_reflect_posts(client):
     assert {"id", "latitude", "longitude", "hour"} <= set(pts[0].keys())
 
 
+def test_sos_responder_and_victim_loop(client):
+    # Victim raises SOS in Bengaluru (opts to share precise location).
+    r = client.post(
+        "/api/v1/safety/sos",
+        json={"latitude": 12.9716, "longitude": 77.5946, "share_precise": True},
+    )
+    body = r.json()
+    iid, token = body["incident_id"], body["resolve_token"]
+    assert iid and token and body["share_precise"] is True
+
+    # Two distinct responders acknowledge (one is "responding").
+    client.post(f"/api/v1/safety/incidents/{iid}/ack", json={"responder_id": "A", "responding": False})
+    s = client.post(f"/api/v1/safety/incidents/{iid}/ack", json={"responder_id": "B", "responding": True}).json()
+    assert s["aware_count"] == 2 and s["responding_count"] == 1
+    # Re-acking the same responder does not double-count.
+    s = client.post(f"/api/v1/safety/incidents/{iid}/ack", json={"responder_id": "A", "responding": False}).json()
+    assert s["aware_count"] == 2
+
+    # Nearby alert carries counts + precise coords (because victim shared).
+    alerts = client.get(
+        "/api/v1/safety/nearby-alerts",
+        params={"lat": 12.9716, "lng": 77.5946, "radius_km": 3},
+    ).json()
+    a = next(x for x in alerts if x["id"] == iid)
+    assert a["aware_count"] == 2 and a["responding_count"] == 1 and a["precise"] is True
+
+    # Wrong token can't resolve; correct token marks safe.
+    assert client.post(f"/api/v1/safety/incidents/{iid}/resolve", json={"resolve_token": "nope"}).status_code == 403
+    assert client.post(f"/api/v1/safety/incidents/{iid}/resolve", json={"resolve_token": token}).json()["status"] == "resolved"
+
+    # Resolved alert disappears from nearby.
+    alerts2 = client.get(
+        "/api/v1/safety/nearby-alerts", params={"lat": 12.9716, "lng": 77.5946, "radius_km": 3}
+    ).json()
+    assert all(x["id"] != iid for x in alerts2)
+
+
+def test_precise_hidden_when_not_shared(client):
+    r = client.post("/api/v1/safety/sos", json={"latitude": 12.9716, "longitude": 77.5946}).json()
+    alerts = client.get(
+        "/api/v1/safety/nearby-alerts", params={"lat": 12.9716, "lng": 77.5946, "radius_km": 3}
+    ).json()
+    a = next(x for x in alerts if x["id"] == r["incident_id"])
+    # Coarse to ~2 decimals (neighbourhood level), not the exact 6-dp coords.
+    assert a["precise"] is False
+    assert a["latitude"] == round(12.9716, 2)
+
+
+def test_credibility_is_advisory_never_fake(client):
+    # A ping with distress terms scores higher than a bare one, but the low one
+    # is NEVER labelled "fake" — the lowest level is "unverified" = treat as real.
+    distress = client.post(
+        "/api/v1/safety/sos",
+        json={"latitude": 12.97, "longitude": 77.59, "note": "someone is following me, help, scared"},
+    ).json()
+    bare = client.post(
+        "/api/v1/safety/sos", json={"latitude": 13.09, "longitude": 77.72}
+    ).json()
+    assert distress["credibility_score"] > bare["credibility_score"]
+    assert bare["credibility_level"] in ("unverified", "some-signals")
+    assert "fake" not in (bare["credibility_note"] or "").lower()
+
+
+def test_sos_message_thread(client):
+    iid = client.post(
+        "/api/v1/safety/sos", json={"latitude": 12.9716, "longitude": 77.5946}
+    ).json()["incident_id"]
+    client.post(f"/api/v1/safety/incidents/{iid}/messages", json={"responder_id": "A", "text": "on my way"})
+    client.post(f"/api/v1/safety/incidents/{iid}/messages", json={"responder_id": "B", "text": "police called", "is_owner": False})
+    msgs = client.get(f"/api/v1/safety/incidents/{iid}/messages").json()
+    assert len(msgs) == 2 and msgs[0]["text"] == "on my way"
+    # Empty message rejected.
+    assert client.post(f"/api/v1/safety/incidents/{iid}/messages", json={"responder_id": "A", "text": "  "}).status_code == 400
+
+
 def test_police_stations_bundled(client):
     fc = client.get("/api/v1/safety/police-stations").json()
     assert fc["type"] == "FeatureCollection"

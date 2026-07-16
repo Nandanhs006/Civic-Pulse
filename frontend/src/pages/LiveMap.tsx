@@ -12,7 +12,7 @@ import MapLegend from '../components/features/map/MapLegend';
 import MapFilters from '../components/features/map/MapFilters';
 import IssueDetailPanel from '../components/features/map/IssueDetailPanel';
 import { Severity, SEVERITY_COLOR, severityOf } from '../components/features/map/severity';
-import { Loader2, ShieldAlert, Layers, LocateFixed, Navigation, X, Sparkles, Wind } from 'lucide-react';
+import { Loader2, ShieldAlert, Layers, LocateFixed, Navigation, X, Sparkles, Wind, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface SafetyPoint {
   id: number;
@@ -270,6 +270,9 @@ const LiveMap: React.FC = () => {
   );
   const [category, setCategory] = useState('');
   const [statusF, setStatusF] = useState('');
+  const [stateF, setStateF] = useState('');
+  const [cityF, setCityF] = useState('');
+  const [mpF, setMpF] = useState('');
 
   useEffect(() => {
     apiClient
@@ -488,6 +491,18 @@ const LiveMap: React.FC = () => {
     () => Array.from(new Set(issues.map((i) => i.status).filter(Boolean))).sort() as string[],
     [issues]
   );
+  const states = useMemo(
+    () => Array.from(new Set(issues.map((i) => (i as any).state).filter(Boolean))).sort() as string[],
+    [issues]
+  );
+  const cities = useMemo(
+    () => Array.from(new Set(issues.map((i) => (i as any).city).filter(Boolean))).sort() as string[],
+    [issues]
+  );
+  const mps = useMemo(
+    () => Array.from(new Set(issues.map((i) => (i as any).mp).filter(Boolean))).sort() as string[],
+    [issues]
+  );
 
   const filtered = useMemo(
     () =>
@@ -495,9 +510,12 @@ const LiveMap: React.FC = () => {
         if (!selectedSeverities.has(severityOf(i))) return false;
         if (category && i.category !== category) return false;
         if (statusF && i.status !== statusF) return false;
+        if (stateF && (i as any).state !== stateF) return false;
+        if (cityF && (i as any).city !== cityF) return false;
+        if (mpF && (i as any).mp !== mpF) return false;
         return true;
       }),
-    [issues, selectedSeverities, category, statusF]
+    [issues, selectedSeverities, category, statusF, stateF, cityF, mpF]
   );
 
   const counts = useMemo(() => {
@@ -517,6 +535,9 @@ const LiveMap: React.FC = () => {
     setSelectedSeverities(new Set(['critical', 'moderate', 'low', 'resolved']));
     setCategory('');
     setStatusF('');
+    setStateF('');
+    setCityF('');
+    setMpF('');
   };
 
   const tileVariant = theme === 'light' ? 'light_all' : 'dark_all';
@@ -730,89 +751,99 @@ const LiveMap: React.FC = () => {
         </div>
       )}
 
-      {/* Filters (top-left) */}
-      <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 1000, maxWidth: '90vw' }}>
+      {/* Left column: Filters + Layers (top-left) */}
+      <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 1000, maxWidth: '90vw', display: 'flex', flexDirection: 'column', gap: 10 }}>
         <MapFilters
           categories={categories}
           statuses={statuses}
+          states={states}
+          cities={cities}
+          mps={mps}
           selectedSeverities={selectedSeverities}
           toggleSeverity={toggleSeverity}
           category={category}
           setCategory={setCategory}
           status={statusF}
           setStatus={setStatusF}
+          stateF={stateF}
+          setStateF={setStateF}
+          cityF={cityF}
+          setCityF={setCityF}
+          mpF={mpF}
+          setMpF={setMpF}
           onReset={resetFilters}
         />
-      </div>
 
-      {/* Near-me action + Layers control (bottom-right) */}
-      <div style={{ position: 'absolute', bottom: 20, right: 12, zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-        {/* Layers panel */}
-        {layersOpen && (
-          <div className="glass-panel animate-fade-in" style={{ padding: 8, width: 210, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', padding: '4px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {t('map.layers')}
-            </div>
-            {([
-              { key: 'boundaries', label: t('map.boundaries'), swatch: ACCENT_LINE, on: showBoundaries, loading: boundariesLoading,
-                toggle: () => setShowBoundaries((v) => !v) },
-              { key: 'assembly', label: t('map.assembly'), swatch: ACCENT, on: showAssembly, loading: !!acLoadingState,
-                toggle: () => setShowAssembly((v) => { const n = !v; if (n) setShowBoundaries(false); else setAcByState(null); return n; }) },
-              { key: 'police', label: t('map.police'), swatch: '#1e3a8a', on: showPolice, loading: false,
-                toggle: () => setShowPolice((v) => !v) },
-              { key: 'safety', label: t('map.safety'), swatch: '#dc2626', on: showSafety, loading: safetyLoading,
-                toggle: () => setShowSafety((v) => !v) },
-              { key: 'aqi', label: t('map.air'), swatch: '#0891b2', on: showAqi, loading: aqiLoading,
-                toggle: () => setShowAqi((v) => !v) },
-            ] as const).map((l) => (
-              <button
-                key={l.key}
-                onClick={l.toggle}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 9, padding: '8px', borderRadius: 8,
-                  border: 'none', cursor: 'pointer', background: l.on ? 'var(--bg-subtle, rgba(37,99,235,.08))' : 'transparent',
-                  fontSize: 13, color: 'var(--text-main)', textAlign: 'left', width: '100%',
-                }}
-              >
-                <span style={{ width: 12, height: 12, borderRadius: 3, background: l.swatch, flexShrink: 0, opacity: l.on ? 1 : 0.35 }} />
-                <span style={{ flex: 1 }}>{l.label}</span>
-                {l.loading && <Loader2 size={13} className="animate-spin" />}
-                <span style={{
-                  width: 32, height: 18, borderRadius: 9, background: l.on ? '#2563eb' : 'var(--border-subtle, #ccc)',
-                  position: 'relative', flexShrink: 0, transition: 'background .2s',
-                }}>
-                  <span style={{ position: 'absolute', top: 2, left: l.on ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={locateMe}
-            className="glass-panel"
-            style={{
-              padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 7,
-              fontSize: 13, cursor: 'pointer', border: 'none', fontWeight: 700, color: '#fff', background: '#2563eb',
-            }}
-            title={t('map.nearMe')}
-          >
-            {nearLoading ? <Loader2 size={15} className="animate-spin" /> : <LocateFixed size={15} />}
-            {t('map.nearMe')}
-          </button>
+        {/* Layers control (big + noticeable, matches the filter panel) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button
             onClick={() => setLayersOpen((v) => !v)}
             className="glass-panel"
             style={{
-              padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 7,
-              fontSize: 13, cursor: 'pointer', border: 'none', fontWeight: 700,
-              color: layersOpen ? 'var(--text-main)' : 'var(--text-muted)',
+              width: isMobile ? '80vw' : 230, padding: '10px 14px', display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between', cursor: 'pointer', border: 'none',
+              fontSize: 13, fontWeight: 700, color: 'var(--text-main)',
             }}
             title={t('map.layers')}
           >
-            <Layers size={15} /> {t('map.layers')}
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Layers size={15} color="var(--saffron, #FF9933)" /> {t('map.layers')}
+            </span>
+            {layersOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
+          {layersOpen && (
+            <div className="glass-panel animate-fade-in" style={{ width: isMobile ? '80vw' : 230, padding: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {([
+                { key: 'boundaries', label: t('map.boundaries'), swatch: ACCENT_LINE, on: showBoundaries, loading: boundariesLoading,
+                  toggle: () => setShowBoundaries((v) => !v) },
+                { key: 'assembly', label: t('map.assembly'), swatch: ACCENT, on: showAssembly, loading: !!acLoadingState,
+                  toggle: () => setShowAssembly((v) => { const n = !v; if (n) setShowBoundaries(false); else setAcByState(null); return n; }) },
+                { key: 'police', label: t('map.police'), swatch: '#1e3a8a', on: showPolice, loading: false,
+                  toggle: () => setShowPolice((v) => !v) },
+                { key: 'safety', label: t('map.safety'), swatch: '#dc2626', on: showSafety, loading: safetyLoading,
+                  toggle: () => setShowSafety((v) => !v) },
+                { key: 'aqi', label: t('map.air'), swatch: '#0891b2', on: showAqi, loading: aqiLoading,
+                  toggle: () => setShowAqi((v) => !v) },
+              ] as const).map((l) => (
+                <button
+                  key={l.key}
+                  onClick={l.toggle}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 9, padding: '8px', borderRadius: 8,
+                    border: 'none', cursor: 'pointer', background: l.on ? 'var(--bg-subtle, rgba(37,99,235,.08))' : 'transparent',
+                    fontSize: 13, color: 'var(--text-main)', textAlign: 'left', width: '100%',
+                  }}
+                >
+                  <span style={{ width: 12, height: 12, borderRadius: 3, background: l.swatch, flexShrink: 0, opacity: l.on ? 1 : 0.35 }} />
+                  <span style={{ flex: 1 }}>{l.label}</span>
+                  {l.loading && <Loader2 size={13} className="animate-spin" />}
+                  <span style={{
+                    width: 32, height: 18, borderRadius: 9, background: l.on ? '#2563eb' : 'var(--border-subtle, #ccc)',
+                    position: 'relative', flexShrink: 0, transition: 'background .2s',
+                  }}>
+                    <span style={{ position: 'absolute', top: 2, left: l.on ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Near-me action (bottom-center) */}
+      <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 1160 }}>
+        <button
+          onClick={locateMe}
+          className="glass-panel"
+          style={{
+            padding: '9px 16px', display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer',
+            border: 'none', fontSize: 13, fontWeight: 700, color: '#fff', background: '#2563eb',
+          }}
+          title={t('map.nearMe')}
+        >
+          {nearLoading ? <Loader2 size={15} className="animate-spin" /> : <LocateFixed size={15} />}
+          {t('map.nearMe')}
+        </button>
       </div>
 
       {/* Assembly-mode hint */}
@@ -850,7 +881,7 @@ const LiveMap: React.FC = () => {
             position: 'absolute', zIndex: 1150, display: 'flex', flexDirection: 'column',
             ...(isMobile
               ? { left: 0, right: 0, bottom: 0, maxHeight: '68vh' }
-              : { top: 12, left: 12, width: 340, maxHeight: 'calc(100% - 24px)' }),
+              : { top: 12, right: 12, width: 340, maxHeight: 'calc(100% - 76px)' }),
             padding: 0, overflow: 'hidden',
           }}
         >
