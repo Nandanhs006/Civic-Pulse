@@ -1582,7 +1582,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                         padding: '18px',
                         cursor: 'pointer',
                         border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-card)',
-                        background: isSelected ? 'rgba(59,130,246,0.03)' : 'var(--overlay-faint)'
+                        background: isSelected ? 'rgba(59,130,246,0.12)' : 'var(--bg-card)'
                       }}
                     >
 
