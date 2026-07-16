@@ -250,7 +250,6 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   // StreetMapper Audio recorder
   const { isRecording, audioBlob, duration, startRecording, stopRecording, deleteRecording } = useAudioRecorder();
   const [fmsTranscribing, setFmsTranscribing] = useState(false);
-  const [fmsTranscription, setFmsTranscription] = useState<string | null>(null);
   const [fmsAudioUrl, setFmsAudioUrl] = useState<string>('');
 
   useEffect(() => {

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
-import { useLang } from '../context/LanguageContext';
 import { MapContainer, TileLayer, Marker, CircleMarker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -11,6 +10,7 @@ import {
   Mic,
   MicOff,
   Image as ImageIcon,
+  MapPin,
   Send,
   RefreshCw,
   MessageSquare,
@@ -41,12 +41,12 @@ const AppSimulator: React.FC = () => {
   const [constituency, setConstituency] = useState<Constituency | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number }>({ lat: 12.9716, lng: 77.5946 });
+  const [gpsCoords] = useState<{ lat: number; lng: number }>({ lat: 12.9716, lng: 77.5946 });
 
   // Mobile App Navigation & StreetMapper State
   const [mobileTab, setMobileTab] = useState<'report' | 'streetmapper'>('report');
   const [mobFmsContent, setMobFmsContent] = useState('');
-  const [mobFmsPhone, setMobFmsPhone] = useState('9988776655');
+  const [mobFmsPhone] = useState('9988776655');
   const [mobFmsCoords, setMobFmsCoords] = useState<[number, number]>([12.9716, 77.5946]);
   const [mobFmsImages, setMobFmsImages] = useState<File[]>([]);
   const [mobFmsImagePreviews, setMobFmsImagePreviews] = useState<string[]>([]);
@@ -182,8 +182,8 @@ const AppSimulator: React.FC = () => {
 
     // Reset mobile FMS
     setMobFmsContent('');
-    setMobFmsImage(null);
-    setMobFmsImagePreview(null);
+    setMobFmsImages([]);
+    setMobFmsImagePreviews([]);
     setMobMpClassResult(null);
     setMobOtpSent(false);
     setMobOtpVerified(false);
@@ -1042,7 +1042,7 @@ const AppSimulator: React.FC = () => {
 
                     <button
                       type="submit"
-                      disabled={syncing || !mobOtpVerified || !mobFmsImage}
+                      disabled={syncing || !mobOtpVerified || !mobFmsImages.length}
                       style={{ border: 'none', background: 'var(--primary)', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '4px' }}
                     >
                       <Send size={12} /> {isOnline ? 'Register Issue' : 'Queue Offline'}
