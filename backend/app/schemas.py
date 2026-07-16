@@ -77,6 +77,7 @@ class SuggestionOut(BaseModel):
     assembly_constituency_id: Optional[int] = None
     assigned_officer_id: Optional[int] = None
     dispatch_status: Optional[str] = "Unassigned"
+    department: Optional[str] = None
     # AI Enhancement Fields
     ai_confidence: Optional[float] = None
     ai_reasoning: Optional[str] = None

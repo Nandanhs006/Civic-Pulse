@@ -5,7 +5,8 @@ import AnalyticsSummary from './AnalyticsSummary';
 import ProjectPrioritizer from './ProjectPrioritizer';
 import SafetyPanel from './SafetyPanel';
 import MpladsPanel from './MpladsPanel';
-import { Suggestion, ProposedProject, Ward, AnalyticsSummary as SummaryType, AssemblyConstituency, MLA } from '../../../types';
+import IssuesInbox from './IssuesInbox';
+import { Suggestion, ProposedProject, AnalyticsSummary as SummaryType, AssemblyConstituency, MLA } from '../../../types';
 import Avatar from '../../common/Avatar';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { useLang } from '../../../context/LanguageContext';
@@ -27,7 +28,6 @@ const ConstituencyDashboard: React.FC<ConstituencyDashboardProps> = ({ constitue
   const isMobile = useIsMobile();
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [projects, setProjects] = useState<ProposedProject[]>([]);
-  const [wards, setWards] = useState<Ward[]>([]);
   const [summary, setSummary] = useState<SummaryType | null>(null);
   const [boundary, setBoundary] = useState<any | null>(null);
   const [segments, setSegments] = useState<AssemblySegment[]>([]);
@@ -55,15 +55,13 @@ const ConstituencyDashboard: React.FC<ConstituencyDashboardProps> = ({ constitue
   const fetchData = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [sugRes, projRes, wardRes, sumRes] = await Promise.all([
+      const [sugRes, projRes, sumRes] = await Promise.all([
         apiClient.get<Suggestion[]>('/api/v1/suggestions/', { params }),
         apiClient.get<ProposedProject[]>('/api/v1/projects/', { params }),
-        apiClient.get<Ward[]>('/api/v1/analytics/wards'),
         apiClient.get<SummaryType>('/api/v1/analytics/summary', { params }),
       ]);
       setSuggestions(sugRes.data);
       setProjects(projRes.data);
-      setWards(wardRes.data);
       setSummary(sumRes.data);
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -116,10 +114,12 @@ const ConstituencyDashboard: React.FC<ConstituencyDashboardProps> = ({ constitue
             <Map size={18} color="var(--secondary)" />
             {t('dash.liveMap')}
           </h3>
-          <MapView suggestions={suggestions} wards={wards} center={center} zoom={zoom} boundary={boundary} />
+          <MapView suggestions={suggestions} center={center} zoom={zoom} boundary={boundary} />
         </div>
         <AnalyticsSummary summary={summary} />
       </div>
+
+      <IssuesInbox suggestions={suggestions} onChange={fetchData} />
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px' }}>
         <MpladsPanel constituencyId={constituencyId} />

@@ -4,6 +4,7 @@ import apiClient from '../services/apiClient';
 import { Mic, MicOff, Send, CheckCircle2, Image, MapPin, Loader2, UserCheck, Trash2, Brain } from 'lucide-react';
 import { Suggestion, Constituency, MP, Hierarchy } from '../types';
 import ConstituencyPicker, { Autofill } from '../components/common/ConstituencyPicker';
+import IssueTimeline from '../components/common/IssueTimeline';
 import Avatar from '../components/common/Avatar';
 import RoutingTree from '../components/common/RoutingTree';
 import { useLang } from '../context/LanguageContext';
@@ -194,9 +195,15 @@ const Portal: React.FC = () => {
     if (imageFile) formData.append('image', imageFile, imageFile.name);
 
     try {
-      const response = await apiClient.post<Suggestion>('/api/v1/suggestions/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const response = await apiClient.post<Suggestion & { is_spam?: boolean; message?: string }>(
+        '/api/v1/suggestions/', formData, { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      // AI dropped it as a test / non-issue — don't show the success flow.
+      if (response.data.is_spam) {
+        alert(response.data.message || t('portal.spamRejected'));
+        setSubmitting(false);
+        return;
+      }
       setSuccessData(response.data);
       setSentToMp(targetMp);
       setPhone('');
@@ -272,6 +279,10 @@ const Portal: React.FC = () => {
                 <p style={{ fontWeight: 600, color: 'var(--accent)' }}>{successData.priority_score}/100</p>
               </div>
             </div>
+          </div>
+          {/* Live tracking timeline (with the citizen's tracking ID) */}
+          <div style={{ ...softPanel, width: '100%', textAlign: 'left' }}>
+            <IssueTimeline issueId={successData.id} />
           </div>
           <button onClick={() => setSuccessData(null)} className="btn-primary" style={{ marginTop: '10px' }}>
             {t('portal.submitAnother')}
