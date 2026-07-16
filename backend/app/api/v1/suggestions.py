@@ -33,6 +33,7 @@ def submit_suggestion(
     audio: Optional[UploadFile] = File(None),
     image: Optional[UploadFile] = File(None),
     service: SuggestionService = Depends(deps.get_suggestion_service),
+    current_user: Optional[User] = Depends(deps.get_current_user_optional),
 ) -> Any:
     """
     Submit a citizen developmental suggestion.
@@ -70,6 +71,14 @@ def submit_suggestion(
         audio_file=audio,
         image_file=image,
     )
+    # Phone-OTP-verified reporter → flag the issue as verified and attach a real
+    # contact number so MPs can follow up. Anonymous submissions stay unverified.
+    if current_user is not None and getattr(current_user, "phone_verified", False):
+        db_suggestion.citizen_verified = True
+        if not db_suggestion.citizen_phone and current_user.phone:
+            db_suggestion.citizen_phone = current_user.phone
+        service.db.commit()
+        service.db.refresh(db_suggestion)
     # AI routing: auto-assign a department + advance routine issues; critical /
     # ambiguous ones stay in the MP's review queue.
     try:

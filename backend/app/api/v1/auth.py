@@ -1,3 +1,4 @@
+import secrets
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -5,9 +6,57 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.core import security
 from app.db.models.user import User
-from app.schemas import Token, UserOut, UserCreate
+from app.schemas import Token, UserOut, UserCreate, PhoneLoginRequest
+from app.services.firebase_auth import verify_phone_token
 
 router = APIRouter()
+
+
+@router.post("/phone/login", response_model=Token)
+def phone_login(payload: PhoneLoginRequest, db: Session = Depends(deps.get_db)) -> Any:
+    """Log in / register a citizen via a verified Firebase phone OTP.
+
+    The client confirms the SMS OTP with Firebase and sends us the resulting
+    Firebase ID token; we verify it, then create-or-fetch a persistent citizen
+    account keyed by the phone number and return our own JWT.
+    """
+    phone = verify_phone_token(payload.id_token)
+    if not phone:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Phone verification failed. Please retry the OTP.",
+        )
+
+    user = db.query(User).filter(User.phone == phone).first()
+    if not user:
+        # Synthetic email keeps the JWT subject / lookup path identical to staff
+        # accounts; citizens never password-login (unusable random hash).
+        synthetic_email = f"{phone.lstrip('+')}@phone.civicpulse"
+        user = db.query(User).filter(User.email == synthetic_email).first()
+        if not user:
+            user = User(
+                email=synthetic_email,
+                hashed_password=security.get_password_hash(secrets.token_urlsafe(24)),
+                full_name=(payload.full_name or "").strip() or "Verified Citizen",
+                is_active=True,
+                is_admin=False,
+                role="citizen",
+                phone=phone,
+                phone_verified=True,
+            )
+            db.add(user)
+        else:
+            user.phone = phone
+    user.phone_verified = True
+    if payload.full_name and (not user.full_name or user.full_name == "Verified Citizen"):
+        user.full_name = payload.full_name.strip()
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "access_token": security.create_access_token(subject=user.email),
+        "token_type": "bearer",
+    }
 
 
 @router.post("/login", response_model=Token)

@@ -90,5 +90,20 @@ class Settings(BaseSettings):
     DUPLICATE_SIMILARITY_THRESHOLD: float = 0.92        # Cosine similarity threshold
     DUPLICATE_LOOKBACK_LIMIT: int = 500                 # Max candidates to compare
 
+    # ── Firebase Phone-OTP auth (citizen verification) ────────────────────────
+    # The web client sends & confirms the SMS OTP via Firebase; the backend only
+    # VERIFIES the resulting Firebase ID token (Firebase Admin SDK) and reads the
+    # phone number. Provide a service account to enable real verification; without
+    # it the backend runs in MOCK mode (accepts "mock:<phone>" dev tokens) so the
+    # whole flow is demoable with no keys.
+    FIREBASE_PROJECT_ID: str | None = os.getenv("FIREBASE_PROJECT_ID")
+    # Either an absolute path to the service-account JSON, or the JSON itself.
+    FIREBASE_SERVICE_ACCOUNT: str | None = os.getenv("FIREBASE_SERVICE_ACCOUNT")
+
+    @property
+    def firebase_enabled(self) -> bool:
+        """True when a real Firebase service account is configured."""
+        return bool(self.FIREBASE_SERVICE_ACCOUNT)
+
 
 settings = Settings()

@@ -40,6 +40,10 @@ class Suggestion(Base):
     # Government department the MP assigned this issue to (workflow routing).
     department: Any = Column(String(80), nullable=True)
 
+    # Reporter was phone-OTP-verified (Firebase) at submit time → MPs see a
+    # "Verified citizen" badge and a real contact number they can follow up on.
+    citizen_verified: Any = Column(Boolean, default=False)
+
     # ── AI Enhancement Fields (Module 1: Vertex AI + Module 3: Vision + Module 4: Embeddings) ──
     ai_confidence = Column(Float, nullable=True)          # Vertex AI classification confidence (0.0–1.0)
     ai_reasoning = Column(String(500), nullable=True)     # Structured reasoning from Vertex AI agent

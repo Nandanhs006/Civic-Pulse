@@ -58,6 +58,10 @@ def _run_lightweight_migrations() -> None:
         "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS is_duplicate BOOLEAN DEFAULT FALSE",
         "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS duplicate_of_id VARCHAR(36)",
         "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS embedding_text TEXT",
+        # Firebase phone-OTP citizen verification.
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS citizen_verified BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT FALSE",
     ]
     for sql in alters:
         try:

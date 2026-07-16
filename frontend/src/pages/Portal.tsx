@@ -1,17 +1,21 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import apiClient from '../services/apiClient';
-import { Mic, MicOff, Send, CheckCircle2, Image, MapPin, Loader2, UserCheck, Trash2, Brain } from 'lucide-react';
+import { Mic, MicOff, Send, CheckCircle2, Image, MapPin, Loader2, UserCheck, Trash2, Brain, BadgeCheck, ShieldCheck } from 'lucide-react';
 import { Suggestion, Constituency, MP, Hierarchy } from '../types';
 import ConstituencyPicker, { Autofill } from '../components/common/ConstituencyPicker';
 import IssueTimeline from '../components/common/IssueTimeline';
 import Avatar from '../components/common/Avatar';
 import RoutingTree from '../components/common/RoutingTree';
+import PhoneAuthModal from '../components/common/PhoneAuthModal';
 import { useLang } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 const Portal: React.FC = () => {
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+  const [showPhoneAuth, setShowPhoneAuth] = useState(false);
   const [phone, setPhone] = useState('');
   const [content, setContent] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -228,6 +232,11 @@ const Portal: React.FC = () => {
 
   return (
     <div style={{ maxWidth: '720px', margin: '10px auto', padding: '0 8px' }} className="animate-fade-in">
+      <PhoneAuthModal
+        open={showPhoneAuth}
+        onClose={() => setShowPhoneAuth(false)}
+        onSuccess={() => { if (user?.phone) setPhone(user.phone); }}
+      />
       <div style={{ marginBottom: '26px', textAlign: 'center' }}>
         <h1 style={{ fontSize: 'clamp(24px, 6vw, 34px)', marginBottom: '8px', color: 'var(--text-main)' }}>
           {t('portal.heroA')} <span style={{ color: 'var(--saffron)' }}>{t('portal.heroB')}</span>
@@ -301,6 +310,22 @@ const Portal: React.FC = () => {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+          {/* Verified-citizen prompt: OTP-verified reports carry a badge MPs act on */}
+          {user?.phone_verified ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--success)' }}>
+              <BadgeCheck size={16} /> Verified citizen{user.phone ? ` · ${user.phone}` : ''} — this report will be marked <strong>Verified</strong>.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', borderRadius: 8, padding: '10px 14px' }}>
+              <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+                Verify your mobile to earn a <strong style={{ color: 'var(--text-main)' }}>Verified citizen</strong> badge so your MP can act & contact you.
+              </span>
+              <button type="button" className="btn-secondary" onClick={() => setShowPhoneAuth(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12.5, whiteSpace: 'nowrap' }}>
+                <ShieldCheck size={14} /> Verify with OTP
+              </button>
+            </div>
+          )}
           {/* Constituency routing */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div

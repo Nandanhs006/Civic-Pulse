@@ -4,10 +4,11 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/apiClient';
 import { MapContainer, TileLayer, Popup, Marker, CircleMarker } from 'react-leaflet';
 import { LatLngExpression } from 'leaflet';
-import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X, Image as ImageIcon, Mic, MicOff, Loader2 } from 'lucide-react';
+import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X, Image as ImageIcon, Mic, MicOff, Loader2, ShieldCheck } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import PhoneAuthModal from '../components/common/PhoneAuthModal';
 import 'leaflet/dist/leaflet.css';
 
 const CATEGORIES = [
@@ -229,7 +230,10 @@ interface ParticipateProps {
 
 const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const navigate = useNavigate();
-  useAuth();
+  const { user } = useAuth();
+  const [showPhoneAuth, setShowPhoneAuth] = useState(false);
+  // Citizens must be phone-OTP verified to use a Participate tool (not the hub).
+  const needsAuth = activeApp !== 'hub' && !user;
   const isMobile = useIsMobile();
   const { theme } = useTheme();
   const tileUrl = `https://{s}.basemaps.cartocdn.com/${theme === 'light' ? 'light_all' : 'dark_all'}/{z}/{x}/{y}{r}.png`;
@@ -851,8 +855,38 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
     setTimeout(() => setSyncMsg(''), 3000);
   };
 
+  // ── Citizen verification gate for the participatory tools ────────────────
+  if (needsAuth) {
+    return (
+      <>
+        <div style={{ maxWidth: '460px', margin: '40px auto', textAlign: 'center' }}>
+          <div className="glass-panel" style={{ padding: '32px 26px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShieldCheck size={30} color="var(--success)" />
+            </div>
+            <h2 style={{ margin: 0, fontSize: '20px' }}>Verify to participate</h2>
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              This civic tool is for verified citizens. A quick one-time SMS code confirms
+              you're real — then your reports carry a <strong>Verified</strong> badge your MP can act on.
+            </p>
+            <button className="btn-primary" onClick={() => setShowPhoneAuth(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              <ShieldCheck size={16} /> Verify with OTP
+            </button>
+            <button onClick={() => navigate('/participate')}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>
+              ← Back to hub
+            </button>
+          </div>
+        </div>
+        <PhoneAuthModal open={showPhoneAuth} onClose={() => setShowPhoneAuth(false)} />
+      </>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <PhoneAuthModal open={showPhoneAuth} onClose={() => setShowPhoneAuth(false)} />
 
       {/* Dynamic Sync Banner */}
       {syncMsg && (
@@ -860,6 +894,20 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
           {syncMsg}
         </div>
       )}
+
+      {/* Citizen verification status / sign-in */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        {user ? (
+          <span className="badge" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)', padding: '6px 12px' }}>
+            <ShieldCheck size={13} /> Verified{user.phone ? ` · ${user.phone}` : (user.full_name ? ` · ${user.full_name}` : '')}
+          </span>
+        ) : (
+          <button className="btn-secondary" onClick={() => setShowPhoneAuth(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', fontSize: 13 }}>
+            <ShieldCheck size={15} /> Verify with OTP
+          </button>
+        )}
+      </div>
 
       {/* ========================================================= */}
       {/* GLOBAL CIVIC TECH HUB MAIN PAGE */}

@@ -7,7 +7,7 @@ import { useAuth } from '../../../context/AuthContext';
 import RoutingTree from '../../common/RoutingTree';
 import IssueTimeline from '../../common/IssueTimeline';
 import { severityOf, SEVERITY_COLOR } from './severity';
-import { X, Image as ImageIcon, CalendarDays, ListChecks } from 'lucide-react';
+import { X, Image as ImageIcon, CalendarDays, ListChecks, BadgeCheck } from 'lucide-react';
 
 interface IssueDetailPanelProps {
   issue: MapIssue;
@@ -79,6 +79,12 @@ const IssueDetailPanel: React.FC<IssueDetailPanelProps> = ({ issue, onClose }) =
       )}
 
       <p style={{ fontSize: '14px', color: 'var(--text-main)', margin: 0, lineHeight: 1.5 }}>{text}</p>
+
+      {issue.citizen_verified && (
+        <span className="badge" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)', width: 'fit-content' }}>
+          <BadgeCheck size={13} /> Verified citizen report
+        </span>
+      )}
 
       <div style={{ display: 'flex', gap: 16, fontSize: '12.5px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
