@@ -14,6 +14,10 @@ from app.api.v1 import (
     mps,
     hierarchy,
     ward,
+    safety,
+    civic,
+    airquality,
+    mplads,
 )
 from app.db.session import engine, SessionLocal
 from app.db.base import Base
@@ -83,6 +87,27 @@ app.include_router(
     ward.router,
     prefix=f"{settings.API_V1_STR}/ward",
     tags=["Ward"],
+)
+app.include_router(
+    safety.router,
+    prefix=f"{settings.API_V1_STR}/safety",
+    tags=["Safety"],
+    dependencies=[Depends(check_rate_limit)],
+)
+app.include_router(
+    civic.router,
+    prefix=f"{settings.API_V1_STR}/civic",
+    tags=["Civic"],
+)
+app.include_router(
+    airquality.router,
+    prefix=f"{settings.API_V1_STR}/airquality",
+    tags=["AirQuality"],
+)
+app.include_router(
+    mplads.router,
+    prefix=f"{settings.API_V1_STR}/mplads",
+    tags=["MPLADS"],
 )
 
 import asyncio

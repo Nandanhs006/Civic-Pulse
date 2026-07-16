@@ -12,6 +12,7 @@ import PmoLeaderboard from './pages/PmoLeaderboard';
 import LiveMap from './pages/LiveMap';
 import Participate from './pages/Participate';
 import RequireRole from './components/common/RequireRole';
+import SosButton from './components/common/SosButton';
 import { useIsMobile } from './hooks/useIsMobile';
 
 import './styles/index.css';
@@ -26,6 +27,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <main style={{ maxWidth: '1440px', margin: '0 auto', padding: isMobile ? '18px 14px 48px' : '28px 24px 64px' }}>
         {children}
       </main>
+      <SosButton />
     </div>
   );
 };

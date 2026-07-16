@@ -23,6 +23,7 @@ env/
 node_modules/
 dist/
 dist-ssr/
+.vite/
 *.local
 .eslintcache
 
@@ -34,6 +35,7 @@ htmlcov/
 
 # Databases
 *.db
+*.db-journal
 *.sqlite3
 
 # Local uploads and data

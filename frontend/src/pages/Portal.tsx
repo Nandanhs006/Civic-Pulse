@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import apiClient from '../services/apiClient';
 import { Mic, MicOff, Send, CheckCircle2, Image, MapPin, Loader2, UserCheck, Trash2 } from 'lucide-react';
@@ -50,18 +50,30 @@ const Portal: React.FC = () => {
     };
   }, [constituency, targetMp, hierarchy]);
 
-  // Capture GPS on mount (used as supporting metadata / map pin / auto-detect).
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
-          setGpsReal(true);
-        },
-        () => setCoords({ lat: 22.9734, lng: 78.6569 }) // fallback: centre of India (not auto-detected)
-      );
-    }
+  // Request the browser location and drive constituency auto-detection.
+  // Reusable so it runs on mount AND from an explicit "Detect location" button
+  // (a user gesture is what reliably resolves the permission prompt in many
+  // browsers — otherwise autofill silently waits for one).
+  const requestLocation = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setDetecting(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+        setGpsReal(true);
+      },
+      () => {
+        setCoords({ lat: 22.9734, lng: 78.6569 }); // fallback: centre of India (not auto-detected)
+        setGpsReal(false);
+        setDetecting(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
   }, []);
+
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
 
   // Auto-detect constituency from real GPS: precise boundary lookup first,
   // then fall back to reverse-geocoded name matching if that misses.
@@ -258,7 +270,17 @@ const Portal: React.FC = () => {
                 <span style={{ fontSize: '12px', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <MapPin size={12} /> {t('portal.autofilled')}
                 </span>
-              ) : null}
+              ) : (
+                <button
+                  onClick={requestLocation}
+                  style={{
+                    fontSize: '12px', color: 'var(--secondary)', background: 'none', border: 'none',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', padding: 0,
+                  }}
+                >
+                  <MapPin size={12} /> {t('portal.detectLocation')}
+                </button>
+              )}
             </div>
             <ConstituencyPicker value={constituency?.id ?? null} onChange={setConstituency} autofill={autofill} />
 

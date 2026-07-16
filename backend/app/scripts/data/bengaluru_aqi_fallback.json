@@ -1,0 +1,26 @@
+{
+  "source": "fallback-sample",
+  "note": "Offline sample of real Bengaluru CPCB/KSPCB continuous AQI stations, used when the live data.gov.in API is unavailable/rate-limited. Pollutant values are indicative.",
+  "records": [
+    {"station": "Silk Board, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.917", "longitude": "77.623", "pollutant_id": "PM2.5", "avg_value": "88"},
+    {"station": "Silk Board, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.917", "longitude": "77.623", "pollutant_id": "PM10", "avg_value": "142"},
+    {"station": "BTM Layout, Bengaluru - CPCB", "city": "Bengaluru", "latitude": "12.913", "longitude": "77.610", "pollutant_id": "PM2.5", "avg_value": "72"},
+    {"station": "BTM Layout, Bengaluru - CPCB", "city": "Bengaluru", "latitude": "12.913", "longitude": "77.610", "pollutant_id": "PM10", "avg_value": "118"},
+    {"station": "Hebbal, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "13.036", "longitude": "77.597", "pollutant_id": "PM2.5", "avg_value": "54"},
+    {"station": "Hebbal, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "13.036", "longitude": "77.597", "pollutant_id": "PM10", "avg_value": "96"},
+    {"station": "Hombegowda Nagar, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.938", "longitude": "77.596", "pollutant_id": "PM2.5", "avg_value": "61"},
+    {"station": "Hombegowda Nagar, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.938", "longitude": "77.596", "pollutant_id": "PM10", "avg_value": "104"},
+    {"station": "Jayanagar 5th Block, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.920", "longitude": "77.584", "pollutant_id": "PM2.5", "avg_value": "48"},
+    {"station": "Jayanagar 5th Block, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.920", "longitude": "77.584", "pollutant_id": "PM10", "avg_value": "84"},
+    {"station": "City Railway Station, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.977", "longitude": "77.570", "pollutant_id": "PM2.5", "avg_value": "95"},
+    {"station": "City Railway Station, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.977", "longitude": "77.570", "pollutant_id": "PM10", "avg_value": "158"},
+    {"station": "Peenya, Bengaluru - CPCB", "city": "Bengaluru", "latitude": "13.033", "longitude": "77.520", "pollutant_id": "PM2.5", "avg_value": "112"},
+    {"station": "Peenya, Bengaluru - CPCB", "city": "Bengaluru", "latitude": "13.033", "longitude": "77.520", "pollutant_id": "PM10", "avg_value": "196"},
+    {"station": "Sanegurava Halli, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.991", "longitude": "77.545", "pollutant_id": "PM2.5", "avg_value": "66"},
+    {"station": "Sanegurava Halli, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.991", "longitude": "77.545", "pollutant_id": "PM10", "avg_value": "110"},
+    {"station": "Bapuji Nagar, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.952", "longitude": "77.557", "pollutant_id": "PM2.5", "avg_value": "79"},
+    {"station": "Bapuji Nagar, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.952", "longitude": "77.557", "pollutant_id": "PM10", "avg_value": "133"},
+    {"station": "Kadabesanahalli, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.936", "longitude": "77.685", "pollutant_id": "PM2.5", "avg_value": "58"},
+    {"station": "Kadabesanahalli, Bengaluru - KSPCB", "city": "Bengaluru", "latitude": "12.936", "longitude": "77.685", "pollutant_id": "PM10", "avg_value": "99"}
+  ]
+}

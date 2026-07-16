@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"
 
+    # data.gov.in open-data API (CPCB air quality, etc.). Defaults to the public
+    # sample key (rate-limited/shared) — set DATA_GOV_API_KEY to your own key.
+    DATA_GOV_API_KEY: str = os.getenv(
+        "DATA_GOV_API_KEY",
+        "579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b",
+    )
+
     # Redis config
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
