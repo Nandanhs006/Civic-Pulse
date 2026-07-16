@@ -102,6 +102,7 @@ class EmbeddingService:
                 model=self.EMBEDDING_MODEL,
                 content=text.strip(),
                 task_type="SEMANTIC_SIMILARITY",
+                request_options={"timeout": 5.0}
             )
             return result["embedding"]
         except Exception as e:

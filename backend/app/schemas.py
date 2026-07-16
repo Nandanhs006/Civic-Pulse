@@ -104,6 +104,9 @@ class MapIssueOut(BaseModel):
     image_url: Optional[str] = None
     constituency_id: Optional[int] = None
     created_at: datetime
+    state: Optional[str] = None
+    city: Optional[str] = None
+    mp: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -318,3 +321,21 @@ class SafetySummary(BaseModel):
     total: int = 0
     last_30_days: int = 0
     by_hour: List[int] = []  # 24 buckets, index = hour of day (local server time)
+
+
+# Sync Schemas
+class SuggestionSyncIn(BaseModel):
+    offline_uuid: str
+    content: Optional[str] = None
+    citizen_phone: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    constituency_id: Optional[int] = None
+    language_code: Optional[str] = "en"
+    created_at_offline: Optional[str] = None
+
+
+class SuggestionSyncOut(BaseModel):
+    offline_uuid: str
+    live_id: Optional[str] = None
+    status: str  # "synced", "duplicate", "error"

@@ -7,8 +7,9 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import LanguageSwitcher from '../common/LanguageSwitcher';
 import {
   Sun, Moon, LogOut, LogIn, LayoutDashboard, Radio, Command,
-  MapPinned, Users, Menu, X,
+  MapPinned, Users, Menu, X, Smartphone,
 } from 'lucide-react';
+
 
 const navLinkStyle = ({ isActive }: { isActive: boolean }): React.CSSProperties => ({
   display: 'flex',
@@ -81,6 +82,7 @@ const TopBar: React.FC = () => {
     { to: '/', label: t('nav.portal'), icon: Radio, end: true },
     { to: '/map', label: t('nav.liveMap'), icon: MapPinned },
     { to: '/participate', label: t('nav.participate'), icon: Users },
+    { to: '/simulator', label: 'Simulator', icon: Smartphone },
     ...(user?.role === 'mp'
       ? [{ to: '/mp', label: t('nav.myConstituency'), icon: LayoutDashboard }]
       : []),

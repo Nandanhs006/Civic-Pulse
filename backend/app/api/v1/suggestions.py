@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile, s
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.api import deps
-from app.schemas import SuggestionOut, MapIssueOut
+from app.schemas import SuggestionOut, MapIssueOut, SuggestionSyncIn, SuggestionSyncOut
 from app.services.suggestion_service import SuggestionService
 from app.services import issue_timeline
 from app.services.spam_filter import spam_check
@@ -114,13 +114,51 @@ def get_suggestions_list(
 @router.get("/map", response_model=List[MapIssueOut])
 def get_map_issues(
     limit: int = 5000,
-    service: SuggestionService = Depends(deps.get_suggestion_service),
+    db: Session = Depends(deps.get_db),
 ) -> Any:
     """
     Public: all geolocated citizen issues for the live map.
     Excludes personal fields (no citizen phone).
     """
-    return service.get_map_issues(limit=limit)
+    from app.db.models.suggestion import Suggestion
+    from app.db.models.constituency import Constituency
+    from app.db.models.mp import MP
+
+    results = (
+        db.query(
+            Suggestion,
+            Constituency.state,
+            Constituency.name.label("constituency_name"),
+            MP.name.label("mp_name"),
+        )
+        .outerjoin(Constituency, Suggestion.constituency_id == Constituency.id)
+        .outerjoin(MP, Constituency.id == MP.constituency_id)
+        .filter(Suggestion.latitude.isnot(None), Suggestion.longitude.isnot(None))
+        .order_by(Suggestion.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    output = []
+    for sug, state, city, mp in results:
+        output.append({
+            "id": sug.id,
+            "latitude": float(sug.latitude) if sug.latitude is not None else None,
+            "longitude": float(sug.longitude) if sug.longitude is not None else None,
+            "category": sug.category,
+            "priority_score": sug.priority_score,
+            "status": sug.status,
+            "sentiment": sug.sentiment,
+            "content": sug.content,
+            "english_translation": sug.english_translation,
+            "image_url": sug.image_url,
+            "constituency_id": sug.constituency_id,
+            "created_at": sug.created_at,
+            "state": state or "Unknown State",
+            "city": city or "Unknown Constituency",
+            "mp": mp or "No Representative"
+        })
+    return output
 
 
 @router.get("/{id}", response_model=SuggestionOut)
@@ -218,5 +256,66 @@ def transcribe_audio_endpoint(
     Useful for displaying live translation previews before submission.
     """
     return service.transcribe_audio_preview(audio)
+
+
+@router.post("/sync", response_model=List[SuggestionSyncOut])
+def sync_suggestions_endpoint(
+    payload: List[SuggestionSyncIn],
+    service: SuggestionService = Depends(deps.get_suggestion_service),
+) -> Any:
+    """
+    Bulk import offline suggestion entries from mobile app cache queue.
+    Idempotent logic prevents duplicate logs on connection retries.
+    """
+    payload_dicts = [item.model_dump() for item in payload]
+    return service.sync_suggestions(payload_dicts)
+
+
+@router.post("/sms/intake")
+def sms_intake_webhook(
+    From: str = Form(...),
+    Body: str = Form(...),
+    service: SuggestionService = Depends(deps.get_suggestion_service),
+) -> Any:
+    """
+    Intake SMS reports from telecom gateways.
+    Parses format: REPORT [Category] [Description] or raw text content.
+    Returns lightweight confirmation text back to the gateway.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    text = Body.strip()
+    category = "General"
+    content = text
+
+    # Parse potential keyword prefix: 'REPORT <category> <description>'
+    if text.upper().startswith("REPORT"):
+        parts = text.split(None, 2)
+        if len(parts) >= 3:
+            # e.g. REPORT Water Pipe broken -> parts = ['REPORT', 'Water', 'Pipe broken']
+            category_candidate = parts[1].strip()
+            known_categories = {"Water", "Roads", "Education", "Health", "Sanitation", "Public Spaces", "Electricity", "Safety"}
+            matching_cat = next((c for c in known_categories if c.lower() == category_candidate.lower()), None)
+            if matching_cat:
+                category = matching_cat
+                content = parts[2].strip()
+            else:
+                content = text[7:].strip()
+        elif len(parts) == 2:
+            content = parts[1].strip()
+
+    try:
+        suggestion = service.create_suggestion(
+            content=content,
+            citizen_phone=From,
+            language_code="en",
+        )
+        short_id = suggestion.id[:8].upper()
+        return f"Civic Pulse: Thank you! Report registered. ID: {short_id}. Category: {suggestion.category}."
+    except Exception as e:
+        logger.error(f"[SMS Webhook] Failed to register suggestion: {e}")
+        return "Civic Pulse: Error registering complaint. Please try again later."
+
 
 

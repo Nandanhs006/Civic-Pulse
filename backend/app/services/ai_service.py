@@ -135,7 +135,8 @@ class AIService:
                     )
 
                     response = self.model.generate_content(
-                        [{"mime_type": mime_type, "data": audio_bytes}, prompt]
+                        [{"mime_type": mime_type, "data": audio_bytes}, prompt],
+                        request_options={"timeout": 5.0}
                     )
 
                     cleaned_text = response.text.strip()
@@ -196,8 +197,15 @@ class AIService:
             },
         ]
 
-        # Pick one randomly or construct a basic fallback
-        return random.choice(mock_transcripts)
+        # Return a consistent water supply complaint to align with the presentation scenario
+        return {
+            "raw_text": "There is no water supply in our street for 3 days.",
+            "language_code": "en",
+            "english_translation": "There is no water supply in our street for 3 days.",
+            "category": "Water",
+            "sentiment": "Negative",
+            "priority_score": 85,
+        }
 
     # ─────────────────────────────────────────────────────────────────────────
     # MODULE 3: Gemini Vision — Photo Analysis
@@ -262,7 +270,8 @@ class AIService:
             )
 
             response = self.model.generate_content(
-                [{"mime_type": mime_type, "data": image_bytes}, prompt]
+                [{"mime_type": mime_type, "data": image_bytes}, prompt],
+                request_options={"timeout": 5.0}
             )
 
             cleaned = response.text.strip()
@@ -372,7 +381,10 @@ class AIService:
                     f"4. Urgency priority score (1-100 based on danger, public impact, safety risks). "
                     f"Output strictly a JSON block with keys: 'english_translation', 'category', 'sentiment', 'priority_score'."
                 )
-                response = self.model.generate_content(prompt)
+                response = self.model.generate_content(
+                    prompt,
+                    request_options={"timeout": 5.0}
+                )
                 cleaned_text = response.text.strip()
                 if cleaned_text.startswith("```json"):
                     cleaned_text = cleaned_text[7:]
