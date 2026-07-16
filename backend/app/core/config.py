@@ -84,7 +84,19 @@ class Settings(BaseSettings):
 
     # AI Mock Config
     MOCK_AI_PIPELINE: bool = True
+    # Legacy single key (a comma-separated list is also accepted here).
     GEMINI_API_KEY: str | None = None
+    # ── Gemini key pool + model fallback (beats free-tier rate limits) ────────
+    # Add as MANY keys as you like (comma or newline separated). Requests
+    # round-robin across them and a key that hits 429/quota is skipped for a
+    # cooldown, so calls keep succeeding. Merged with GEMINI_API_KEY above.
+    GEMINI_API_KEYS: str | None = os.getenv("GEMINI_API_KEYS")
+    # Ordered model fallback: if every key is exhausted on one model, the next
+    # model is tried (separate quota). Override to taste.
+    GEMINI_MODELS: str = os.getenv(
+        "GEMINI_MODELS",
+        "gemini-flash-latest,gemini-2.0-flash,gemini-2.0-flash-lite,gemini-1.5-flash",
+    )
     UPLOAD_DIR: str = "uploads"
 
     # ── GCP / Vertex AI (Module 1: Vertex Agent) ─────────────────────────────

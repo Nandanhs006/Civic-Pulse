@@ -42,27 +42,23 @@ class AIService:
     SENTIMENTS = ["Positive", "Neutral", "Negative"]
 
     def __init__(self):
-        self.api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY")
-        self.api_keys = [k.strip() for k in self.api_key.split(",") if k.strip()] if self.api_key else []
-        self.use_gemini = False
-        self.model = None
+        # ── Gemini (primary AI) — shared key/model pool with rotation ─────────
+        from app.services.gemini_client import gemini
 
-        # ── Gemini (primary AI — GEMINI_API_KEY) ──────────────────────────────
-        if self.api_keys and not settings.MOCK_AI_PIPELINE:
-            try:
-                genai.configure(api_key=self.api_keys[0])
-                self.model = genai.GenerativeModel("gemini-flash-latest")
-                self.use_gemini = True
-                logger.info(f"[AI] Gemini Flash configured successfully with {len(self.api_keys)} key(s).")
-            except Exception as e:
-                logger.warning(
-                    f"[AI] Failed to configure Gemini client: {e}. Falling back to mock NLP."
-                )
+        self._pool = gemini
+        self.api_keys = gemini.keys
+        self.use_gemini = gemini.enabled
+        self.model = None  # models are chosen per-call by the pool
+
+        if self.use_gemini:
+            logger.info(
+                "[AI] Gemini active over %d key(s); model fallback: %s",
+                len(self.api_keys), ", ".join(gemini.models),
+            )
+        elif settings.MOCK_AI_PIPELINE:
+            logger.info("[AI] Running with local mock NLP (MOCK_AI_PIPELINE is True).")
         else:
-            if settings.MOCK_AI_PIPELINE:
-                logger.info("[AI] Running with local mock NLP (MOCK_AI_PIPELINE is True).")
-            else:
-                logger.info("[AI] GEMINI_API_KEY not found. Running with local mock NLP.")
+            logger.info("[AI] No Gemini keys found. Running with local mock NLP.")
 
         # ── Vertex AI Agent (pitch-ready — requires GOOGLE_APPLICATION_CREDENTIALS) ─
         self.use_vertex = False
@@ -89,22 +85,15 @@ class AIService:
 
 
     def _generate_content_with_rotation(self, *args, **kwargs):
-        """Runs generate_content across the list of api_keys, rotating key if failed."""
-        if not self.api_keys:
-            raise ValueError("[AI] No Gemini API keys configured.")
+        """generate_content across the shared key AND model pool.
 
-        last_err = None
-        for idx, key in enumerate(self.api_keys):
-            try:
-                genai.configure(api_key=key)
-                self.model = genai.GenerativeModel("gemini-flash-latest")
-                return self.model.generate_content(*args, **kwargs)
-            except Exception as e:
-                logger.warning(
-                    f"[AI] generate_content failed using key index {idx}: {e}. Trying next key..."
-                )
-                last_err = e
-        raise last_err
+        Rotates to the next API key on a 429/quota error (round-robin, with a
+        cooldown on exhausted keys) and falls back through GEMINI_MODELS if every
+        key is rate-limited on a model — so a call still returns under load.
+        """
+        from app.services.gemini_client import gemini
+
+        return gemini.generate(*args, **kwargs)
 
 
     def transcribe_audio(self, file_path: str) -> Dict[str, Any]:

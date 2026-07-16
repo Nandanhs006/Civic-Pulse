@@ -458,6 +458,19 @@ def health_check():
     return {"status": "healthy"}
 
 
+@app.get(f"{settings.API_V1_STR}/ai/status", tags=["Debug"])
+def ai_status():
+    """Gemini key-pool health (no keys exposed).
+
+    Shows how many API keys are loaded, how many are currently cooling down after
+    a rate-limit, the model fallback chain, and the last error — so you can tell
+    at a glance whether to add more keys.
+    """
+    from app.services.gemini_client import gemini
+
+    return gemini.status()
+
+
 # Serve the built frontend (single-service deploys, e.g. Render/Cloud Run) when a
 # compiled bundle is present. Dev/CI have no bundle, so the JSON root is kept.
 _FRONTEND_DIST = os.path.join(

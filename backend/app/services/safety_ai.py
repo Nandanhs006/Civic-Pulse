@@ -33,21 +33,23 @@ def _is_night(hour: int) -> bool:
 
 
 def _llm_distress(note: Optional[str]) -> Optional[int]:
-    """Best-effort Gemini distress rating 0-15; None unless a key is configured."""
-    if not note or settings.MOCK_AI_PIPELINE or not settings.GEMINI_API_KEY:
+    """Best-effort Gemini distress rating 0-15; None unless keys are configured.
+
+    Uses the shared key/model pool so a rate-limited key rotates instead of
+    silently degrading the triage.
+    """
+    from app.services.gemini_client import gemini
+
+    if not note or not gemini.enabled:
         return None
     try:
-        import google.generativeai as genai  # type: ignore
-
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-flash-latest")
         prompt = (
             "On a 0-15 scale, how strongly does this message indicate a REAL "
             "personal-safety emergency (0 = none, 15 = severe)? Reply with only "
             "the number.\nMessage: " + note[:400]
         )
-        resp = model.generate_content(prompt)
-        digits = "".join(ch for ch in (resp.text or "") if ch.isdigit())[:2]
+        text = gemini.generate_text(prompt)
+        digits = "".join(ch for ch in text if ch.isdigit())[:2]
         return max(0, min(15, int(digits or "0")))
     except Exception:  # noqa: BLE001 — never let AI break the SOS path
         return None
