@@ -1,9 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
-import { useLang } from '../context/LanguageContext';
-import { MapContainer, TileLayer, Marker, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, CircleMarker, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet default marker icon path issue in Vite
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
+
+interface MapControllerProps {
+  center: [number, number];
+}
+
+const MapController: React.FC<MapControllerProps> = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
+  return null;
+};
 import {
   Smartphone,
   Wifi,
@@ -17,7 +41,9 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
-  Brain
+  Brain,
+  MapPin,
+  LocateFixed
 } from 'lucide-react';
 import ConstituencyPicker from '../components/common/ConstituencyPicker';
 import { Constituency } from '../types';
@@ -41,12 +67,12 @@ const AppSimulator: React.FC = () => {
   const [constituency, setConstituency] = useState<Constituency | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number }>({ lat: 12.9716, lng: 77.5946 });
+  const [gpsCoords] = useState<{ lat: number; lng: number }>({ lat: 12.9716, lng: 77.5946 });
 
   // Mobile App Navigation & StreetMapper State
   const [mobileTab, setMobileTab] = useState<'report' | 'streetmapper'>('report');
   const [mobFmsContent, setMobFmsContent] = useState('');
-  const [mobFmsPhone, setMobFmsPhone] = useState('9988776655');
+  const [mobFmsPhone] = useState('9988776655');
   const [mobFmsCoords, setMobFmsCoords] = useState<[number, number]>([12.9716, 77.5946]);
   const [mobFmsImages, setMobFmsImages] = useState<File[]>([]);
   const [mobFmsImagePreviews, setMobFmsImagePreviews] = useState<string[]>([]);
@@ -182,8 +208,8 @@ const AppSimulator: React.FC = () => {
 
     // Reset mobile FMS
     setMobFmsContent('');
-    setMobFmsImage(null);
-    setMobFmsImagePreview(null);
+    setMobFmsImages([]);
+    setMobFmsImagePreviews([]);
     setMobMpClassResult(null);
     setMobOtpSent(false);
     setMobOtpVerified(false);
@@ -249,7 +275,7 @@ const AppSimulator: React.FC = () => {
   const handleMobVerifyOtp = () => {
     if (mobOtpInput.trim() === mobOtpCode) {
       setMobOtpVerified(true);
-      alert('✅ Phone verified successfully! Registry unlocked.');
+      alert('✅ Phone verified successfully!');
     } else {
       alert('❌ Invalid verification code.');
     }
@@ -901,8 +927,9 @@ const AppSimulator: React.FC = () => {
 
                   {/* Leaflet map frame */}
                   <div style={{ height: '130px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-card)', position: 'relative' }}>
-                    <MapContainer key={mobFmsCoords.toString()} center={mobFmsCoords} zoom={14} style={{ width: '100%', height: '100%' }}>
+                    <MapContainer center={mobFmsCoords} zoom={14} style={{ width: '100%', height: '100%' }}>
                       <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png" />
+                      <MapController center={mobFmsCoords} />
                       <Marker
                         position={mobFmsCoords}
                         draggable={true}
@@ -919,6 +946,38 @@ const AppSimulator: React.FC = () => {
                         pathOptions={{ color: 'var(--secondary)', fillColor: 'var(--secondary)', fillOpacity: 0.12, weight: 1 }}
                       />
                     </MapContainer>
+
+                    {/* Blue Locate Me Button overlay */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (navigator.geolocation) {
+                          navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                              setMobFmsCoords([position.coords.latitude, position.coords.longitude]);
+                            },
+                            (error) => {
+                              console.warn("Mobile FMS Geolocation error:", error);
+                              alert("Could not fetch GPS location. Please check browser permissions.");
+                            }
+                          );
+                        }
+                      }}
+                      style={{
+                        position: 'absolute', top: '6px', right: '6px', zIndex: 1000,
+                        background: '#2563eb', color: 'white', border: 'none',
+                        borderRadius: '50%', width: '26px', height: '26px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                        transition: 'background-color 0.2s'
+                      }}
+                      title="Locate Me"
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                    >
+                      <LocateFixed size={13} />
+                    </button>
+
                     <div style={{ position: 'absolute', bottom: '4px', left: '4px', background: 'rgba(14,17,24,0.85)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', zIndex: 100, border: '1px solid var(--border-card)' }}>
                       📍 {mobFmsCoords[0].toFixed(4)}, {mobFmsCoords[1].toFixed(4)}
                     </div>
@@ -1042,7 +1101,7 @@ const AppSimulator: React.FC = () => {
 
                     <button
                       type="submit"
-                      disabled={syncing || !mobOtpVerified || !mobFmsImage}
+                      disabled={syncing || !mobOtpVerified || mobFmsImages.length === 0}
                       style={{ border: 'none', background: 'var(--primary)', color: 'white', padding: '8px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '4px' }}
                     >
                       <Send size={12} /> {isOnline ? 'Register Issue' : 'Queue Offline'}

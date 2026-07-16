@@ -2,13 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../services/apiClient';
-import { MapContainer, TileLayer, Popup, Marker, CircleMarker } from 'react-leaflet';
-import { LatLngExpression } from 'leaflet';
-import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X, Image as ImageIcon, Mic, MicOff, Loader2 } from 'lucide-react';
+import { MapContainer, TileLayer, Popup, Marker, CircleMarker, useMapEvents, useMap } from 'react-leaflet';
+import L, { LatLngExpression } from 'leaflet';
+import { ArrowLeft, Brain, ThumbsUp, Sliders, Search, Filter, MapPin, MessageSquare, Send, Activity, PlusCircle, ArrowUpDown, X, Image as ImageIcon, Mic, MicOff, Loader2, LocateFixed } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet default marker icon path issue in Vite
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
 
 const CATEGORIES = [
   "Water",
@@ -223,6 +235,32 @@ const DUMMY_SUGGESTIONS: Suggestion[] = [
 
 const MOCK_SUGGESTIONS: Suggestion[] = [];
 
+interface LocationPickerMapProps {
+  coords: [number, number];
+  setCoords: (coords: [number, number]) => void;
+}
+
+const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ setCoords }) => {
+  useMapEvents({
+    click(e) {
+      setCoords([e.latlng.lat, e.latlng.lng]);
+    }
+  });
+  return null;
+};
+
+interface MapControllerProps {
+  center: [number, number];
+}
+
+const MapController: React.FC<MapControllerProps> = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
+  return null;
+};
+
 interface ParticipateProps {
   activeApp?: 'hub' | 'fixmystreet' | 'decidim' | 'cpgrams' | 'seeclickfix' | 'ushahidi' | 'hotline' | 'ward' | 'citybrain' | 'mailbox';
 }
@@ -250,7 +288,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   // StreetMapper Audio recorder
   const { isRecording, audioBlob, duration, startRecording, stopRecording, deleteRecording } = useAudioRecorder();
   const [fmsTranscribing, setFmsTranscribing] = useState(false);
-  const [fmsTranscription, setFmsTranscription] = useState<string | null>(null);
+  // const [fmsTranscription, setFmsTranscription] = useState<string | null>(null);
   const [fmsAudioUrl, setFmsAudioUrl] = useState<string>('');
 
   useEffect(() => {
@@ -279,8 +317,48 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const [fmsSearchResult, setFmsSearchResult] = useState<any | null>(null);
   const [searchLoading, setSearchLoading] = useState<boolean>(false);
 
-  // 2. Decidim State
-  const [votedProjects, setVotedProjects] = useState<Record<number, boolean>>({});
+  // 2. Decidim State (Upgraded CivicFund)
+  // const [votedProjects, setVotedProjects] = useState<Record<number, boolean>>({});
+  const [projectVotes, setProjectVotes] = useState<Record<number, { up: number; down: number }>>({
+    1: { up: 14, down: 2 },
+    2: { up: 9, down: 0 }
+  });
+  const [projectRanks, setProjectRanks] = useState<Record<number, number>>({
+    1: 1,
+    2: 2
+  });
+  const [allocatedFunds, setAllocatedFunds] = useState<Record<number, number>>({});
+  const [projectArguments, setProjectArguments] = useState<Record<number, Array<{ type: 'pro' | 'con'; text: string; date: string }>>>({
+    1: [
+      { type: 'pro', text: 'Clean water is a fundamental right, this restoration is urgent.', date: '2026-07-15' },
+      { type: 'con', text: 'Cost is a bit high compared to other projects.', date: '2026-07-16' }
+    ],
+    2: [
+      { type: 'pro', text: 'This road has caused multiple minor accidents. Needs immediate tarring!', date: '2026-07-15' }
+    ]
+  });
+
+  const [surveys, setSurveys] = useState<Array<{ id: number; rating: number; priorityRepresented: string; feedbackText: string; date: string }>>([
+    { id: 1, rating: 5, priorityRepresented: 'Yes', feedbackText: 'The budget allocation is very transparent. I like being able to vote.', date: '2026-07-15' }
+  ]);
+  const [surveyRating, setSurveyRating] = useState<number>(0);
+  const [surveyPriority, setSurveyPriority] = useState<string>('Yes');
+  const [surveyFeedback, setSurveyFeedback] = useState<string>('');
+
+  const [decidimTab, setDecidimTab] = useState<'proposals' | 'budgeting' | 'surveys'>('proposals');
+
+  // Submit Proposal Form State
+  const [showProposalForm, setShowProposalForm] = useState<boolean>(false);
+  const [newPropTitle, setNewPropTitle] = useState('');
+  const [newPropDesc, setNewPropDesc] = useState('');
+  const [newPropCost, setNewPropCost] = useState('');
+  const [newPropCategory, setNewPropCategory] = useState('General');
+  const [newPropCoords, setNewPropCoords] = useState<[number, number]>([12.9716, 77.5946]);
+  const [newPropImage, setNewPropImage] = useState<File | null>(null);
+  const [newPropImagePreview, setNewPropImagePreview] = useState<string | null>(null);
+  const [newPropArgText, setNewPropArgText] = useState<Record<number, string>>({});
+  // const [newPropArgType, setNewPropArgType] = useState<Record<number, 'pro' | 'con'>>({});
+
 
   // 3. CPGRAMS State
   const [cpgText, setCpgText] = useState('');
@@ -665,7 +743,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
   const handleVerifyOtp = () => {
     if (otpInput.trim() === otpCode) {
       setOtpVerified(true);
-      alert('✅ Phone verified successfully! Grievance Registry unlocked.');
+      alert('✅ Phone verified successfully!');
     } else {
       alert('❌ Invalid verification code. Please try again.');
     }
@@ -758,19 +836,144 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
     }
   };
 
-  // 2. Decidim Project Upvote
+  // 2. Decidim Upgraded Handlers
   const handleDecidimUpvote = (projectId: number) => {
-    if (votedProjects[projectId]) return;
-    setVotedProjects(prev => ({ ...prev, [projectId]: true }));
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return { ...p, supporting_suggestions_count: p.supporting_suggestions_count + 1 };
-      }
-      return p;
-    }));
-    setSyncMsg('Vote recorded! Project prioritization weighting updated.');
+    setProjectVotes(prev => {
+      const votes = prev[projectId] || { up: 0, down: 0 };
+      const nextVotes = { ...votes, up: votes.up + 1 };
+      
+      // Auto-update project's priority suggestions count
+      setProjects(pList => pList.map(p => {
+        if (p.id === projectId) {
+          return { ...p, supporting_suggestions_count: nextVotes.up };
+        }
+        return p;
+      }));
+
+      return { ...prev, [projectId]: nextVotes };
+    });
+    setSyncMsg('Supporting vote recorded! Priority metrics updated.');
     setTimeout(() => setSyncMsg(''), 3000);
   };
+
+  const handleDecidimDownvote = (projectId: number) => {
+    setProjectVotes(prev => {
+      const votes = prev[projectId] || { up: 0, down: 0 };
+      return { ...prev, [projectId]: { ...votes, down: votes.down + 1 } };
+    });
+    setSyncMsg('Opposing vote recorded.');
+    setTimeout(() => setSyncMsg(''), 3000);
+  };
+
+  const handleDecidimRankChange = (projectId: number, rank: number) => {
+    setProjectRanks(prev => ({ ...prev, [projectId]: rank }));
+    setSyncMsg(`Project priority rank updated to #${rank}.`);
+    setTimeout(() => setSyncMsg(''), 3000);
+  };
+
+  const handleAddProjectArgument = (projectId: number, e: React.FormEvent) => {
+    e.preventDefault();
+    const text = newPropArgText[projectId]?.trim();
+    if (!text) return;
+
+    // Simulated AI classifier deciding if the argument is Pro or Con
+    const lower = text.toLowerCase();
+    const conKeywords = [
+      'expensive', 'waste', 'against', 'high', 'cost', 'no', 'bad', 'unnecessary', 
+      'delay', 'poor', 'not', 'disagree', 'critique', 'criticism', 'object', 'oppose',
+      'wasteful', 'overpriced', 'dislike', 'avoid'
+    ];
+    const isCon = conKeywords.some(keyword => lower.includes(keyword));
+    const type = isCon ? 'con' : 'pro';
+
+    setProjectArguments(prev => {
+      const current = prev[projectId] || [];
+      return {
+        ...prev,
+        [projectId]: [
+          ...current,
+          { type, text, date: new Date().toISOString().split('T')[0] }
+        ]
+      };
+    });
+
+    setNewPropArgText(prev => ({ ...prev, [projectId]: '' }));
+    setSyncMsg(`🤖 AI classified argument as [${type.toUpperCase()}] and posted.`);
+    setTimeout(() => setSyncMsg(''), 4000);
+  };
+
+  const handleProposalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPropTitle.trim() || !newPropDesc.trim() || !newPropCost) {
+      alert('Please fill in all required fields.');
+      return;
+    }
+
+    const newProject: ProposedProject = {
+      id: Date.now(),
+      title: newPropTitle,
+      description: newPropDesc,
+      category: newPropCategory,
+      estimated_cost: Number(newPropCost),
+      priority_score: 50,
+      supporting_suggestions_count: 0,
+      status: 'Proposed'
+    };
+
+    setProjects(prev => [newProject, ...prev]);
+    
+    // Add default initial arguments
+    setProjectArguments(prev => ({
+      ...prev,
+      [newProject.id]: []
+    }));
+
+    // Reset Form
+    setNewPropTitle('');
+    setNewPropDesc('');
+    setNewPropCost('');
+    setNewPropCategory('General');
+    setNewPropImage(null);
+    setNewPropImagePreview(null);
+    setShowProposalForm(false);
+
+    setSyncMsg('✅ Proposal submitted successfully with coordinates and attachments!');
+    setTimeout(() => setSyncMsg(''), 4000);
+  };
+
+
+  const handleSurveySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (surveyRating === 0) {
+      alert('Please select a star rating.');
+      return;
+    }
+
+    const newSurvey = {
+      id: Date.now(),
+      rating: surveyRating,
+      priorityRepresented: surveyPriority,
+      feedbackText: surveyFeedback,
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    setSurveys(prev => [newSurvey, ...prev]);
+    setSurveyRating(0);
+    setSurveyPriority('Yes');
+    setSurveyFeedback('');
+
+    setSyncMsg('✅ Thank you for your feedback! Survey response recorded.');
+    setTimeout(() => setSyncMsg(''), 3000);
+  };
+
+  const handleProposalImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setNewPropImage(file);
+      setNewPropImagePreview(URL.createObjectURL(file));
+    }
+  };
+
 
   // 3. CPGRAMS AI Grievance Classification
   const handleCpgAnalyze = async (e: React.FormEvent) => {
@@ -1037,6 +1240,7 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
             <div className="glass-panel" style={{ height: isMobile ? '320px' : '480px', padding: 0, position: 'relative', overflow: 'hidden' }}>
               <MapContainer center={MAP_CENTER} zoom={14} style={{ width: '100%', height: '100%' }}>
                 <TileLayer key={theme} url={tileUrl} />
+                <MapController center={fmsCoords} />
                 <Marker
                   position={fmsCoords}
                   draggable={true}
@@ -1058,6 +1262,38 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
                   }}
                 />
               </MapContainer>
+
+              {/* Blue Locate Me Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        setFmsCoords([position.coords.latitude, position.coords.longitude]);
+                      },
+                      (error) => {
+                        console.warn("FMS Geolocation error:", error);
+                        alert("Could not fetch GPS location. Please check browser permissions.");
+                      }
+                    );
+                  }
+                }}
+                style={{
+                  position: 'absolute', top: '12px', right: '12px', zIndex: 1000,
+                  background: '#2563eb', color: 'white', border: 'none',
+                  borderRadius: '50%', width: '36px', height: '36px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  transition: 'background-color 0.2s'
+                }}
+                title="Locate Me"
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+              >
+                <LocateFixed size={18} />
+              </button>
+
               <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', zIndex: 100, border: '1px solid var(--border-card)' }}>
                 📍 Coordinates: {fmsCoords[0].toFixed(5)}, {fmsCoords[1].toFixed(5)} <span style={{ color: 'var(--secondary)', marginLeft: '4px' }}>(Draggable Pin)</span>
               </div>
@@ -1328,48 +1564,462 @@ const Participate: React.FC<ParticipateProps> = ({ activeApp = 'hub' }) => {
       {/* ========================================================= */}
       {activeApp === 'decidim' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <ArrowLeft size={16} /> Back to Hub
-          </button>
-
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>CivicFund Participatory Budgeting</h2>
-            <p style={{ margin: '0 0 24px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-              Support development projects proposed for your constituency. Upvotes affect the prioritization scoring metric directly.
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
-              {projects.map(project => (
-                <div key={project.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{project.category}</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700 }}>Est: ₹{project.estimated_cost.toLocaleString()}</span>
-                  </div>
-
-                  <div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '15px' }}>{project.title}</h4>
-                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                      {project.description}
-                    </p>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <ThumbsUp size={14} /> {project.supporting_suggestions_count} Supporters
-                    </span>
-                    <button
-                      onClick={() => handleDecidimUpvote(project.id)}
-                      className={`btn ${votedProjects[project.id] ? 'btn-secondary' : 'btn-primary'}`}
-                      style={{ padding: '6px 16px', fontSize: '12px' }}
-                      disabled={votedProjects[project.id]}
-                    >
-                      {votedProjects[project.id] ? 'Supported' : 'Support Proposal'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button onClick={() => navigate('/participate')} className="btn btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ArrowLeft size={16} /> Back to Hub
+            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setDecidimTab('proposals')}
+                className={`btn ${decidimTab === 'proposals' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '6px 14px', fontSize: '12px' }}
+              >
+                🗳️ Proposals & Voting
+              </button>
+              <button
+                onClick={() => setDecidimTab('budgeting')}
+                className={`btn ${decidimTab === 'budgeting' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '6px 14px', fontSize: '12px' }}
+              >
+                📊 Budget & Revenues
+              </button>
+              <button
+                onClick={() => setDecidimTab('surveys')}
+                className={`btn ${decidimTab === 'surveys' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '6px 14px', fontSize: '12px' }}
+              >
+                📋 Feedback Surveys
+              </button>
             </div>
           </div>
+
+          {/* ==================== TAB 1: PROPOSALS & VOTING ==================== */}
+          {decidimTab === 'proposals' && (
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h2 style={{ margin: '0 0 4px 0', fontSize: '20px' }}>CivicFund Public Proposals</h2>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                    Submit developmental suggestions, upvote/downvote community requests, rank priority orders, and contribute arguments.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => setShowProposalForm(!showProposalForm)}
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '8px 14px' }}
+                  >
+                    <PlusCircle size={15} /> {showProposalForm ? 'Close Form' : 'Submit Proposal'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Ingestion proposal form */}
+              {showProposalForm && (
+                <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.02)' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Create New CivicFund Proposal</h3>
+                  <form onSubmit={handleProposalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 600 }}>PROPOSAL TITLE</label>
+                        <input
+                          type="text"
+                          value={newPropTitle}
+                          onChange={(e) => setNewPropTitle(e.target.value)}
+                          placeholder="E.g., Solar lights installation in Sector C..."
+                          style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '6px', fontSize: '13px' }}
+                          required
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 600 }}>ESTIMATED COST (₹)</label>
+                        <input
+                          type="number"
+                          value={newPropCost}
+                          onChange={(e) => setNewPropCost(e.target.value)}
+                          placeholder="e.g. 150000"
+                          style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '6px', fontSize: '13px' }}
+                          required
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 600 }}>CATEGORY</label>
+                        <select
+                          value={newPropCategory}
+                          onChange={(e) => setNewPropCategory(e.target.value)}
+                          style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '6px', fontSize: '13px' }}
+                        >
+                          <option value="General">General</option>
+                          <option value="Water">Water</option>
+                          <option value="Roads">Roads</option>
+                          <option value="Sanitation">Sanitation</option>
+                          <option value="Public Spaces">Public Spaces</option>
+                          <option value="Electricity">Electricity</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600 }}>DESCRIPTION</label>
+                      <textarea
+                        rows={2}
+                        value={newPropDesc}
+                        onChange={(e) => setNewPropDesc(e.target.value)}
+                        placeholder="Detail the scope of work and community benefits..."
+                        style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '8px 10px', borderRadius: '6px', fontSize: '13px' }}
+                        required
+                      />
+                    </div>
+
+                    {/* Geolocation & Attachment Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 600 }}>📍 GEOLOCATION PICKER (Tap map to pin coordinates)</label>
+                        <div style={{ height: '140px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border-card)' }}>
+                          <MapContainer center={MAP_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
+                            <TileLayer key={theme} url={tileUrl} />
+                            <Marker position={newPropCoords} />
+                            <LocationPickerMap coords={newPropCoords} setCoords={setNewPropCoords} />
+                          </MapContainer>
+                        </div>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Pinned Coords: {newPropCoords[0].toFixed(5)}, {newPropCoords[1].toFixed(5)}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 600 }}>📎 ATTACH PROJECT DESIGN DOCUMENT / EVIDENCE</label>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={handleProposalImageChange}
+                          style={{ background: 'var(--overlay-faint)', border: '1px solid var(--border-card)', padding: '6px 10px', borderRadius: '6px', fontSize: '12px' }}
+                        />
+                        {newPropImagePreview && (
+                          <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <img src={newPropImagePreview} alt="attachment preview" style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{newPropImage?.name} Attached</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '13px', width: 'fit-content', alignSelf: 'flex-end', marginTop: '4px' }}>
+                      Submit Proposal & Pin Coordinates
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* Proposals board grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
+                {projects.map(project => {
+                  const votes = projectVotes[project.id] || { up: 0, down: 0 };
+                  const score = votes.up - votes.down;
+                  const rank = projectRanks[project.id] || 5;
+                  const args = projectArguments[project.id] || [];
+
+                  // Approval workflows tags logic
+                  const meetsThreshold = project.supporting_suggestions_count >= 5;
+                  const isGoodToMove = score >= 10;
+                  const isLowPriority = score < -3;
+
+                  return (
+                    <div key={project.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', border: '1px solid var(--border-card)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                        <span className="badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{project.category}</span>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {meetsThreshold && <span className="badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>Meets Threshold</span>}
+                          {isGoodToMove && <span className="badge" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', fontWeight: 700 }}>👍 Good To Move</span>}
+                          {isLowPriority && <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}> Do Not Prioritize</span>}
+                          {!isGoodToMove && !isLowPriority && <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>Under Review</span>}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{project.title}</span>
+                          <span style={{ color: 'var(--secondary)' }}>Rank #{rank}</span>
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                          {project.description}
+                        </p>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', marginTop: '8px' }}>
+                          Estimated Cost: ₹{project.estimated_cost.toLocaleString()}
+                        </div>
+                      </div>
+
+                      {/* Voting and Priority Selection Controls */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid var(--overlay-faint)', paddingTop: '10px' }}>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => handleDecidimUpvote(project.id)}
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            🔼 For ({votes.up})
+                          </button>
+                          <button
+                            onClick={() => handleDecidimDownvote(project.id)}
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            🔽 Against ({votes.down})
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Priority:</span>
+                          <select
+                            value={rank}
+                            onChange={(e) => handleDecidimRankChange(project.id, Number(e.target.value))}
+                            style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '2px 4px', borderRadius: '4px', fontSize: '11px' }}
+                          >
+                            <option value={1}>Rank 1</option>
+                            <option value={2}>Rank 2</option>
+                            <option value={3}>Rank 3</option>
+                            <option value={4}>Rank 4</option>
+                            <option value={5}>Rank 5</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Public Arguments Widget (Pro/Con comments) */}
+                      <div style={{ borderTop: '1px solid var(--overlay-faint)', paddingTop: '10px' }}>
+                        <h5 style={{ margin: '0 0 6px 0', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Public Argument Board</h5>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '100px', overflowY: 'auto', marginBottom: '8px', paddingRight: '4px' }}>
+                          {args.length === 0 ? (
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No community arguments posted yet.</span>
+                          ) : (
+                            args.map((a, index) => (
+                              <div key={index} style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', background: a.type === 'pro' ? 'rgba(34,197,94,0.05)' : 'rgba(239,68,68,0.05)', border: a.type === 'pro' ? '1px solid rgba(34,197,94,0.1)' : '1px solid rgba(239,68,68,0.1)' }}>
+                                <strong style={{ color: a.type === 'pro' ? '#22c55e' : '#ef4444', marginRight: '4px' }}>[{a.type.toUpperCase()}]</strong>
+                                <span style={{ color: 'var(--text-main)' }}>{a.text}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Argument Submission */}
+                        <form onSubmit={(e) => handleAddProjectArgument(project.id, e)} style={{ display: 'flex', gap: '6px' }}>
+                          <input
+                            type="text"
+                            value={newPropArgText[project.id] || ''}
+                            onChange={(e) => setNewPropArgText(prev => ({ ...prev, [project.id]: e.target.value }))}
+                            placeholder="Add argument..."
+                            style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', flex: 1 }}
+                            required
+                          />
+                          <button type="submit" className="btn btn-primary" style={{ padding: '2px 8px', fontSize: '10px' }}>
+                            Add
+                          </button>
+                        </form>
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ==================== TAB 2: BUDGET ALLOCATION ==================== */}
+          {decidimTab === 'budgeting' && (() => {
+            const totalAllocated = Object.entries(allocatedFunds).reduce((acc, [_, val]) => acc + val, 0);
+            const remainingBudget = 2000000 - totalAllocated;
+            const isOverBudget = remainingBudget < 0;
+
+            return (
+              <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div>
+                  <h2 style={{ margin: '0 0 4px 0', fontSize: '20px' }}>CivicFund Revenues & Participatory Budget Allocation</h2>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                    Distribute the allocated ward revenues pool of **₹2,000,000** (20 Lakhs) across proposals. Toggle allocations to stay within boundary limits.
+                  </p>
+                </div>
+
+                {/* Allocation stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '16px', borderBottom: '1px solid var(--border-card)', paddingBottom: '20px' }}>
+                  <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>TOTAL REVENUE POOL</span>
+                    <strong style={{ fontSize: '18px', color: 'var(--text-main)', marginTop: '4px' }}>₹2,000,000</strong>
+                  </div>
+                  <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>TOTAL ALLOCATED FUNDS</span>
+                    <strong style={{ fontSize: '18px', color: isOverBudget ? '#ef4444' : '#22c55e', marginTop: '4px' }}>₹{totalAllocated.toLocaleString()}</strong>
+                  </div>
+                  <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>REMAINING BUDGET POOL</span>
+                    <strong style={{ fontSize: '18px', color: isOverBudget ? '#ef4444' : 'var(--secondary)', marginTop: '4px' }}>₹{remainingBudget.toLocaleString()}</strong>
+                  </div>
+                </div>
+
+                {/* Progress bar visualizer */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '6px' }}>
+                    <span>Budget Allocation Bar</span>
+                    <span style={{ fontWeight: 700 }}>{((totalAllocated / 2000000) * 100).toFixed(1)}% Used</span>
+                  </div>
+                  <div style={{ height: '14px', background: 'var(--overlay-med)', borderRadius: '7px', overflow: 'hidden', border: '1px solid var(--border-card)' }}>
+                    <div style={{
+                      width: `${Math.min((totalAllocated / 2000000) * 100, 100)}%`,
+                      height: '100%',
+                      background: isOverBudget ? '#ef4444' : '#22c55e',
+                      transition: 'width 0.3s ease, background-color 0.3s'
+                    }} />
+                  </div>
+                  {isOverBudget && (
+                    <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', color: '#ef4444', marginTop: '10px' }}>
+                      ⚠️ <strong>Overbudget Limit exceeded!</strong> Please de-allocate or downscale allocations to save community funds.
+                    </div>
+                  )}
+                </div>
+
+                {/* Allocation spreadsheet */}
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-card)', textAlign: 'left' }}>
+                        <th style={{ padding: '10px' }}>PROPOSAL NAME</th>
+                        <th style={{ padding: '10px' }}>CATEGORY</th>
+                        <th style={{ padding: '10px' }}>ESTIMATED COST</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>ALLOCATE FUNDS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projects.map(p => {
+                        const isAllocated = !!allocatedFunds[p.id];
+                        return (
+                          <tr key={p.id} style={{ borderBottom: '1px solid var(--overlay-faint)' }}>
+                            <td style={{ padding: '12px 10px', fontWeight: 600 }}>{p.title}</td>
+                            <td style={{ padding: '12px 10px' }}>
+                              <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)' }}>{p.category}</span>
+                            </td>
+                            <td style={{ padding: '12px 10px', fontWeight: 700 }}>₹{p.estimated_cost.toLocaleString()}</td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <button
+                                onClick={() => {
+                                  setAllocatedFunds(prev => {
+                                    const next = { ...prev };
+                                    if (next[p.id]) {
+                                      delete next[p.id];
+                                    } else {
+                                      next[p.id] = p.estimated_cost;
+                                    }
+                                    return next;
+                                  });
+                                }}
+                                className={`btn ${isAllocated ? 'btn-danger' : 'btn-primary'}`}
+                                style={{ padding: '4px 12px', fontSize: '11px' }}
+                              >
+                                {isAllocated ? 'De-allocate Cost' : 'Allocate Cost'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
+            );
+          })()}
+
+          {/* ==================== TAB 3: FEEDBACK SURVEYS ==================== */}
+          {decidimTab === 'surveys' && (
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <h2 style={{ margin: '0 0 4px 0', fontSize: '20px' }}>CivicFund Process Feedback Survey</h2>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                  Rate the participatory budgeting allocation process. Help local ward officials optimize community communication streams.
+                </p>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '360px 1fr', gap: '20px', alignItems: 'start' }}>
+                {/* Survey Intake Form */}
+                <div className="glass-panel" style={{ padding: '20px', background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>Intake Survey Form</h3>
+                  <form onSubmit={handleSurveySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600 }}>1. SATISFACTION RATING (1-5 Stars)</label>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setSurveyRating(star)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', padding: 0 }}
+                          >
+                            {star <= surveyRating ? '★' : '☆'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600 }}>2. REPRESENTS COMMUNITY PRIORITIES?</label>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        {['Yes', 'No', 'Somewhat'].map((option) => (
+                          <label key={option} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name="priorityRadio"
+                              checked={surveyPriority === option}
+                              onChange={() => setSurveyPriority(option)}
+                            />
+                            {option}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600 }}>3. DETAILED COMMENTS & CRITIQUES</label>
+                      <textarea
+                        rows={3}
+                        value={surveyFeedback}
+                        onChange={(e) => setSurveyFeedback(e.target.value)}
+                        placeholder="E.g., The water pipe allocation should be larger..."
+                        style={{ background: 'var(--overlay-faint)', color: 'var(--text-main)', border: '1px solid var(--border-card)', padding: '6px 10px', borderRadius: '6px', fontSize: '12px' }}
+                        required
+                      />
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '12px', marginTop: '6px' }}>
+                      Submit Feedback Survey
+                    </button>
+                  </form>
+                </div>
+
+                {/* Submitted Surveys Results */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700 }}>Survey Results Board</h3>
+                  {surveys.length === 0 ? (
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No feedback surveys submitted yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '380px', overflowY: 'auto' }}>
+                      {surveys.map(s => (
+                        <div key={s.id} className="glass-panel" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: 'var(--secondary)' }}>Rating: {'★'.repeat(s.rating)}{'☆'.repeat(5 - s.rating)}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{s.date}</span>
+                          </div>
+                          <div>
+                            <strong>Priority Representation:</strong> {s.priorityRepresented}
+                          </div>
+                          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11px', lineHeight: 1.4 }}>
+                            "{s.feedbackText}"
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
