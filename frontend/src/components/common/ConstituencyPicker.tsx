@@ -33,7 +33,7 @@ const ConstituencyPicker: React.FC<ConstituencyPickerProps> = ({ value, onChange
   useEffect(() => {
     apiClient
       .get<string[]>('/api/v1/constituencies/states')
-      .then((r) => setStates(r.data))
+      .then((r) => setStates(Array.isArray(r.data) ? r.data : []))
       .catch((e) => console.error('Failed to load states', e));
   }, []);
 
@@ -45,7 +45,7 @@ const ConstituencyPicker: React.FC<ConstituencyPickerProps> = ({ value, onChange
     setLoadingC(true);
     apiClient
       .get<Constituency[]>('/api/v1/constituencies/', { params: { state } })
-      .then((r) => setConstituencies(r.data))
+      .then((r) => setConstituencies(Array.isArray(r.data) ? r.data : []))
       .catch((e) => console.error('Failed to load constituencies', e))
       .finally(() => setLoadingC(false));
   }, [state]);

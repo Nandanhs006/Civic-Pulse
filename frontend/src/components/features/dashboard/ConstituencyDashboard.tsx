@@ -3,6 +3,8 @@ import apiClient from '../../../services/apiClient';
 import MapView from './MapView';
 import AnalyticsSummary from './AnalyticsSummary';
 import ProjectPrioritizer from './ProjectPrioritizer';
+import SafetyPanel from './SafetyPanel';
+import MpladsPanel from './MpladsPanel';
 import { Suggestion, ProposedProject, Ward, AnalyticsSummary as SummaryType, AssemblyConstituency, MLA } from '../../../types';
 import Avatar from '../../common/Avatar';
 import { useIsMobile } from '../../../hooks/useIsMobile';
@@ -117,6 +119,11 @@ const ConstituencyDashboard: React.FC<ConstituencyDashboardProps> = ({ constitue
           <MapView suggestions={suggestions} wards={wards} center={center} zoom={zoom} boundary={boundary} />
         </div>
         <AnalyticsSummary summary={summary} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px' }}>
+        <MpladsPanel constituencyId={constituencyId} />
+        <SafetyPanel constituencyId={constituencyId} />
       </div>
 
       <ProjectPrioritizer projects={projects} onRefresh={fetchData} constituencyId={constituencyId} />

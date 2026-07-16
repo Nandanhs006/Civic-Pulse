@@ -243,3 +243,35 @@ class WardOfficerOut(BaseModel):
 class WardDispatchInput(BaseModel):
     suggestion_id: str
     officer_id: int
+
+
+# Women-safety SOS ("amplify + inform" model). Anonymized — no personal data.
+class SosRequest(BaseModel):
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    note: Optional[str] = None
+
+
+class SosResponse(BaseModel):
+    incident_id: Optional[int] = None
+    logged: bool = True  # False when outside the Bengaluru service area
+    emergency_number: str = "112"  # India ERSS / national emergency number
+    constituency: Optional[ConstituencyOut] = None
+    mp: Optional[MPOut] = None
+    message: str
+
+
+class SafetyIncidentPoint(BaseModel):
+    id: int
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    constituency_id: Optional[int] = None
+    hour: Optional[int] = None
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SafetySummary(BaseModel):
+    total: int = 0
+    last_30_days: int = 0
+    by_hour: List[int] = []  # 24 buckets, index = hour of day (local server time)
