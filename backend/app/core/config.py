@@ -44,7 +44,10 @@ class Settings(BaseSettings):
     )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
 
-    # Postgres config
+    # Postgres config. Either set DATABASE_URL to a full connection string (e.g.
+    # Supabase / Neon — persistent, unlike Render's 90-day free DB) OR set the
+    # individual POSTGRES_* vars. DATABASE_URL takes precedence when present.
+    DATABASE_URL_OVERRIDE: str | None = os.getenv("DATABASE_URL")
     POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "localhost")
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
@@ -52,6 +55,12 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> str:
+        if self.DATABASE_URL_OVERRIDE:
+            # SQLAlchemy needs the postgresql:// scheme (Supabase copies as this).
+            url = self.DATABASE_URL_OVERRIDE
+            if url.startswith("postgres://"):
+                url = "postgresql://" + url[len("postgres://"):]
+            return url
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"
 
     # data.gov.in open-data API (CPCB air quality, etc.). Defaults to the public
