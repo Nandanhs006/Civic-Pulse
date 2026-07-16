@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Phone, X, Loader2, KeyRound } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
-import { getFirebaseAuth, isFirebaseConfigured, toE164 } from '../../services/firebase';
+import { getFirebaseAuth, isFirebaseConfigured } from '../../services/firebase';
 
 interface Props {
   open: boolean;
@@ -14,6 +14,9 @@ interface Props {
 
 // Demo code accepted only when Firebase isn't configured (no real SMS).
 const DEMO_CODE = '123456';
+// India-only: the input holds just the 10 local digits; +91 is a fixed prefix.
+const IN_PREFIX = '+91';
+const e164In = (local: string) => IN_PREFIX + local;
 
 const PhoneAuthModal: React.FC<Props> = ({ open, onClose, onSuccess, title, reason }) => {
   const { login } = useAuth();
@@ -41,8 +44,8 @@ const PhoneAuthModal: React.FC<Props> = ({ open, onClose, onSuccess, title, reas
 
   const sendOtp = async () => {
     setError(null);
-    const e164 = toE164(phone);
-    if (!/^\+\d{8,15}$/.test(e164)) { setError('Enter a valid mobile number.'); return; }
+    if (!/^\d{10}$/.test(phone)) { setError('Enter a valid 10-digit Indian mobile number.'); return; }
+    const e164 = e164In(phone);
     setBusy(true);
     try {
       const auth = getFirebaseAuth();
@@ -76,7 +79,7 @@ const PhoneAuthModal: React.FC<Props> = ({ open, onClose, onSuccess, title, reas
       } else {
         // demo/mock mode
         if (code !== DEMO_CODE) { setError(`Demo code is ${DEMO_CODE}.`); setBusy(false); return; }
-        idToken = `mock:${toE164(phone)}`;
+        idToken = `mock:${e164In(phone)}`;
       }
       const res = await apiClient.post('/api/v1/auth/phone/login', {
         id_token: idToken,
@@ -127,10 +130,20 @@ const PhoneAuthModal: React.FC<Props> = ({ open, onClose, onSuccess, title, reas
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>MOBILE NUMBER</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="glass-input" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px' }}>
                 <Phone size={16} color="var(--text-muted)" />
-                <input className="glass-input" style={{ flex: 1 }} type="tel" inputMode="numeric"
-                  value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" />
+                {/* Fixed, non-erasable India country code */}
+                <span style={{ fontWeight: 600, color: 'var(--text-main)', userSelect: 'none' }}>+91</span>
+                <span style={{ width: 1, height: 20, background: 'var(--border-card)' }} />
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="98765 43210"
+                  style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-main)', fontSize: 15, letterSpacing: 1, padding: '12px 0' }}
+                />
               </div>
             </div>
             {error && <span style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</span>}
@@ -149,7 +162,7 @@ const PhoneAuthModal: React.FC<Props> = ({ open, onClose, onSuccess, title, reas
         {step === 'otp' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              Enter the code sent to <strong style={{ color: 'var(--text-main)' }}>{toE164(phone)}</strong>.
+              Enter the code sent to <strong style={{ color: 'var(--text-main)' }}>{e164In(phone)}</strong>.
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <KeyRound size={16} color="var(--text-muted)" />
