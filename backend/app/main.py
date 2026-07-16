@@ -34,6 +34,41 @@ from app.middleware.timeout import TimeoutMiddleware
 # Create database tables directly if running without Alembic
 Base.metadata.create_all(bind=engine)
 
+
+def _run_lightweight_migrations() -> None:
+    """Add columns that post-date the original tables.
+
+    ``create_all`` only CREATES missing tables — it never ALTERs an existing
+    one. On a persistent DB (e.g. Render Postgres) a table created by an older
+    deploy is missing newer columns, so every ``SELECT *`` over that model 500s.
+    These idempotent ALTERs make each boot self-healing. Postgres supports
+    ``ADD COLUMN IF NOT EXISTS``; on SQLite it raises and is safely skipped
+    (fresh SQLite already has the column via create_all).
+    """
+    from sqlalchemy import text
+
+    alters = [
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS department VARCHAR(80)",
+        # Defensive: columns added after the original suggestions table. Harmless
+        # if already present (IF NOT EXISTS) — keeps SELECT * over the model working
+        # on any age of persisted DB.
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS ai_confidence DOUBLE PRECISION",
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS ai_reasoning VARCHAR(500)",
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS image_analysis TEXT",
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS is_duplicate BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS duplicate_of_id VARCHAR(36)",
+        "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS embedding_text TEXT",
+    ]
+    for sql in alters:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(sql))
+        except Exception as exc:  # noqa: BLE001 — never block boot on a migration
+            print(f"[migrate] skipped: {exc.__class__.__name__}")
+
+
+_run_lightweight_migrations()
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="AI-powered constituency mapping and citizen preference prioritization engine.",
