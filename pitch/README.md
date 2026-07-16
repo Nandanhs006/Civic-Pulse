@@ -35,8 +35,7 @@ re-run the local app and the capture script (Chrome headless via puppeteer-core)
 ## Note on demo issue images
 
 Map issue photos are bundled in `frontend/public/issue-images/` and served
-same-origin so they always load. Currently populated: **Water, Roads,
-Electricity, Health, Education, Safety** (6/8). To finish, drop files named
-`<slug>_<n>.jpg` into that folder for the last two categories and list them in
-`backend/app/scripts/seed_demo_issues.py` (`LOCAL_CATEGORY_IMAGES`):
-**sanitation, publicspace**.
+same-origin so they always load. **All 8 categories are populated** (Water,
+Roads, Electricity, Health, Education, Safety, Sanitation, Public Spaces). To
+swap or add more, drop files named `<slug>_<n>.jpg` into that folder and list
+them in `backend/app/scripts/seed_demo_issues.py` (`LOCAL_CATEGORY_IMAGES`).

@@ -120,8 +120,9 @@ LOCAL_CATEGORY_IMAGES = {
     "Water": ["water_1.jpg", "water_2.jpg", "water_3.jpg", "water_4.jpg",
               "water_5.jpg", "water_6.jpg", "water_7.jpg"],
     "Safety": ["safety_1.jpg", "safety_2.jpg", "safety_3.jpg", "safety_4.jpg"],
-    # Still using the Wikimedia fallback until local files are added:
-    # Sanitation / Public Spaces.
+    "Sanitation": ["sanitation_1.jpg", "sanitation_2.jpg", "sanitation_3.jpg",
+                   "sanitation_4.jpg", "sanitation_5.jpg"],
+    "Public Spaces": ["publicspace_1.jpg", "publicspace_2.jpg", "publicspace_3.jpg"],
 }
 
 
